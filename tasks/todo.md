@@ -842,3 +842,21 @@ PiP1, shows beside the dock's PiP2 under Coffin (probe: both visible).
       check that no previous dock frame (or black box) shows at boot; offer
       `DockAwesome --pip-off` early in S:User-Startup for other reboots.
 
+
+## AmiKit and more AmigaOS versions (2026-11-10)
+- [x] AmiKit (DOpus 5 desktop): drops from desktop and listers, selection box,
+      Clock's dot, dragged icon without blinking, clean quit. Branch
+      amikit-dopus, build 367 (2a808c8), not pushed, no release.
+- [x] Build 367 installed in SYS:WBStartup on AmiKit XE, AmigaOS 3.9 and
+      AmigaOS 3.1.4.1; WBDock moved to SYS:WBStartup/Disabled there. Prefs
+      in ENVARC:DockAwesome.json (the WBDock pins on 3.9 and 3.1.4.1).
+- [ ] AmigaOS 3.1 (Kickstart 40): `DockAwesome --caps` hangs. Not installed,
+      WBDock left as is. Find the call that needs V44+ before installing.
+- [ ] Not retested with build 367: ApolloOS, Coffin, AmigaOS 3.2.3.
+- [ ] Illegal instruction (#80000004) reported on 3.2.3 (not a 68080?): safe
+      CPU check at start.
+- [ ] Reports from others on 1.0b2 (ApolloOS): window part kept behind the
+      dock, grey PiP rectangle. Likely no colour key on their core; ask for
+      --caps.
+- [ ] PiP survives ApolloBoot's BOOT:C/Reboot (direct RESET): message to the
+      ApolloBoot author and the Apollo team drafted.
