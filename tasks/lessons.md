@@ -315,3 +315,6 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
 - The drop receiver over the DOpus desktop clipped DOpus's selection box. DOpus
   sets the same window flags for an icon drag and a selection box; tell them
   apart by the drag image around the pointer.
+- Measure before the next guess: a per-frame count of painted drag pixels
+  (all 1561 or 0, never partial) showed whole reads between Directory Opus's
+  erase and redraw, where the "keep half-torn reads" guess had made it worse.

@@ -53,12 +53,20 @@ static int update_drag_mask(App *app, int sample)
             } else app->drag_reference = -1;
         }
         if (app->drag_reference > 0) {
+            /* The drag image moves with the pointer, so a read that finds
+               none mid-drag caught the drag between Directory Opus erasing
+               and redrawing it (half of the reads): the image blinked over
+               the dock. Keep the last image and paint it at the pointer. */
+            int moved = app->drag_mask_live &&
+                (x != app->drag_pointer_x || y != app->drag_pointer_y);
             changed = amiga_display_drag_mask565(app->display,app->source565,app->drag_mask,
                 &app->drag_box,app->left,app->top,left,top,right,bottom,app->renderer.pixels->bytes_equal,
-                app->drag_color);
+                app->drag_color,app->drag_mask_live);
+            if (changed == -2) return moved || reference_changed;
             if (changed >= 0) {
                 app->drag_mask_live = 1;
-                return changed || reference_changed;
+                app->drag_pointer_x = x; app->drag_pointer_y = y;
+                return changed || moved || reference_changed;
             }
         }
     }
@@ -266,19 +274,24 @@ static void pip_mask(void *context, int y, int left, int right, unsigned char *s
    (Workbench draws it after the pointer moves), cutting it at the plate.
    It is painted on the clear parts of the surface too, so the image on the
    surface is one picture: half Workbench's and half ours lagged apart. */
+/* The mask as read, moved by the pointer's travel since. */
 static ULONG paint_drag_image(App *app, unsigned char *buffer, int stride)
 {
     ULONG painted = 0;
-    int y, x;
+    int dx = app->screen->MouseX-app->left-app->drag_pointer_x;
+    int dy = app->screen->MouseY-app->top-app->drag_pointer_y;
+    int visible = pip_visible_width(app), y, x;
     for (y = app->drag_box.top; y < app->drag_box.bottom; ++y) {
         const unsigned char *mask = app->drag_mask+(size_t)y*app->width;
         const unsigned char *color = app->drag_color+(size_t)y*app->width*2;
-        unsigned char *out = buffer+(size_t)y*stride;
+        unsigned char *out;
+        if (y+dy < 0 || y+dy >= app->height) continue;
+        out = buffer+(size_t)(y+dy)*stride;
         for (x = app->drag_box.left; x < app->drag_box.right; ++x)
-            if (mask[x]) {
+            if (mask[x] && x+dx >= 0 && x+dx < visible) {
                 unsigned int v = ((unsigned int)color[x*2]<<8)|color[x*2+1];
                 if (v == 0xf81f) v ^= 0x20; /* never the colour key */
-                out[x*2] = (unsigned char)(v>>8); out[x*2+1] = (unsigned char)v;
+                out[(x+dx)*2] = (unsigned char)(v>>8); out[(x+dx)*2+1] = (unsigned char)v;
                 ++painted;
             }
     }

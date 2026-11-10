@@ -317,6 +317,9 @@ typedef struct App {
     struct Region *shape, *shape_pending;
     unsigned char *source565, *coverage, *drag_mask, *drag_color; /* drag_color: the native drag image (RGB565) where drag_mask is set */
     int drag_reference, drag_mask_live;
+    /* The pointer (PiP coordinates) when the drag mask was last read: the
+       mask is painted moved with the pointer since. */
+    int drag_pointer_x, drag_pointer_y;
     DockRect drag_box; /* bounds every nonzero drag_mask pixel */
     uint64_t front_requested;
     uint64_t settle_started;

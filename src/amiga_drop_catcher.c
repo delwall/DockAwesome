@@ -45,9 +45,8 @@ struct AmigaDropCatcher {
     uint64_t deadline, next_icons, icons_not_before;
     int have_serial, active, waiting, failed;
     /* No shapes: a press on the Directory Opus desktop arms only once the
-       held pointer reaches the zone (the dock's plate), see arm_late. */
+       held drag shows its image on the dock's box, see arm_late. */
     int late;
-    int zone_left, zone_top, zone_right, zone_bottom;
     struct Library *cyber; /* reads pixels for arm_late; NULL arms at once */
     struct RastPort screen_rp, backing_rp;
     volatile int backing_valid;
@@ -299,8 +298,9 @@ static unsigned int arm_for_pointer(AmigaDropCatcher *c)
     return AMIGA_DROP_STARTED;
 }
 
-/* A drag held from the Directory Opus desktop reached the dock's plate:
-   step in now. Directory Opus keeps its drag when the window moves. The
+/* A drag held from the Directory Opus desktop reached the dock's box with
+   its image: step in now (unarmed, PiP hid the image over the zoomed
+   icons). Directory Opus keeps its drag when the window moves. The
    backing was taken at the press: sampled now, it held the selection box
    Directory Opus had drawn, which then stuck in the dock's box (PiP shows
    the window) until the release. */
@@ -333,7 +333,7 @@ static int drag_image_at(AmigaDropCatcher *c, int x, int y)
 static unsigned int arm_late(AmigaDropCatcher *c)
 {
     int x = c->screen->MouseX, y = c->screen->MouseY;
-    if (x < c->zone_left || x >= c->zone_right || y < c->zone_top || y >= c->zone_bottom) return 0;
+    if (!inside(c, x, y)) return 0;
     /* A selection box: stay out of the way, it draws across the dock. */
     if (!drag_image_at(c, x, y)) return 0;
     set_catching(c, 1);
@@ -341,12 +341,6 @@ static unsigned int arm_late(AmigaDropCatcher *c)
     c->late = 0;
     ++c->stats.arms;
     return AMIGA_DROP_STARTED;
-}
-
-void amiga_drop_catcher_set_zone(AmigaDropCatcher *c, int left, int top, int right, int bottom)
-{
-    if (!c) return;
-    c->zone_left = left; c->zone_top = top; c->zone_right = right; c->zone_bottom = bottom;
 }
 
 unsigned int amiga_drop_catcher_accepted(AmigaDropCatcher *c)
