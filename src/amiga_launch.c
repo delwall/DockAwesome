@@ -443,13 +443,30 @@ int launch_open(App *app)
 }
 
 /* The programs' code is in the dock's memory until they reply: wait for
-   every one. The dock's windows are already closed. */
+   every one. The dock's windows are already closed. Directory Opus answers
+   ARexx at once; one that never came kept the dock from quitting, so its
+   replies get two seconds, then the port is left behind, ignored. */
 void launch_close(App *app)
 {
+    enum { REXX_TICKS = 2*TICKS_PER_SECOND, POLL_TICKS = 5 };
+    const struct DockLaunched *launch;
+    int ticks = 0, told = 0;
     if (!app->launch_port) return;
-    while (app->launched || app->rexx_pending) {
-        WaitPort(app->launch_port);
-        launch_reap(app);
+    for (launch_reap(app); app->launched || app->rexx_pending; launch_reap(app)) {
+        if (!told) {
+            for (launch = app->launched; launch; launch = launch->next)
+                printf("Waiting for %s, started from the dock, to quit.\n",launch->path);
+            told = 1;
+        }
+        if (app->launched) { WaitPort(app->launch_port); continue; }
+        if (ticks >= REXX_TICKS) {
+            printf("Directory Opus did not answer %d command(s).\n",app->rexx_pending);
+            app->launch_port->mp_Flags = PA_IGNORE;
+            app->launch_port = NULL;
+            return;
+        }
+        Delay(POLL_TICKS);
+        ticks += POLL_TICKS;
     }
     DeleteMsgPort(app->launch_port);
     app->launch_port = NULL;

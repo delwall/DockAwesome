@@ -2,6 +2,7 @@
    Workbench's program and drawer lists, window titles and Shells, so the main
    task never waits on a handler; the main task schedules polls and applies
    the results. Also window actions (focus, close) and Shell menu targets. */
+#include "amiga_caps.h"
 #include "amiga_app.h"
 
 static int shell_target_live(const ShellTarget *target)
@@ -386,6 +387,24 @@ static void discover_unnamed(ProgramPoll *poll, const WindowProgram *owner)
     free(source.pixels);
 }
 
+/* The newest launch still waiting for its app, or NULL. */
+static const DockLaunch *open_launch(const ProgramPoll *poll)
+{
+    int k, c;
+    for (k = poll->launch_count-1; k >= 0; --k) {
+        if (poll->now-poll->launches[k].at > poll->launch_ticks) continue;
+        for (c = 0; c < LAUNCH_SLOTS; ++c) if (poll->claimed[c] == poll->launches[k].at) break;
+        if (c == LAUNCH_SLOTS) return &poll->launches[k];
+    }
+    return NULL;
+}
+
+static void claim_launch(ProgramPoll *poll, const DockLaunch *launch)
+{
+    poll->claimed[poll->claimed_next] = launch->at;
+    poll->claimed_next = (poll->claimed_next+1)%LAUNCH_SLOTS;
+}
+
 /* Every process that shows a visible window is an app; background tasks
    are not. In order, an app belongs to: the pin it was attributed to, a
    pinned program with its path, the pin launched just before it appeared,
@@ -394,14 +413,10 @@ static void poll_window_programs(ProgramPoll *poll, const struct List *programs)
 {
     WindowProgram *owners = poll->owners;
     struct Screen *screen;
-    const struct MsgPort *desktop;
-    const struct Task *desktop_task;
     const DockLaunch *launch = NULL;
     int count = 0, i, k;
     ULONG lock = LockIBase(0);
     Forbid();
-    desktop = FindPort((STRPTR)"WORKBENCH");
-    desktop_task = desktop ? desktop->mp_SigTask : NULL;
     for (screen = IntuitionBase->FirstScreen; screen && count < DOCK_MAX_ITEMS; screen = screen->NextScreen) {
         const struct Window *window;
         for (window = screen->FirstWindow; window && count < DOCK_MAX_ITEMS; window = window->NextWindow) {
@@ -410,7 +425,7 @@ static void poll_window_programs(ProgramPoll *poll, const struct List *programs)
             const char *task_name;
             int existing;
             if (!owner || &owner->pr_Task == poll->dock_task ||
-                &owner->pr_Task == desktop_task || !window->WLayer) continue;
+                amiga_caps_desktop_task(&owner->pr_Task) || !window->WLayer) continue;
             for (existing = 0; existing < count; ++existing)
                 if (owners[existing].process == owner) break;
             if (existing < count) {
@@ -436,8 +451,7 @@ static void poll_window_programs(ProgramPoll *poll, const struct List *programs)
         if (i < count && pin_by_id(poll,poll->attributions[k].pin_id) >= 0) ++k;
         else poll->attributions[k] = poll->attributions[--poll->attribution_count];
     }
-    for (k = poll->launch_count-1; k >= 0 && !launch; --k)
-        if (poll->now-poll->launches[k].at <= poll->launch_ticks) launch = &poll->launches[k];
+    launch = open_launch(poll);
     for (i = 0; i < count; ++i) {
         const WindowProgram *owner = &owners[i];
         const struct Task *task = &owner->process->pr_Task;
@@ -457,6 +471,11 @@ static void poll_window_programs(ProgramPoll *poll, const struct List *programs)
                 program_path_matches(owner,poll->pins[pin].path)) {
                 mark_owner(poll,pin,owner);
                 pinned = 1;
+                /* The launched program found by its path: its launch is done. */
+                if (launch && !seen && poll->pins[pin].pin_id == launch->pin_id) {
+                    claim_launch(poll,launch);
+                    launch = open_launch(poll);
+                }
             }
         if (!pinned && launch && !seen && owner->visible &&
             (pin = pin_by_id(poll,launch->pin_id)) >= 0 &&
@@ -466,6 +485,10 @@ static void poll_window_programs(ProgramPoll *poll, const struct List *programs)
             mark_owner(poll,pin,owner);
             poll->pins[pin].attributed = 1;
             pinned = 1;
+            /* Only the first new app: a window opened elsewhere a moment
+               later (a Directory Opus lister) is not this pin's. */
+            claim_launch(poll,launch);
+            launch = open_launch(poll);
         }
         for (pin = 0; pin < poll->count && !pinned; ++pin)
             if (poll->pins[pin].temporary && !strchr(poll->pins[pin].path,':') &&
@@ -949,7 +972,10 @@ int program_poll_result(App *app, int *recreate)
         if (!(poll->valid & poll->pins[i].kind) && !poll->pins[i].attributed) continue;
         pin = pin_index(app,poll->pins[i].pin_id);
         if (pin < 0) continue;
-        running = poll->pins[i].running || poll->pins[i].attributed;
+        /* Keep the sources apart: the next poll carries RUNNING_WORKBENCH
+           over while the Workbench list cannot be read (no Workbench, as
+           under Directory Opus), so a window's dot must not turn into it. */
+        running = poll->pins[i].running | (poll->pins[i].attributed ? RUNNING_WINDOW : 0);
         if (launch_active(app,app->items[pin].path)) running |= RUNNING_SELF;
         app->items[pin].owner = running ? poll->pins[i].owner : NULL;
         if (poll->pins[i].kind == PIN_DRAWER) app->items[pin].lister = running ? poll->pins[i].lister : 0;

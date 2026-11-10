@@ -15,6 +15,7 @@
 #include <proto/cybergraphics.h>
 #include <cybergraphx/cybergraphics.h>
 #include <stdio.h>
+#include <string.h>
 
 #ifndef RPTAG_PenMode
 #define RPTAG_PenMode 0x80000080UL
@@ -78,6 +79,24 @@ struct MsgPort *amiga_caps_dopus_port(void)
 {
     if (!FindName(&SysBase->LibList,(STRPTR)"dopus5.library")) return NULL;
     return FindPort((STRPTR)"DOPUS.1");
+}
+
+int amiga_caps_desktop_task(const struct Task *task)
+{
+    static const char *const ports[] = {"WORKBENCH", "WANDERER", "WANDERER.1"};
+    const char *name;
+    unsigned int i;
+    if (!task) return 0;
+    for (i = 0; i < sizeof(ports)/sizeof(ports[0]); ++i) {
+        const struct MsgPort *port = FindPort((STRPTR)ports[i]);
+        if (port && (port->mp_Flags & PF_ACTION) == PA_SIGNAL && port->mp_SigTask == task) return 1;
+    }
+    /* Directory Opus 5 runs as many processes, each named "dopus" or
+       "dopus_<job>" (dopus_lister for every lister, dopus_desktop_update,
+       ...: see the DOpus 5 source). */
+    name = task->tc_Node.ln_Name;
+    return name && amiga_caps_dopus_port() &&
+        (!strcmp(name,"dopus") || !strncmp(name,"dopus_",6)) ? 2 : 0;
 }
 
 int amiga_caps_probe(DockCaps *caps, struct Screen *screen)

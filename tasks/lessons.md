@@ -305,3 +305,13 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
 - Before writing a release-notes line, find its verification in tasks/todo.md
   (or the commit body). "Built, not yet run on hardware" stays out.
 - Commit titles describe intent; the verification notes describe what is true.
+
+## AmiKit: Directory Opus is the desktop (2026-11-10)
+- Synthetic input from amiagent does not reach the dock or Intuition windows on
+  AmiKit (`Input: downs=0`). Ask the user for clicks and drags there.
+- `a || b` on bit flags collapses them to 1, which is RUNNING_WORKBENCH: a
+  window's dot became Workbench evidence that is kept while the Workbench list
+  cannot be read (no Workbench). Combine flags with `|`.
+- The drop receiver over the DOpus desktop clipped DOpus's selection box. DOpus
+  sets the same window flags for an icon drag and a selection box; tell them
+  apart by the drag image around the pointer.

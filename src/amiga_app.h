@@ -190,6 +190,9 @@ typedef struct {
     int seen_count;
     struct { const struct Task *task; uint32_t pin_id; } attributions[DOCK_MAX_ITEMS];
     int attribution_count;
+    /* Launches that already got their app (by `at`): one app per launch. */
+    uint64_t claimed[LAUNCH_SLOTS];
+    int claimed_next;
     char aliases[DOCK_MAX_ITEMS][PATH_CAP];
     size_t lengths[DOCK_MAX_ITEMS];
 } ProgramPoll;

@@ -41,6 +41,9 @@ unsigned int amiga_drop_catcher_update(AmigaDropCatcher *catcher,
 unsigned int amiga_drop_catcher_accepted(AmigaDropCatcher *catcher);
 unsigned int amiga_drop_catcher_cancel(AmigaDropCatcher *catcher);
 int amiga_drop_catcher_active(const AmigaDropCatcher *catcher);
+/* The dock's plate in screen coordinates: a drag held from the Directory
+   Opus desktop arms the receiver only once the pointer reaches it. */
+void amiga_drop_catcher_set_zone(AmigaDropCatcher *catcher, int left, int top, int right, int bottom);
 /* Immutable desktop pixels sampled before Workbench starts the drag. */
 struct BitMap *amiga_drop_catcher_backing(const AmigaDropCatcher *catcher);
 /* Call ONLY AFTER CloseWindow: the temporary Region must outlive its Layer,

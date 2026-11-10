@@ -882,6 +882,13 @@ static void update_drop_catcher(App *app)
     up_known = app->input_context.external_up_known;
     up_x = app->input_context.external_up_x; up_y = app->input_context.external_up_y;
     Enable();
+    {
+        DockRect plate;
+        if (dock_edge_panel_rect(&app->settings,app->edge,app->placement,app->count,
+                app->width,app->height,&plate))
+            amiga_drop_catcher_set_zone(app->drop_catcher,app->left+plate.left,app->top+plate.top,
+                app->left+plate.right,app->top+plate.bottom);
+    }
     if (cancelled || app->gesture.active || app->input_context.held || dock_ui_busy(app->ui))
         flags = amiga_drop_catcher_cancel(app->drop_catcher);
     else flags = amiga_drop_catcher_update(app->drop_catcher, serial, screen, x, y, held, dragged,
