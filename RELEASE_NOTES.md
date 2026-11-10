@@ -1,5 +1,19 @@
 # Release notes
 
+## Next release
+
+Changes since 1.0 beta 2.
+
+**More systems**
+- Runs on AmiKit XE, AmigaOS 3.9 and AmigaOS 3.1.4.1 on the Vampire.
+- Works with Directory Opus 5 as the desktop (AmiKit): icons from the
+  desktop and from listers can be dropped on the dock.
+
+**Fixes**
+- A running program's dot goes away when it quits, also without Workbench.
+- A dragged icon no longer blinks over the dock.
+- A selection box drawn across the dock stays visible.
+
 ## 1.0 beta 2
 
 Changes since 1.0 beta 1.
