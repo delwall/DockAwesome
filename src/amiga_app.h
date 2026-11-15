@@ -223,6 +223,9 @@ typedef struct {
     ULONG program_polls, program_changes, menu_suspends;
     ULONG program_checks, drawer_checks, document_checks, status_events;
     ULONG source_polls, layer_busy, source_changes, front_requests, shape_updates, shape_rects, shape_rects_peak;
+    /* Live polls at the motion rate: their count and summed spacing. */
+    ULONG motion_polls;
+    uint64_t motion_ticks, motion_last;
     ULONG bob_opens, bob_places, bob_failures, bob_waits; /* the drawn drag pin */
     LONG bob_last[4]; /* its last place and size */
     ULONG drop_messages, drop_arguments, drop_added, drop_reordered, drop_bad_paths;

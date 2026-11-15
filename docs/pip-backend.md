@@ -72,8 +72,9 @@ popup or dialog clip and the keyed tail are applied to a scratch copy of each
 row span. A frame with an active mask converts whole, and so does the next
 conversion into a buffer that holds a masked frame.
 
-Poll the background every 100 ms at rest and every 20 ms during motion or a
-held button. Animation captures reset the background deadline. Matching
+Poll the background every 100 ms at rest and ask for 10 ms during motion or a
+held button (timer.device rounds it up: about 17 ms between polls on
+Coffin). Animation captures reset the background deadline. Matching
 source bytes and geometry skip decode, draw, and upload; otherwise only the
 box of changed source pixels is decoded, composed and converted. Reuse all
 buffers.

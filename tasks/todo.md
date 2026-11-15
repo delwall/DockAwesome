@@ -926,7 +926,13 @@ times, the conversion byte by byte.
       ARexx CHANGEWINDOW (delay 2), Break. 58-60 polls, 37-38 changes each:
       capture_compare_us_avg 27333 (before) -> 16663 (Fast RAM row) ->
       14031 (long scan) -> 12072 (span copy). Forced capture 31561 -> 18087.
-- [ ] User looks at a window dragged under the dock with the new build.
-- [ ] Next if still visible: the row compare and copy in AMMX, or poll faster
-      while the source changes.
+- [x] User: "Bättre men laggar lite fortfarande".
+- [x] Poll spacing with a held button (new profile counter motion_polls,
+      motion_interval_us_avg; ARexx move plus a held desktop drag): 20 ms
+      requested gave 28.6 ms. Starting the timer before the capture: 28.1
+      ms, no gain, reverted. Asking for 10 ms: 17.1 ms (timer.device rounds
+      up), capture 6.2 ms average.
+- [ ] User looks again with the 10 ms build.
+- [ ] Next if still visible: poll on the VBlank during motion, or the row
+      compare and copy in AMMX.
 

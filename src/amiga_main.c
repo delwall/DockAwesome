@@ -809,7 +809,9 @@ static void live_schedule(App *app)
     app->live_io->tr_node.io_Command = TR_ADDREQUEST;
     app->live_io->tr_node.io_Flags = 0;
     app->live_io->tr_time.tv_secs = 0;
-    app->live_io->tr_time.tv_micro = fast ? 20000 : 100000;
+    /* timer.device rounds a request up: 10 ms gave 17 ms between motion
+       polls on Coffin (20 ms gave 28.6 ms), close to one field. */
+    app->live_io->tr_time.tv_micro = fast ? 10000 : 100000;
     app->live_fast = fast;
     SendIO((struct IORequest *)app->live_io); app->live_pending = 1;
 }
@@ -821,6 +823,13 @@ static int live_due(App *app)
     if (WaitIO((struct IORequest *)app->live_io)) {
         app->failed = 1; strcpy(app->surface_error, "Live background timer failed.");
         return 0;
+    }
+    if (app->profile) {
+        uint64_t now = profile_clock();
+        if (app->live_fast && app->stats.motion_last) {
+            ++app->stats.motion_polls; app->stats.motion_ticks += now-app->stats.motion_last;
+        }
+        app->stats.motion_last = now;
     }
     return 1;
 }
@@ -1052,13 +1061,15 @@ static void profile_report(App *app)
         (unsigned long)app->stats.drag_reveal_frames,(unsigned long)app->stats.drag_reveal_peak);
     printf("PiP popup reveal: frames=%lu\n",(unsigned long)app->stats.popup_reveal_frames);
     printf("PiP dialog reveal: frames=%lu\n",(unsigned long)app->stats.dialog_reveal_frames);
-    printf("PiP2: layer_busy=%lu\n",(unsigned long)app->stats.layer_busy);
+    printf("PiP2: layer_busy=%lu motion_polls=%lu motion_interval_us_avg=%lu\n",
+        (unsigned long)app->stats.layer_busy,(unsigned long)app->stats.motion_polls,
+        ticks_us(app,app->stats.motion_ticks,app->stats.motion_polls));
     {
         AmigaDropCatcherStats drop = amiga_drop_catcher_stats(app->drop_catcher);
         printf("PiP receiver: arms=%lu disarms=%lu presses_armed=%lu presses_unarmed=%lu\n",
             drop.arms,drop.disarms,drop.presses_armed,drop.presses_unarmed);
     }
-    printf("PiP2: polls=%lu source_changes=%lu front_requests=%lu capture_compare_us_avg=%lu decode_us_avg=%lu changed_px_avg=%lu (settled100ms, motion20ms)\n",
+    printf("PiP2: polls=%lu source_changes=%lu front_requests=%lu capture_compare_us_avg=%lu decode_us_avg=%lu changed_px_avg=%lu (settled100ms, motion10ms)\n",
         (unsigned long)app->stats.source_polls, (unsigned long)app->stats.source_changes,
         (unsigned long)app->stats.front_requests,
         ticks_us(app,app->stats.capture_ticks,app->stats.source_polls),

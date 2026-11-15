@@ -212,7 +212,7 @@ UI, PiP, and screen lock before Workbench resets and reopens afterwards.
 PiP uses a small RGB565 overlay and an empty idle AppWindow shape. Pixels
 outside the artwork and plate use SAGA's source key. The native display code
 locks the source bitmap for each read. Equal source bytes skip decoding and
-drawing. Poll at 100 ms when idle and 20 ms during motion. See [PiP](pip-backend.md).
+drawing. Poll at 100 ms when idle and ask for 10 ms during motion (about 17 ms between polls). See [PiP](pip-backend.md).
 
 Workbench drops use a temporary receiver. Capture a clean backdrop before
 Workbench locks the layers. Reuse it until the drop or release is complete.
