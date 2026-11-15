@@ -2363,8 +2363,8 @@ static void usage(void)
          "dock without window shapes (it glitched the dock on some setups).\n"
          "--window-drag carries a pin dragged out of the dock in a window, as\n"
          "before, instead of drawing it on the screen (RTG without window shapes).\n"
-         "--caps prints the probed CPU, chipset and OS features and the chosen\n"
-         "backend, then exits. Include it in bug reports.");
+         "--caps prints the probed CPU, chipset and OS features and whether PiP\n"
+         "can run, then exits. Include it in bug reports.");
 }
 
 /* Before the libraries are open. A Workbench start has no console. */
