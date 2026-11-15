@@ -943,3 +943,20 @@ times, the conversion byte by byte.
       with WBRun, RAM: test files removed. A second C:ApolloExplorerSrv that
       I started (one already ran) stays until the next reboot.
 
+## AmiKit: drops from the Directory Opus desktop fail (2026-11-15)
+User on AmiKit XE (24-bit, DOpus 5 desktop, core 12856): an icon dragged
+from the desktop "glitches" over the dock and is not added. Same with the
+installed build 367 (2a808c8), started from the Shell and from a lister,
+so not from today's changes. tasks/todo.md had desktop and lister drops
+working on 2026-11-10.
+- Profiles (new build / 367): drag image painted over the dock (110 / 31
+  frames), receiver armed late on the drag image (arms=2 / 1), presses
+  unarmed (2 / 1), and no AppMessage at all (messages=0): Directory Opus
+  did not deliver the drop to the receiver window.
+- [ ] Find what changed since 2026-11-10 (screen depth? DOpus settings?) and
+      whether lister drops still work. Agent input does not reach the dock
+      on AmiKit: each try needs the user's drag.
+- Cleaned: config restored, test files removed from RAM:, installed dock
+  running (started by the user from a lister). A C:ApolloExplorerSrv that I
+  started (none ran at boot) stays until the next reboot.
+
