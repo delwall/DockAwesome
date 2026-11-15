@@ -910,8 +910,17 @@ opaque window) cut windows behind its zoom room (3.2.3 report). Decision
       new build ran as the dock: zoom sweep, menu, RAM Disk dropped from
       Workbench (saved), dragged out (removed), Quit. Config restored from
       the backup, installed dock restarted with WBRun, RAM: files removed.
-- [ ] ApolloOS (shaped windows path) and a screen PiP cannot use (8-bit)
-      not run yet.
+- [x] ApolloOS R9.5 (shaped windows), final build: --caps all yes; installed
+      dock quit through its menu; new build with --profile: shaped label,
+      zoom, RAM Disk dropped from Workbench (messages=1 added=1) and dragged
+      out (downs=1 ups=1, screen clean), menu Quit. A second dock showed
+      "PiP2 is already in use." and ended after OK. Config restored,
+      installed dock restarted with WBRun, RAM: test files removed.
+- [x] Coffin (24-bit) and AmiKit (24-bit): start, --caps, zoom, refusal of a
+      second dock (Coffin), drop and drag out (Coffin). AmiKit desktop drops
+      fail with build 367 too, see below.
+- [ ] A screen PiP cannot use (8-bit): not run on hardware, only in
+      test_profile.
 
 ## 24-bit PiP capture cost (2026-11-15)
 User on Coffin (24-bit): the part behind the dock lags a window dragged
