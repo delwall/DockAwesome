@@ -860,3 +860,17 @@ PiP1, shows beside the dock's PiP2 under Coffin (probe: both visible).
       --caps.
 - [ ] PiP survives ApolloBoot's BOOT:C/Reboot (direct RESET): message to the
       ApolloBoot author and the Apollo team drafted.
+
+## CPU check before any 68080 code (2026-11-15)
+Illegal instruction (#80000004) was reported on 3.2.3. AttnFlags bit 10 is
+set on the Vampire under ApolloOS ($a47f) and AmigaOS 3.2.3 ($847f), core
+12856 (measured). The startup and libnix are 68000 code (multilib ".").
+- [x] src/amiga_cpu_guard.c, built with -m68020: an ADD2INIT at priority
+      -128 (the first libnix constructor) checks bit 10 and exits with 20
+      after a Shell line or an EasyRequest from Workbench.
+- [x] objdump: the check is plain 68020 code (btst #2,296(a6) on
+      AttnFlags); its init-list entry has priority 0, the lowest.
+- [x] 3.2.3, build 370: --caps and --version as before. A test build that
+      requires bit 11: from the Shell the line and return code 20; from
+      Workbench (WBRun) the requester, and the process ended after OK.
+      Test files removed from RAM:.

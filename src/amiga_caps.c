@@ -104,8 +104,8 @@ int amiga_caps_probe(DockCaps *caps, struct Screen *screen)
     *caps = (DockCaps){0};
     caps->cpu_080 = amiga_caps_cpu_080();
 #ifdef DOCK_AMMX
-    /* This build runs only on a 68080, whether or not exec reports one:
-       AmigaOS 3.2 need not set AttnFlags bit 10. */
+    /* This build runs only on a 68080: amiga_cpu_guard.c stops the start
+       when exec does not report one. */
     caps->ammx = 1;
 #endif
     /* A custom chip register: read it only on a 68080 (a Vampire). */

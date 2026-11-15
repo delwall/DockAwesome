@@ -45,6 +45,9 @@ $(AMIGA_OBJDIR)/%.o: src/%.c include/dock_core.h Makefile | check-toolchain
 	@mkdir -p "$(@D)"
 	"$(AMIGA_CC)" $(AMIGA_INCLUDES) $(AMIGA_FLAGS) $(CPU_FLAGS) -MMD -MP -c "$<" -o "$@"
 
+# The CPU check runs before any 68080 code, so it must run on any 68020+.
+$(AMIGA_OBJDIR)/amiga_cpu_guard.o: CPU_FLAGS := -m68020
+
 $(AMIGA_OBJDIR)/amiga_input.o: src/amiga_input.s Makefile | check-toolchain
 	@mkdir -p "$(@D)"
 	"$(AMIGA_AS)" -Fhunk -m68020 -opt-speed -o "$@" "$<"
