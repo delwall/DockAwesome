@@ -912,3 +912,21 @@ opaque window) cut windows behind its zoom room (3.2.3 report). Decision
       the backup, installed dock restarted with WBRun, RAM: files removed.
 - [ ] ApolloOS (shaped windows path) and a screen PiP cannot use (8-bit)
       not run yet.
+
+## 24-bit PiP capture cost (2026-11-15)
+User on Coffin (24-bit): the part behind the dock lags a window dragged
+sideways. --bench-sweep: one forced capture of the 1056x100 box took 31.6
+ms (16-bit: 4.0 ms). Each changed row read video memory three or four
+times, the conversion byte by byte.
+- [x] Read each row once into a Fast RAM row (memcpy), compare and convert
+      from there; one conversion loop per pixel format.
+- [x] Convert and copy only the changed span; scan for it a long at a time.
+- [x] Matched run on Coffin, core 12856, 24-bit: dock with --profile from an
+      Execute script, Archives window moved 70 x 10 px under the dock by
+      ARexx CHANGEWINDOW (delay 2), Break. 58-60 polls, 37-38 changes each:
+      capture_compare_us_avg 27333 (before) -> 16663 (Fast RAM row) ->
+      14031 (long scan) -> 12072 (span copy). Forced capture 31561 -> 18087.
+- [ ] User looks at a window dragged under the dock with the new build.
+- [ ] Next if still visible: the row compare and copy in AMMX, or poll faster
+      while the source changes.
+
