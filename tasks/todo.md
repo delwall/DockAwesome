@@ -858,6 +858,15 @@ PiP1, shows beside the dock's PiP2 under Coffin (probe: both visible).
 - [ ] Reports from others on 1.0b2 (ApolloOS): window part kept behind the
       dock, grey PiP rectangle. Likely no colour key on their core; ask for
       --caps.
+- [ ] Same report on AmigaOS 3.2.3, core STANDALONE_12846_x14_16, 1.0b2
+      (photo 2026-11-15): a window is cut where it meets the dock's box,
+      the wallpaper shows instead. Live PiP keys those pixels to the
+      scanout, so the dock likely runs in snapshot mode: saved PiP prefs
+      fall back to snapshot without a word when PiP fails to open
+      (amiga_main.c, fall_back_to_snapshot), and the snapshot window covers
+      the zoom room above the dock. Ask for `DockAwesome --caps` and, with
+      the dock quit, `DockAwesome --pip` (prints the reason). Then: report
+      the fallback reason, and keep the snapshot window at rest height.
 - [ ] PiP survives ApolloBoot's BOOT:C/Reboot (direct RESET): message to the
       ApolloBoot author and the Apollo team drafted.
 
