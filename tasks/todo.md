@@ -932,7 +932,14 @@ times, the conversion byte by byte.
       requested gave 28.6 ms. Starting the timer before the capture: 28.1
       ms, no gain, reverted. Asking for 10 ms: 17.1 ms (timer.device rounds
       up), capture 6.2 ms average.
-- [ ] User looks again with the 10 ms build.
-- [ ] Next if still visible: poll on the VBlank during motion, or the row
-      compare and copy in AMMX.
+- [x] User with the 10 ms build: "Microskopiskt mindre". Floor: the glass
+      shows a copy of the screen taken after Workbench drew the window, then
+      composed and shown at the next field (one to two fields). SAGA PiP has
+      a colour key, no alpha blend, so translucent glass needs the copy.
+      Stopped here; left open: VBlank-paced motion polls, AMMX row compare,
+      or a design change (less translucent glass while the source moves).
+- [x] Coffin cleaned: test docks quit, Archives window closed, ENVARC: and
+      ENV: DockAwesome.json restored from the backup, installed dock started
+      with WBRun, RAM: test files removed. A second C:ApolloExplorerSrv that
+      I started (one already ran) stays until the next reboot.
 
