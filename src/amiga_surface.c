@@ -36,8 +36,8 @@ void close_surface(App *app)
     input_invalidate(app);
     animation_cancel(app);
     live_cancel(app);
-    /* The backend releases its hardware, native window and buffers. No
-       backend is chosen before the first select_backend. */
+    /* PiP releases its hardware, native window and buffers. No surface is
+       set before the first select_backend. */
     if (app->surface) app->surface->close(app);
     free(app->check_canvas.pixels); memset(&app->check_canvas,0,sizeof(app->check_canvas));
     dock_renderer_release(&app->check_renderer);
@@ -54,21 +54,20 @@ int open_surface(App *app)
     int cross = app->settings.max_size+2*app->settings.padding+12;
     int available_height = app->screen->Height-app->screen->BarHeight-2;
     /* Keep the right PiP raster's keyed tail even where it crosses the screen edge. */
-    int right_padding = app->edge == DOCK_EDGE_RIGHT && app->pip_mode ?
-        RIGHT_PIP_TAIL-DOCK_DESKTOP_GAP : 0;
+    int right_padding = app->edge == DOCK_EDGE_RIGHT ? RIGHT_PIP_TAIL-DOCK_DESKTOP_GAP : 0;
     int panel_cross = dock_panel_thickness(&app->settings)+DOCK_DESKTOP_GAP+right_padding;
     /* SAGA shows the last columns of each PiP row at the start of the next
        one: a right dock keeps them past the screen edge, a left dock keyed
        on its far side. Without them a pin dragged out of a left dock (on
        AmigaOS 3.2.3) left icon pixels at the screen's left edge and lost
        its own last columns: an invisible edge. */
-    app->pip_tail = app->edge == DOCK_EDGE_LEFT && app->pip_mode ? RIGHT_PIP_TAIL : 0;
+    app->pip_tail = app->edge == DOCK_EDGE_LEFT ? RIGHT_PIP_TAIL : 0;
     /* Each attempt reports its own error. Keep the text of an earlier failure. */
     if (!app->failed) app->surface_error[0] = 0;
     app->settings.edge_padding = right_padding;
     if (cross < panel_cross) cross = panel_cross;
     /* Pinning can use this spare room without closing and opening the surface. */
-    if (app->pip_mode && reserve && app->settings.max_size > app->settings.base_size) {
+    if (reserve && app->settings.max_size > app->settings.base_size) {
         reserve += 2;
         if (reserve > DOCK_MAX_ITEMS) reserve = DOCK_MAX_ITEMS;
     }
@@ -76,11 +75,8 @@ int open_surface(App *app)
     if (wanted > limit) wanted = limit;
     if (wanted < 1) return 0;
     app->width = app->edge == DOCK_EDGE_BOTTOM ? wanted : cross+app->pip_tail;
-    if (app->width > app->screen->Width) app->width = app->screen->Width;
-    if (app->pip_mode) {
-        app->width = (app->width+31)&~31;
-        if (app->width > app->screen->Width) app->width = app->screen->Width&~31;
-    }
+    app->width = (app->width+31)&~31;
+    if (app->width > app->screen->Width) app->width = app->screen->Width&~31;
     app->height = app->edge == DOCK_EDGE_BOTTOM ? cross : wanted;
     if (app->height > available_height) return 0;
     app->left = app->edge == DOCK_EDGE_LEFT ? 0 : app->edge == DOCK_EDGE_RIGHT ?
@@ -94,7 +90,7 @@ int open_surface(App *app)
     app->screen_left = app->screen->LeftEdge; app->screen_top = app->screen->TopEdge;
     app->display = amiga_display_open(app->screen, app->width, app->height);
     if (!app->display || !image_alloc(&app->canvas, app->width, app->height) ||
-        ((app->snapshot || app->pip_mode) && !image_alloc(&app->backdrop, app->width, app->height))) return 0;
+        !image_alloc(&app->backdrop, app->width, app->height)) return 0;
     amiga_display_set_converters(app->display,app->renderer.pixels->rgba_to_rgb24,
         app->renderer.pixels->decode565,app->renderer.pixels->encode565);
     app->active = 0; app->hovered = -1;
@@ -115,23 +111,14 @@ int open_surface(App *app)
     return 1;
 }
 
-static void apply_profile(App *app, int backend, int explicit_pip)
-{
-    app->features = dock_choose_profile(&app->caps,backend,explicit_pip);
-    app->pip_mode = app->features.backend == DOCK_BACKEND_PIP;
-    app->snapshot = app->features.backend == DOCK_BACKEND_SNAPSHOT;
-    /* The 68080 build's AMMX kernels serve every backend, not only PiP. */
-    app->use_ammx = app->features.pixels == DOCK_PIXELS_AMMX;
-    /* Only while no surface is open: close uses the table that opened it. */
-    app->surface = app->pip_mode ? &amiga_surface_pip : &amiga_surface_window;
-}
-
-/* Follow the (new) Workbench screen; features.error reports an explicit
-   PiP request that cannot be met. */
-void select_backend(App *app, int explicit_pip)
+/* Follow the (new) Workbench screen. features.error says why PiP, which
+   the dock needs, cannot run there. */
+void select_backend(App *app)
 {
     amiga_caps_probe_screen(&app->caps,app->screen);
-    apply_profile(app,app->requested_backend,explicit_pip);
+    app->features = dock_choose_profile(&app->caps);
+    app->use_ammx = app->features.pixels == DOCK_PIXELS_AMMX;
+    app->surface = &amiga_surface_pip;
 }
 
 /* Pixel kernels for use_ammx, shared with the controls. */
@@ -143,13 +130,4 @@ void use_pixel_backend(App *app)
 #endif
     dock_ui_set_converters(app->ui,app->renderer.pixels->rgba_to_rgb24,app->renderer.pixels->decode565,
         app->renderer.pixels->encode565,app->renderer.pixels->mix_half);
-}
-
-/* After a closed PiP surface: open the snapshot backend instead. */
-int fall_back_to_snapshot(App *app)
-{
-    apply_profile(app,DOCK_BACKEND_SNAPSHOT,0);
-    use_pixel_backend(app);
-    app->surface_error[0] = 0;
-    return open_surface(app);
 }

@@ -23,27 +23,24 @@ typedef struct {
     int dopus;          /* Directory Opus 5 runs (DOPUS.1 and dopus5.library) */
 } DockCaps;
 
-enum { DOCK_BACKEND_OPAQUE, DOCK_BACKEND_SNAPSHOT, DOCK_BACKEND_PIP };
 enum { DOCK_PIXELS_PORTABLE, DOCK_PIXELS_AMMX };
-/* Why an explicit PiP request cannot be met, the first missing need. */
+/* Why PiP cannot run, the first missing need. The dock needs PiP. */
 enum {
     DOCK_PROFILE_OK, DOCK_PROFILE_PIP_NO_AMMX, DOCK_PROFILE_PIP_NO_CORE,
     DOCK_PROFILE_PIP_SCREEN
 };
 
 typedef struct {
-    int backend;        /* DOCK_BACKEND_*: PiP falls back to snapshot */
-    int pixels;         /* DOCK_PIXELS_* for every backend */
+    int pixels;         /* DOCK_PIXELS_* */
     int ui_shapes;      /* shaped labels, menus and Folder Stack */
     int ui_glass;       /* RGB glass for menus, labels and Folder Stack */
     int ui_rgb_pens;    /* native drawing in RGB, not palette pens */
     int aa_text;        /* antialiased menu and label text */
     int apollo_pointer; /* input handler reads ApolloOS relative pointer events */
-    int error;          /* DOCK_PROFILE_*, set only for an explicit PiP request */
+    int error;          /* DOCK_PROFILE_*: nonzero stops the start */
 } DockProfile;
 
-DockProfile dock_choose_profile(const DockCaps *caps, int requested_backend, int explicit_pip);
+DockProfile dock_choose_profile(const DockCaps *caps);
 const char *dock_profile_error_text(int error);
-const char *dock_backend_name(int backend);
 
 #endif

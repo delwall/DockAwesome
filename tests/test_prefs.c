@@ -25,8 +25,6 @@ static void test_roundtrip(void)
     dock_prefs_defaults(&before);
     before.edge = DOCK_EDGE_RIGHT;
     before.zoom = 70;
-    before.pip_mode = 1;
-    before.snapshot = 0;
     before.pip_x_offset = -128;
     before.pip_y_offset = 128;
     strcpy(before.folder,"SYS:My \"folder\"/F\xf6r");
@@ -41,6 +39,7 @@ static void test_roundtrip(void)
     assert(strstr(json,"\\\"tool\\\"\\\\here"));
     assert(strstr(json,"\\u0009\\u0001\\u007f\\u00e5\\u00ff"));
     assert(strstr(json,"\"folder\": \"SYS:My \\\"folder\\\"/F\\u00f6r\""));
+    assert(!strstr(json,"snapshot") && strstr(json,"\"pip\": true"));
     rewind(file);
     assert(dock_prefs_read(file,&after));
     assert(!memcmp(&before,&after,sizeof(before)));
@@ -55,10 +54,13 @@ static void test_edited_file(void)
     assert(prefs.count == 2);
     assert(!strcmp(prefs.paths[0],"RAM:\xe5"));
     assert(!strcmp(prefs.paths[1],"SYS:Prefs/"));
-    assert(prefs.edge == DOCK_EDGE_LEFT && prefs.pip_mode && !prefs.snapshot);
+    assert(prefs.edge == DOCK_EDGE_LEFT);
     assert(prefs.size == dock_settings_default().base_size);
     assert(read_text("{\"version\":1,\"paths\":[]}",&prefs));
-    assert(prefs.count == 0 && prefs.snapshot && !prefs.pip_mode && !prefs.folder[0]);
+    assert(prefs.count == 0 && !prefs.folder[0]);
+    /* Files from before PiP only still load; their backend keys are ignored. */
+    assert(read_text("{\"version\":1,\"snapshot\":true,\"pip\":true,\"edge\":\"right\"}",&prefs));
+    assert(prefs.edge == DOCK_EDGE_RIGHT);
 }
 
 static void test_scale(void)
@@ -100,7 +102,6 @@ static void test_bad_file(void)
         "{\"version\":1,\"size\":96,\"scale_percent\":201}",
         "{\"version\":1,\"zoom\":64,\"scale_percent\":200}",
         "{\"version\":1,\"snapshot\":1}",
-        "{\"version\":1,\"snapshot\":true,\"pip\":true}",
         "{\"version\":1,\"pip_x_offset\":129}",
         "{\"version\":1,\"edge\":\"top\"}",
         "{\"version\":1,}",

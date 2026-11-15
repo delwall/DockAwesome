@@ -21,7 +21,6 @@ void dock_prefs_defaults(DockPrefs *prefs)
     prefs->zoom = defaults.max_size;
     prefs->levels = defaults.levels;
     prefs->edge = DOCK_EDGE_BOTTOM;
-    prefs->snapshot = 1;
     prefs->pip_x_offset = 17;
     prefs->pip_y_offset = -1;
 }
@@ -36,8 +35,6 @@ static int valid_prefs(const DockPrefs *prefs)
     if (!dock_settings_valid(&settings) ||
         (prefs->scale_percent && dock_scaled_size(prefs->size,prefs->scale_percent) != prefs->zoom) ||
         (unsigned)prefs->edge >= sizeof(edge_names)/sizeof(*edge_names) ||
-        (unsigned)prefs->snapshot > 1 || (unsigned)prefs->pip_mode > 1 ||
-        (prefs->snapshot && prefs->pip_mode) ||
         prefs->pip_x_offset < -128 || prefs->pip_x_offset > 128 ||
         prefs->pip_y_offset < -128 || prefs->pip_y_offset > 128 ||
         (unsigned)prefs->count > DOCK_MAX_ITEMS ||
@@ -172,7 +169,7 @@ static int read_object(FILE *file, DockPrefs *prefs)
     if (next_token(file) != '{') return 0;
     do {
         char key[24];
-        int field, ok = 0, version;
+        int field, ok = 0, version, ignored;
         if (!read_string(file,key,sizeof(key)) || next_token(file) != ':') return 0;
         for (field = 0; field < FIELD_COUNT; ++field)
             if (!strcmp(key,keys[field])) break;
@@ -187,8 +184,9 @@ static int read_object(FILE *file, DockPrefs *prefs)
             break;
         case LEVELS: ok = read_integer(file,&prefs->levels); break;
         case EDGE: ok = read_edge(file,&prefs->edge); break;
-        case SNAPSHOT: ok = read_boolean(file,&prefs->snapshot); break;
-        case PIP: ok = read_boolean(file,&prefs->pip_mode); break;
+        /* Backends from before PiP only: read so older files load. "pip":
+           true is still written, so an older build reading it keeps PiP. */
+        case SNAPSHOT: case PIP: ok = read_boolean(file,&ignored); break;
         case PIP_X_OFFSET: ok = read_integer(file,&prefs->pip_x_offset); break;
         case PIP_Y_OFFSET: ok = read_integer(file,&prefs->pip_y_offset); break;
         case PATHS: ok = read_paths(file,prefs); break;
@@ -197,7 +195,6 @@ static int read_object(FILE *file, DockPrefs *prefs)
         if (!ok) return 0;
         c = next_token(file);
     } while (c == ',');
-    if (prefs->pip_mode && !(seen & (1U<<SNAPSHOT))) prefs->snapshot = 0;
     if (seen & (1U<<SCALE_PERCENT)) {
         if (seen & (1U<<ZOOM)) return 0;
         prefs->zoom = dock_scaled_size(prefs->size,prefs->scale_percent);
@@ -241,11 +238,10 @@ int dock_prefs_write(FILE *file, const DockPrefs *prefs)
     if (!file || !prefs || !valid_prefs(prefs)) return 0;
     if (fprintf(file,
             "{\n  \"version\": 1,\n  \"size\": %d,\n  \"%s\": %d,\n  \"levels\": %d,\n"
-            "  \"edge\": \"%s\",\n  \"snapshot\": %s,\n  \"pip\": %s,\n"
+            "  \"edge\": \"%s\",\n  \"pip\": true,\n"
             "  \"pip_x_offset\": %d,\n  \"pip_y_offset\": %d,\n",
             prefs->size,prefs->scale_percent ? "scale_percent" : "zoom",
             prefs->scale_percent ? prefs->scale_percent : prefs->zoom,prefs->levels,edge_names[prefs->edge],
-            prefs->snapshot ? "true" : "false",prefs->pip_mode ? "true" : "false",
             prefs->pip_x_offset,prefs->pip_y_offset) < 0) return 0;
     if (prefs->folder[0] && (fputs("  \"folder\": ",file) == EOF ||
             !write_string(file,prefs->folder) || fputs(",\n",file) == EOF)) return 0;

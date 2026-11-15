@@ -101,15 +101,6 @@ static int input_hit_test(const App *app, int x, int y)
     return -1;
 }
 
-static int dock_background(App *app, int x, int y)
-{
-    DockRect rect;
-    return input_hit_test(app,x,y) < 0 &&
-        dock_edge_panel_rect(&app->settings,app->edge,app->placement,app->count,
-            app->width,app->height,&rect) &&
-        rounded_background(&rect,app->renderer.panel.radius,x,y);
-}
-
 void erase_item(App *app, int index)
 {
     Item *item = &app->items[index];
@@ -429,8 +420,6 @@ static __attribute__((noinline)) int save_config(App *app)
     prefs->scale_percent = app->scale_percent;
     prefs->levels = app->settings.levels;
     prefs->edge = app->edge;
-    prefs->snapshot = app->requested_backend == DOCK_BACKEND_SNAPSHOT;
-    prefs->pip_mode = app->requested_backend == DOCK_BACKEND_PIP;
     prefs->pip_x_offset = app->pip_x_offset;
     prefs->pip_y_offset = app->pip_y_offset;
     prefs->count = 0;
@@ -495,7 +484,6 @@ static void fail_after_cleanup(App *app, const char *fallback)
 static int pointer_inside(App *app, int *x, int *y)
 {
     int inside;
-    struct Layer *layer;
     if (app->bench_active) {
         *x = app->bench_x; *y = app->bench_y;
         return *x >= 0 && *x < app->width && *y >= 0 && *y < app->height &&
@@ -508,15 +496,7 @@ static int pointer_inside(App *app, int *x, int *y)
     if (!inside) return 0;
     if (!dock_edge_hover(&app->settings, app->edge, app->placement, app->count,
             app->width, app->height, *x, *y)) return 0;
-    if (app->pip_mode) return !native_menu_held(app);
-    /* Respect windows above the dock. Never draw directly into their pixels.
-       Workbench holds the layers through an icon drag. Never wait for them;
-       keep the previous hover state until the lock is free. */
-    if (!AttemptSemaphore(&app->screen->LayerInfo.Lock)) return app->active;
-    layer = WhichLayer(&app->screen->LayerInfo, app->screen->MouseX, app->screen->MouseY);
-    inside = layer == app->window->WLayer;
-    ReleaseSemaphore(&app->screen->LayerInfo.Lock);
-    return inside;
+    return !native_menu_held(app);
 }
 
 /* The stack pin's morph follows the Folder Stack in quarter steps (and to
@@ -560,7 +540,7 @@ static void update_hover_label(App *app)
     uint32_t pin = 0;
     DockRect anchor;
     if (hovered >= 0 && hovered < app->count && app->active &&
-        IntuitionBase->FirstScreen == app->screen && (!app->pip_mode || app->pip_visible) &&
+        IntuitionBase->FirstScreen == app->screen && app->pip_visible &&
         !app->gesture.active && !buttons_engaged(app,ANY_BUTTON) &&
         !amiga_drop_catcher_active(app->drop_catcher) && !dock_ui_busy(app->ui))
         pin = app->items[hovered].pin_id;
@@ -822,15 +802,14 @@ void live_cancel(App *app)
 static void live_schedule(App *app)
 {
     int fast;
-    if (!app->live_open || app->live_failed ||
-        (!app->pip_mode && !app->program_worker)) return;
-    fast = app->pip_mode && (animation_needed(app) || buttons_engaged(app,ANY_BUTTON));
+    if (!app->live_open) return;
+    fast = animation_needed(app) || buttons_engaged(app,ANY_BUTTON);
     if (app->live_pending && fast && !app->live_fast) live_cancel(app);
     if (app->live_pending) return;
     app->live_io->tr_node.io_Command = TR_ADDREQUEST;
     app->live_io->tr_node.io_Flags = 0;
-    app->live_io->tr_time.tv_secs = !app->pip_mode;
-    app->live_io->tr_time.tv_micro = !app->pip_mode ? 0 : fast ? 20000 : 100000;
+    app->live_io->tr_time.tv_secs = 0;
+    app->live_io->tr_time.tv_micro = fast ? 20000 : 100000;
     app->live_fast = fast;
     SendIO((struct IORequest *)app->live_io); app->live_pending = 1;
 }
@@ -840,9 +819,7 @@ static int live_due(App *app)
     if (!app->live_pending || !CheckIO((struct IORequest *)app->live_io)) return 0;
     app->live_pending = 0;
     if (WaitIO((struct IORequest *)app->live_io)) {
-        if (app->pip_mode) {
-            app->failed = 1; strcpy(app->surface_error, "Live background timer failed.");
-        } else app->live_failed = 1;
+        app->failed = 1; strcpy(app->surface_error, "Live background timer failed.");
         return 0;
     }
     return 1;
@@ -993,7 +970,7 @@ static int animation_open(App *app)
             app->live_io = (struct timerequest *)CreateIORequest(app->live_port, sizeof(struct timerequest));
         if (app->live_io && !OpenDevice((STRPTR)TIMERNAME, UNIT_MICROHZ,
                 (struct IORequest *)app->live_io, 0)) app->live_open = 1;
-        if (app->pip_mode && !app->live_open) return 0;
+        if (!app->live_open) return 0;
     }
     return app->clock_hz != 0;
 }
@@ -1071,34 +1048,32 @@ static void profile_report(App *app)
         puts(" (main-task target update through final present; includes retargeting)");
         fflush(stdout);
     }
-    if (app->pip_mode) {
-        printf("PiP drag image: frames=%lu peak_pixels=%lu (painted over the dock)\n",
-            (unsigned long)app->stats.drag_reveal_frames,(unsigned long)app->stats.drag_reveal_peak);
-        printf("PiP popup reveal: frames=%lu\n",(unsigned long)app->stats.popup_reveal_frames);
-        printf("PiP dialog reveal: frames=%lu\n",(unsigned long)app->stats.dialog_reveal_frames);
-        printf("PiP2: layer_busy=%lu\n",(unsigned long)app->stats.layer_busy);
-        {
-            AmigaDropCatcherStats drop = amiga_drop_catcher_stats(app->drop_catcher);
-            printf("PiP receiver: arms=%lu disarms=%lu presses_armed=%lu presses_unarmed=%lu\n",
-                drop.arms,drop.disarms,drop.presses_armed,drop.presses_unarmed);
-        }
-        printf("PiP2: polls=%lu source_changes=%lu front_requests=%lu capture_compare_us_avg=%lu decode_us_avg=%lu changed_px_avg=%lu (settled100ms, motion20ms)\n",
-            (unsigned long)app->stats.source_polls, (unsigned long)app->stats.source_changes,
-            (unsigned long)app->stats.front_requests,
-            ticks_us(app,app->stats.capture_ticks,app->stats.source_polls),
-            ticks_us(app,app->stats.decode_ticks,app->stats.source_changes),
-            app->stats.source_changes ? (unsigned long)(app->stats.source_pixels/app->stats.source_changes) : 0UL);
-        fflush(stdout);
-        printf("PiP shape: updates=%lu rects=%lu rects_peak=%lu\n",
-            (unsigned long)app->stats.shape_updates, (unsigned long)app->stats.shape_rects,
-            (unsigned long)app->stats.shape_rects_peak);
-        fflush(stdout);
+    printf("PiP drag image: frames=%lu peak_pixels=%lu (painted over the dock)\n",
+        (unsigned long)app->stats.drag_reveal_frames,(unsigned long)app->stats.drag_reveal_peak);
+    printf("PiP popup reveal: frames=%lu\n",(unsigned long)app->stats.popup_reveal_frames);
+    printf("PiP dialog reveal: frames=%lu\n",(unsigned long)app->stats.dialog_reveal_frames);
+    printf("PiP2: layer_busy=%lu\n",(unsigned long)app->stats.layer_busy);
+    {
+        AmigaDropCatcherStats drop = amiga_drop_catcher_stats(app->drop_catcher);
+        printf("PiP receiver: arms=%lu disarms=%lu presses_armed=%lu presses_unarmed=%lu\n",
+            drop.arms,drop.disarms,drop.presses_armed,drop.presses_unarmed);
     }
+    printf("PiP2: polls=%lu source_changes=%lu front_requests=%lu capture_compare_us_avg=%lu decode_us_avg=%lu changed_px_avg=%lu (settled100ms, motion20ms)\n",
+        (unsigned long)app->stats.source_polls, (unsigned long)app->stats.source_changes,
+        (unsigned long)app->stats.front_requests,
+        ticks_us(app,app->stats.capture_ticks,app->stats.source_polls),
+        ticks_us(app,app->stats.decode_ticks,app->stats.source_changes),
+        app->stats.source_changes ? (unsigned long)(app->stats.source_pixels/app->stats.source_changes) : 0UL);
+    fflush(stdout);
+    printf("PiP shape: updates=%lu rects=%lu rects_peak=%lu\n",
+        (unsigned long)app->stats.shape_updates, (unsigned long)app->stats.shape_rects,
+        (unsigned long)app->stats.shape_rects_peak);
+    fflush(stdout);
     printf("Drawn drag pin: opens=%lu places=%lu vblank_waits=%lu failures=%lu last=%ld,%ld %ldx%ld visible=%d\n",
         (unsigned long)app->stats.bob_opens, (unsigned long)app->stats.bob_places,
         (unsigned long)app->stats.bob_waits, (unsigned long)app->stats.bob_failures,
         (long)app->stats.bob_last[0], (long)app->stats.bob_last[1], (long)app->stats.bob_last[2],
-        (long)app->stats.bob_last[3], app->pip_mode ? pip_visible_width(app) : app->width);
+        (long)app->stats.bob_last[3], pip_visible_width(app));
     fflush(stdout);
 }
 
@@ -1270,7 +1245,7 @@ static const DockCache *stack_morph(App *app, const DockCache *icon, int level)
 static void publish_close_button(App *app, const DockPlacement *placement, int count)
 {
     int i, valid = 0, left = 0, top = 0, right = 0, bottom = 0;
-    if (app->stack_button_shown && app->pip_mode && !app->moving_item)
+    if (app->stack_button_shown && !app->moving_item)
         for (i = 0; i < count; ++i) if (app->items[row_item(app,i)].stack) {
             left = app->left+placement[i].x; top = app->top+placement[i].y;
             right = left+placement[i].size; bottom = top+placement[i].size;
@@ -1327,7 +1302,7 @@ static void draw(App *app)
         else overlays[overlay_count++] = (DockOverlay){icon, x, y};
     } else app->drag_overlay_icon = NULL;
     app->renderer.overlays = overlays; app->renderer.overlay_count = overlay_count;
-    dock_renderer_draw(&app->renderer, &app->canvas, (app->snapshot || app->pip_mode) ? &app->backdrop : NULL,
+    dock_renderer_draw(&app->renderer, &app->canvas, &app->backdrop,
         icons, placement, count, &app->settings);
     if (app->check_canvas.pixels) {
         /* A second renderer that starts over every frame is the reference. */
@@ -1337,7 +1312,7 @@ static void draw(App *app)
         check->edge = app->renderer.edge;
         check->overlays = overlays; check->overlay_count = overlay_count;
         dock_renderer_backdrop_changed(check);
-        dock_renderer_draw(check, &app->check_canvas, (app->snapshot || app->pip_mode) ? &app->backdrop : NULL,
+        dock_renderer_draw(check, &app->check_canvas, &app->backdrop,
             icons, placement, count, &app->settings);
         check->overlays = NULL; check->overlay_count = 0;
         ++app->stats.check_frames;
@@ -1728,7 +1703,7 @@ static int update_drag_bob(App *app, const DockImage *icon, int x, int y)
         if (!app->drag_bob) { ++app->stats.bob_failures; app->bob_failed = gesture->token; return -1; }
         ++app->stats.bob_opens;
         {
-            int visible = app->pip_mode ? pip_visible_width(app) : app->width;
+            int visible = pip_visible_width(app);
             amiga_drag_bob_set_exclude(app->drag_bob,
                 (DockRect){app->left,app->top,app->left+visible,app->top+app->height});
         }
@@ -1829,7 +1804,7 @@ static void drag_bob_present(App *app)
 static int update_drag_preview(App *app)
 {
     DockGesture *gesture = &app->gesture;
-    int shaped = app->pip_mode && app->caps.shaped_windows;
+    int shaped = app->caps.shaped_windows;
     int index = gesture->active && gesture->dragged && !gesture->cancelled ?
         pin_index(app,gesture->pin_id) : -1;
     int x = app->left+gesture->x, y = app->top+gesture->y;
@@ -1837,7 +1812,7 @@ static int update_drag_preview(App *app)
     int inside = 0; /* the dock itself can draw the icon */
     if (index >= 0 && !app->items[index].temporary && !app->items[index].stack) {
         int level = app->moving_item ? app->held_icon.level : app->placement[index].level;
-        int visible = app->pip_mode ? pip_visible_width(app) : app->width;
+        int visible = pip_visible_width(app);
         int left = gesture->x-app->items[index].cache.image[level].width/2;
         int top = gesture->y-app->items[index].cache.image[level].height/2;
         icon = &app->items[index].cache.image[level];
@@ -1940,7 +1915,7 @@ static void open_menu(App *app, int x, int y, uint32_t pin_id)
     app->input_context.popup_open = app->input_context.ui_busy = 1;
     app->input_context.active = NULL;
     Enable();
-    opened = dock_ui_open_popup(app->ui,app->edge,x,y,app->pip_mode ? NULL : app->window,
+    opened = dock_ui_open_popup(app->ui,app->edge,x,y,NULL,
         action,can_keep,stack);
     sync_input_ui(app);
     if (opened) {
@@ -2142,7 +2117,7 @@ static __attribute__((noinline)) void event_loop(App *app)
                the status polls and the drop catcher would wait on it (the
                dock froze, deaf to Ctrl-C). Only decide whether PiP steps
                aside for the menu, then wait for it to close. */
-            if (app->pip_mode) pip_menu_check(app);
+            pip_menu_check(app);
             interaction_cancel(app);
             continue;
         }
@@ -2214,54 +2189,12 @@ static __attribute__((noinline)) void event_loop(App *app)
         if (!running) break;
         if (accept_drops(app,&recreate)) redraw = save = 1;
         while ((msg = (struct IntuiMessage *)GetMsg(app->window->UserPort))) {
-            ULONG cls = msg->Class, seconds = msg->Seconds, micros = msg->Micros;
-            UWORD code = msg->Code, qualifier = msg->Qualifier;
+            ULONG cls = msg->Class;
+            UWORD code = msg->Code;
             int x = msg->MouseX, y = msg->MouseY;
             ReplyMsg((struct Message *)msg);
             if (recreate && !(cls == IDCMP_RAWKEY && code == 0x45)) continue;
-            if (cls == IDCMP_REFRESHWINDOW) {
-                if (!app->pip_mode) {
-                    BeginRefresh(app->window);
-                    app->present_whole = 1;
-                    draw(app);
-                    EndRefresh(app->window, TRUE);
-                }
-            } else if (!app->pip_mode && cls == IDCMP_MOUSEBUTTONS && code == SELECTDOWN) {
-                int hit = input_hit_test(app, x, y);
-                uint32_t token;
-                DockGestureInput in;
-                if (app->gesture.cancelled) dock_gesture_reset(&app->gesture);
-                Disable();
-                if (!++app->input_context.next_token) ++app->input_context.next_token;
-                token = app->input_context.next_token;
-                app->native_external_serial = app->input_context.external_seconds == seconds &&
-                    app->input_context.external_micros == micros ? app->input_context.external_serial : 0;
-                Enable();
-                in = gesture_point(app, DOCK_GESTURE_DOWN, token,
-                    hit >= 0 ? app->items[hit].pin_id : 0, hit >= 0 ? app->items[hit].pin_id : 0,
-                    x, y, current_input_flags(app, qualifier));
-                apply_gesture(app, &in, &redraw, &save, &recreate);
-            } else if (!app->pip_mode && cls == IDCMP_MOUSEBUTTONS && code == SELECTUP) {
-                int hit = input_hit_test(app, x, y);
-                unsigned int flags = current_input_flags(app, qualifier);
-                DockGestureInput in;
-                Disable();
-                if (app->native_external_serial && app->native_external_serial == app->input_context.external_serial) {
-                    if (app->input_context.external_dragged) flags |= DOCK_INPUT_DRAGGED;
-                    if (app->input_context.external_cancelled) flags |= DOCK_INPUT_CANCELLED;
-                }
-                Enable();
-                in = gesture_point(app, DOCK_GESTURE_UP, app->gesture.token, app->gesture.pin_id,
-                    hit >= 0 ? app->items[hit].pin_id : 0, x, y, flags);
-                apply_gesture(app, &in, &redraw, &save, &recreate);
-            } else if (!app->pip_mode && cls == IDCMP_MOUSEBUTTONS && code == MENUDOWN &&
-                !dock_ui_busy(app->ui) && !app->gesture.active) {
-                int hit = input_hit_test(app,x,y);
-                if (hit >= 0 || dock_background(app,x,y)) {
-                    open_menu(app,app->left+x,app->top+y,hit >= 0 ? app->items[hit].pin_id : 0);
-                    redraw = 1;
-                }
-            } else if (cls == IDCMP_INACTIVEWINDOW && app->gesture.active) {
+            if (cls == IDCMP_INACTIVEWINDOW && app->gesture.active) {
                 /* An older inactive message must not cancel a newer queued DOWN. */
                 interaction_cancel_for(app, app->gesture.token);
             } else if (cls == IDCMP_RAWKEY && !(code & IECODE_UP_PREFIX)) {
@@ -2275,7 +2208,7 @@ static __attribute__((noinline)) void event_loop(App *app)
                 } else if (code == 0x13) recreate = 1;
             }
         }
-        if (app->pip_mode && !recreate && running) {
+        if (!recreate && running) {
             InputButton button = {0};
             while (input_pop(app, &button)) {
                 DockGestureInput in;
@@ -2291,14 +2224,14 @@ static __attribute__((noinline)) void event_loop(App *app)
             }
         }
         if (!recreate && running && app->gesture.active &&
-            (app->pip_mode ? app->input_context.held : !!(PeekQualifier() & IEQUALIFIER_LEFTBUTTON))) {
+            app->input_context.held) {
             DockGestureInput in;
             int x, y;
             unsigned int flags;
             Disable();
             x = app->screen->MouseX-app->left; y = app->screen->MouseY-app->top;
             flags = current_input_flags(app, PeekQualifier());
-            if (app->pip_mode && app->input_context.held_token == app->gesture.token) {
+            if (app->input_context.held_token == app->gesture.token) {
                 if (app->input_context.held_dragged) flags |= DOCK_INPUT_DRAGGED;
                 if (app->input_context.held_cancelled) flags |= DOCK_INPUT_CANCELLED;
             }
@@ -2404,7 +2337,7 @@ static void bench_sweep(App *app)
 static void usage(void)
 {
     puts("DockAwesome [--config file] [--size pixels] [--zoom pixels] [--levels n]\n"
-         "            [--snapshot | --opaque | --pip] [--ammx] [--profile]\n"
+         "            [--profile]\n"
          "            [--pip-dump prefix] [--pip-x-offset n] [--pip-y-offset n]\n"
          "            [--bench-sweep speed] [--damage-check] [--no-vsync]\n"
          "            [--self-launch] [--window-drag] [--pip1] [--pip-off] [Workbench paths...]\n"
@@ -2413,9 +2346,9 @@ static void usage(void)
          "Drag to reorder. Drag out or press Delete to remove a pin.\n"
          "R refreshes the background. Esc or Ctrl-C quits.\n"
          "Default preferences: " DEFAULT_CONFIG "\n"
-         "--ammx is kept for compatibility: the 68080 build always uses AMMX.\n"
-         "--pip needs SAGA RGB565, Apollo core 11900+, and Intuition/Layers V50.\n"
-         "Saved PiP settings use snapshot mode when PiP is unavailable.\n"
+         "The dock is a SAGA PiP overlay: it needs a Vampire 68080, Apollo core\n"
+         "11900 or newer and a 16-, 24- or 32-bit Workbench screen.\n"
+         "--ammx and --pip are accepted for compatibility: both are always on.\n"
          "--pip-x-offset and --pip-y-offset set alignment from -128 to 128.\n"
          "--pip-dump writes prefix-source.ppm and prefix-composed.ppm on exit.\n"
          "--bench-sweep 1..64 sweeps a synthetic pointer at that many pixels per\n"
@@ -2449,7 +2382,7 @@ int main(int argc, char **argv)
 {
     App *app = calloc(1, sizeof(*app));
     int i, status = 20, initial_count, config_state;
-    int explicit_pip = 0, caps_only = 0;
+    int caps_only = 0;
     if (!app) return 20;
     app->settings = dock_settings_default(); app->input_bit = app->vblank_bit = -1;
     app->reset.bit = -1;
@@ -2496,8 +2429,6 @@ int main(int argc, char **argv)
     app->scale_percent = app->prefs.scale_percent;
     app->settings.levels = app->prefs.levels;
     app->edge = app->prefs.edge;
-    app->snapshot = app->prefs.snapshot;
-    app->pip_mode = app->prefs.pip_mode;
     app->pip_x_offset = app->prefs.pip_x_offset;
     app->pip_y_offset = app->prefs.pip_y_offset;
     for (i = 1; i < argc; ++i) {
@@ -2512,9 +2443,6 @@ int main(int argc, char **argv)
         }
         else if (!strcmp(argv[i], "--levels"))
             app->settings.levels = i+1 < argc ? bounded_option(argv[++i],2,DOCK_MAX_LEVELS) : INT_MAX;
-        else if (!strcmp(argv[i], "--opaque")) { app->snapshot = 0; app->pip_mode = explicit_pip = 0; }
-        else if (!strcmp(argv[i], "--snapshot")) { app->snapshot = 1; app->pip_mode = explicit_pip = 0; }
-        else if (!strcmp(argv[i], "--pip")) { app->pip_mode = explicit_pip = 1; app->snapshot = 0; }
         else if (!strcmp(argv[i], "--ammx")) app->use_ammx = 1;
         else if (!strcmp(argv[i], "--profile")) app->profile = 1;
         else if (!strcmp(argv[i], "--damage-check")) app->damage_check = app->profile = 1;
@@ -2546,10 +2474,6 @@ int main(int argc, char **argv)
     if (app->pip_x_offset == INT_MAX || app->pip_y_offset == INT_MAX) {
         puts("PiP alignment must be an integer from -128 to 128."); free(app); return 20;
     }
-    if (app->pip_dump[0] && !app->pip_mode) { puts("--pip-dump requires --pip."); free(app); return 20; }
-    app->requested_backend = app->pip_mode ? DOCK_BACKEND_PIP :
-        app->snapshot ? DOCK_BACKEND_SNAPSHOT : DOCK_BACKEND_OPAQUE;
-    explicit_pip |= !!app->pip_dump[0];
 #ifndef DOCK_AMMX
     if (app->use_ammx) { puts("Use the DockAwesome080 build for --ammx."); free(app); return 20; }
 #endif
@@ -2565,10 +2489,9 @@ int main(int argc, char **argv)
     app->screen = LockPubScreen(NULL);
     if (!app->screen) { message("Cannot access the Workbench screen."); goto done; }
     amiga_caps_probe(&app->caps,app->screen);
-    /* --pip and --pip-dump always request PiP. */
-    select_backend(app,explicit_pip);
+    select_backend(app);
     if (caps_only) {
-        amiga_caps_print(&app->caps,&app->features,app->requested_backend);
+        amiga_caps_print(&app->caps,&app->features);
         status = 0; goto done;
     }
     if (app->features.error) { message(dock_profile_error_text(app->features.error)); goto done; }
@@ -2615,34 +2538,27 @@ int main(int argc, char **argv)
     app->drop_port = CreateMsgPort();
     if (!app->drop_port) { message("Cannot open the Workbench drop port."); goto done; }
     i = open_surface(app);
-    if (!i && app->pip_mode && !explicit_pip) {
-        close_surface(app);
-        i = fall_back_to_snapshot(app);
-    }
     /* A partly opened surface can hold the PiP lease: report after cleanup. */
     if (!i) {
-        fail_after_cleanup(app,"Cannot open the dock. Use an 8-bit or higher public screen.\n"
-            "True color needs cybergraphics.library V40 or newer."); goto done;
+        fail_after_cleanup(app,"Cannot open the dock's PiP overlay."); goto done;
     }
     if (!animation_open(app)) { fail_after_cleanup(app,"Cannot open timer.device for dock animation."); goto done; }
     if (!install_input(app)) { fail_after_cleanup(app,"Cannot install pointer observer in input.device."); goto done; }
-    if (app->pip_mode) reset_watch_open(app);
+    reset_watch_open(app);
     if (app->count != initial_count || config_state != 1) save_config(app);
-    if (app->pip_mode) {
-        struct Task *self = FindTask(NULL);
-        int priority = self->tc_Node.ln_Pri, desktop_priority = priority;
-        struct MsgPort *desktop;
-        Forbid();
-        desktop = FindPort((STRPTR)"WORKBENCH");
-        if (desktop && desktop->mp_SigTask && ((struct Task *)desktop->mp_SigTask)->tc_Node.ln_Pri <= 2)
-            desktop_priority = ((struct Task *)desktop->mp_SigTask)->tc_Node.ln_Pri;
-        Permit();
-        /* Workbench runs at +1 on the audited target and its drag loop can
-           starve a priority 0 receiver. Share its priority; never busy-poll. */
-        if (desktop_priority > priority) {
-            app->saved_priority = SetTaskPri(self, desktop_priority);
-            app->priority_changed = 1;
-        }
+    struct Task *self = FindTask(NULL);
+    int priority = self->tc_Node.ln_Pri, desktop_priority = priority;
+    struct MsgPort *desktop;
+    Forbid();
+    desktop = FindPort((STRPTR)"WORKBENCH");
+    if (desktop && desktop->mp_SigTask && ((struct Task *)desktop->mp_SigTask)->tc_Node.ln_Pri <= 2)
+        desktop_priority = ((struct Task *)desktop->mp_SigTask)->tc_Node.ln_Pri;
+    Permit();
+    /* Workbench runs at +1 on the audited target and its drag loop can
+       starve a priority 0 receiver. Share its priority; never busy-poll. */
+    if (desktop_priority > priority) {
+        app->saved_priority = SetTaskPri(self, desktop_priority);
+        app->priority_changed = 1;
     }
     launch_open(app);
     program_poll_open(app);

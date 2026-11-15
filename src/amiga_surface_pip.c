@@ -459,7 +459,7 @@ static int pip_open(App *app)
             WA_Borderless, TRUE, WA_Activate, FALSE, WA_RMBTrap, TRUE,
             WA_SimpleRefresh, TRUE, WA_NoCareRefresh, TRUE,
             WA_BackFill, (ULONG)LAYERS_NOBACKFILL,
-            WA_IDCMP, IDCMP_FLAGS & ~IDCMP_REFRESHWINDOW, TAG_DONE);
+            WA_IDCMP, IDCMP_FLAGS, TAG_DONE);
         if (!app->window) return 0;
         /* With --pip1, labels and dragged pins float in PiP1 when it is
            free; reserve the largest icon with the Remove pill under it.
@@ -482,7 +482,7 @@ static int pip_open(App *app)
         WA_Left, app->left, WA_Top, app->top, WA_Width, app->width-right_padding, WA_Height, app->height,
         WA_Borderless, TRUE, WA_Activate, FALSE, WA_ReportMouse, TRUE, WA_RMBTrap, TRUE,
         WA_SimpleRefresh, TRUE, WA_NoCareRefresh, TRUE,
-        WA_IDCMP, IDCMP_FLAGS & ~IDCMP_REFRESHWINDOW, WA_MouseQueue, 1,
+        WA_IDCMP, IDCMP_FLAGS, WA_MouseQueue, 1,
         WA_ShapeRegion, (ULONG)app->shape,
         TAG_DONE);
     if (!app->window) return 0;

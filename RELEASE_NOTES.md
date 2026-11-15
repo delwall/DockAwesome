@@ -9,6 +9,14 @@ Changes since 1.0 beta 2.
 - Works with Directory Opus Magellan II as the desktop (AmiKit): icons
   from the desktop and from listers can be dropped on the dock.
 
+**PiP only**
+- The dock always uses SAGA PiP. When PiP cannot run (screen depth, core,
+  PiP already in use), it says why and quits, instead of switching quietly
+  to a static background that hid parts of windows behind the dock.
+  `--snapshot` and `--opaque` are gone; `--pip` is still accepted.
+- On a CPU other than the 68080 the dock says so instead of crashing with
+  an illegal instruction.
+
 **Fixes**
 - A running program's dot goes away when it quits, also without Workbench.
 - A dragged icon no longer blinks over the dock.

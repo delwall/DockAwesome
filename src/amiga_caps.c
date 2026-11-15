@@ -215,7 +215,7 @@ static void print_library(const char *name, const struct Library *library)
     else printf("  %-22s missing\n",name);
 }
 
-void amiga_caps_print(const DockCaps *caps, const DockProfile *profile, int requested_backend)
+void amiga_caps_print(const DockCaps *caps, const DockProfile *profile)
 {
     struct Library *cyber = OpenLibrary((STRPTR)"cybergraphics.library",0);
     const struct Library *input, *console;
@@ -268,8 +268,8 @@ void amiga_caps_print(const DockCaps *caps, const DockProfile *profile, int requ
     print_library("input.device",input);
     print_library("console.device",console);
     if (cyber) CloseLibrary(cyber);
-    printf("Profile (requested %s)\n",dock_backend_name(requested_backend));
-    printf("  %-22s %s\n","backend",dock_backend_name(profile->backend));
+    printf("Profile\n");
+    printf("  %-22s %s\n","pip",yes_no(!profile->error));
     printf("  %-22s %s\n","pixels",profile->pixels == DOCK_PIXELS_AMMX ? "ammx" : "portable");
     printf("  %-22s %s\n","ui_shapes",yes_no(profile->ui_shapes));
     printf("  %-22s %s\n","ui_glass",yes_no(profile->ui_glass));

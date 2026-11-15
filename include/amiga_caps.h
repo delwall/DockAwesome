@@ -22,6 +22,6 @@ struct MsgPort *amiga_caps_dopus_port(void);
    Forbid. */
 int amiga_caps_desktop_task(const struct Task *task);
 /* --caps: the probed table, library versions and the chosen profile. */
-void amiga_caps_print(const DockCaps *caps, const DockProfile *profile, int requested_backend);
+void amiga_caps_print(const DockCaps *caps, const DockProfile *profile);
 
 #endif

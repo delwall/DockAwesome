@@ -10,7 +10,7 @@ typedef struct {
     int size, zoom, levels;
     int scale_percent; /* Zero when zoom is an explicit pixel size. */
     DockEdge edge;
-    int snapshot, pip_mode, pip_x_offset, pip_y_offset;
+    int pip_x_offset, pip_y_offset;
     int count;
     char folder[DOCK_PREFS_PATH_CAP]; /* Empty disables the drawer shortcut. */
     char paths[DOCK_MAX_ITEMS][DOCK_PREFS_PATH_CAP];

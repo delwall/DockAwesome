@@ -1,11 +1,9 @@
 /* The input.device handler (dock_input_observe) runs on input.device's
    task: it must not render, allocate or wait. It calls only the hit tests
-   below and dock_image_opaque_at, exec Signal and AttemptSemaphore,
-   layers WhichLayer under that semaphore, and the verified console
+   below and dock_image_opaque_at, exec Signal, and the verified console
    handler (dispatch_shell_close). The main task publishes hit snapshots
    (input_publish) and reads the queued button pairs (input_pop). */
 #include "amiga_app.h"
-#include <proto/layers.h>
 
 static int snapshot_hit(const InputSnapshot *s, int x, int y)
 {
@@ -13,20 +11,6 @@ static int snapshot_hit(const InputSnapshot *s, int x, int y)
     for (i = s->count-1; i >= 0; --i)
         if (dock_image_opaque_at(s->image[i],x-s->placement[i].x,y-s->placement[i].y)) return i;
     return -1;
-}
-
-/* In the window modes another window can cover the dock. The pointer is
-   on the dock only where its layer is the front one; when the layer list
-   is busy the press goes on to Intuition, as before. */
-static int dock_layer_in_front(const InputSnapshot *s)
-{
-    struct Layer_Info *info = &s->screen->LayerInfo;
-    int front;
-    if (!s->layer) return 1;
-    if (!AttemptSemaphore(&info->Lock)) return 0;
-    front = WhichLayer(info,s->screen->MouseX,s->screen->MouseY) == s->layer;
-    ReleaseSemaphore(&info->Lock);
-    return front;
 }
 
 int rounded_background(const DockRect *r, int radius, int x, int y)
@@ -46,7 +30,7 @@ void input_publish(App *app)
     InputSnapshot *s;
     const DockPlacement *row = row_placement(app);
     int i;
-    if (app->pip_mode ? !app->pip_visible : !app->window) {
+    if (!app->pip_visible) {
         Disable(); c->active = NULL; Enable(); return;
     }
     if (dock_ui_busy(app->ui) ||
@@ -59,7 +43,6 @@ void input_publish(App *app)
     dock_edge_panel_rect(&app->settings,app->edge,row,s->count,
         app->width,app->height,&s->panel);
     s->panel_radius = app->renderer.panel.radius;
-    s->layer = app->pip_mode ? NULL : app->window->WLayer;
     for (i = 0; i < s->count; ++i) {
         int item = row_item(app,i);
         s->placement[i] = row[i];
@@ -208,8 +191,7 @@ struct InputEvent *dock_input_observe(struct InputEvent *events, void *context)
                 !c->held && !external_was_held && IntuitionBase->FirstScreen == s->screen) {
                 int x = s->screen->MouseX-s->left, y = s->screen->MouseY-s->top;
                 int hit = snapshot_hit(s,x,y);
-                int on_dock = (hit >= 0 || rounded_background(&s->panel,s->panel_radius,x,y)) &&
-                    dock_layer_in_front(s);
+                int on_dock = hit >= 0 || rounded_background(&s->panel,s->panel_radius,x,y);
                 if (on_dock && !clean) ++c->right_ambiguous;
                 if (on_dock && clean) {
                     c->menu_screen = s->screen;
@@ -248,7 +230,6 @@ struct InputEvent *dock_input_observe(struct InputEvent *events, void *context)
             } else if (e->ie_Code == SELECTDOWN && c->held) {
                 e->ie_Class = IECLASS_NULL; captured = 1;
             } else if (e->ie_Code == SELECTDOWN && !already_external && !c->right_held && !c->ui_busy && s &&
-                !s->layer && /* the window modes take left presses through IDCMP */
                 IntuitionBase->FirstScreen == s->screen && !(e->ie_Qualifier & IEQUALIFIER_RBUTTON)) {
                 int x = s->screen->MouseX-s->left, y = s->screen->MouseY-s->top;
                 int hit = clean ? snapshot_hit(s, x, y) : -1;
@@ -275,8 +256,6 @@ struct InputEvent *dock_input_observe(struct InputEvent *events, void *context)
                     !(e->ie_Qualifier & IEQUALIFIER_RBUTTON)) {
                     c->external_screen = c->dock_screen;
                     c->external_x = c->dock_screen->MouseX; c->external_y = c->dock_screen->MouseY;
-                    c->external_seconds = e->ie_TimeStamp.tv_secs;
-                    c->external_micros = e->ie_TimeStamp.tv_micro;
                     c->external_dragged = c->external_cancelled = 0;
                     c->external_up_known = 0;
                     ++c->external_serial;

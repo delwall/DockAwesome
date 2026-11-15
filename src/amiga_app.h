@@ -61,7 +61,7 @@ extern void dock_call_console_input(InputHandlerCode code, struct InputEvent *ev
 #define CONFIG_CAP 768
 #define DEFAULT_CONFIG "ENVARC:DockAwesome.json"
 #define INPUT_BUTTONS 64
-#define IDCMP_FLAGS (IDCMP_MOUSEMOVE|IDCMP_MOUSEBUTTONS|IDCMP_REFRESHWINDOW|IDCMP_RAWKEY|IDCMP_INACTIVEWINDOW)
+#define IDCMP_FLAGS (IDCMP_MOUSEMOVE|IDCMP_MOUSEBUTTONS|IDCMP_RAWKEY|IDCMP_INACTIVEWINDOW)
 
 #ifndef WA_ShapeRegion
 #define WA_ShapeRegion (WA_Dummy + 65)
@@ -84,9 +84,6 @@ typedef struct {
     uint32_t pin_id[DOCK_MAX_ITEMS];
     DockRect panel;
     int panel_radius;
-    /* The window modes' dock layer, which other windows can cover; NULL
-       for PiP, which is always in front. */
-    struct Layer *layer;
 } InputSnapshot;
 typedef struct {
     UWORD code;
@@ -127,7 +124,6 @@ typedef struct {
     volatile ULONG external_serial;
     volatile int external_held;
     volatile int external_dragged, external_cancelled;
-    ULONG external_seconds, external_micros;
     volatile int right_held, menu_cancelled, ui_busy, popup_open, popup_dismiss;
     /* The Folder Stack's close button in screen coordinates, while it is
        shown: a press there closes the stack and the pair is consumed. */
@@ -247,15 +243,15 @@ typedef struct {
        motion, zero a frame never shown, two or more a stall. */
     ULONG pace_one, pace_same, pace_stall, pace_field;
 } ProfileStats;
-/* A surface backend: how the dock reaches the screen. One table per backend,
-   chosen with the profile (apply_profile) while no surface is open, so open,
-   close and every frame use the same one. Each entry runs at most once per
-   frame or poll; pixel loops stay inside the backend. See docs/architecture.md. */
+/* The surface backend: how the dock reaches the screen. PiP is the only
+   one; select_backend sets it while no surface is open. Each entry runs at
+   most once per frame or poll; pixel loops stay inside the backend. See
+   docs/architecture.md. */
 typedef struct SurfaceOps {
     const char *name;
     /* The backend's part of open_surface, after the common steps have placed
-       the surface, opened the display layer, allocated the canvas (and the
-       backdrop for a backend that composes over the desktop) and laid out the
+       the surface, opened the display layer, allocated the canvas and the
+       backdrop and laid out the
        row: fill the backdrop, open the native window and its AppWindow, and
        whatever present needs. 0 on failure, leaving close_surface to release
        a partial open (surface_error may say why). */
@@ -273,7 +269,7 @@ typedef struct SurfaceOps {
     /* Show the composed frame; called once per draw. */
     void (*present)(struct App *app, const DockImage *frame);
 } SurfaceOps;
-extern const SurfaceOps amiga_surface_pip, amiga_surface_window;
+extern const SurfaceOps amiga_surface_pip;
 
 typedef struct App {
     DockSettings settings;
@@ -281,15 +277,14 @@ typedef struct App {
     DockEdge edge;
     DockUI *ui;
     Item items[DOCK_MAX_ITEMS];
-    int requested_backend;
-    int count, snapshot, use_ammx, profile, timer_open, timer_pending, timer_failed;
+    int count, use_ammx, profile, timer_open, timer_pending, timer_failed;
     int incomplete_pins;
     int timer_label_only;
     struct MsgPort *timer_port;
     struct timerequest *timer_io;
     ULONG clock_hz, frames;
     uint64_t started;
-    int pip_mode, live_open, live_pending, live_fast, live_failed, pip_visible, source_valid, failed;
+    int live_open, live_pending, live_fast, pip_visible, source_valid, failed;
     int screen_left, screen_top;
     DockRect dialog_clip;
     int pip_x_offset, pip_y_offset;
@@ -399,7 +394,6 @@ typedef struct App {
     uint64_t label_at;
     int label_visible;
     int gesture_redraw;
-    ULONG native_external_serial;
     int saved_priority, priority_changed;
     ULONG menu_seen;
     int left, top, width, height, active, hovered;
@@ -528,11 +522,9 @@ static inline int viewport_limit(const App *app, DockEdge edge)
 {
     int length = edge == DOCK_EDGE_BOTTOM ? app->screen->Width :
         app->screen->Height-app->screen->BarHeight-2;
-    if (app->pip_mode) {
-        int maximum = edge == DOCK_EDGE_BOTTOM ? AMIGA_PIP_MAX_WIDTH : AMIGA_PIP_MAX_HEIGHT;
-        if (length > maximum) length = maximum;
-        if (edge == DOCK_EDGE_BOTTOM) length &= ~31;
-    }
+    int maximum = edge == DOCK_EDGE_BOTTOM ? AMIGA_PIP_MAX_WIDTH : AMIGA_PIP_MAX_HEIGHT;
+    if (length > maximum) length = maximum;
+    if (edge == DOCK_EDGE_BOTTOM) length &= ~31;
     return length;
 }
 
@@ -583,12 +575,11 @@ int ui_fit(void *context, const DockUIPrefs *draft);
 DockUIPrefs current_ui_prefs(const App *app);
 int apply_preferences(App *app, const DockUIPrefs *prefs);
 
-/* amiga_surface.c: the common surface steps and backend selection. */
+/* amiga_surface.c: the common surface steps and the profile. */
 int open_surface(App *app);
 void close_surface(App *app);
-void select_backend(App *app, int explicit_pip);
+void select_backend(App *app);
 void use_pixel_backend(App *app);
-int fall_back_to_snapshot(App *app);
 
 /* amiga_input_handler.c: the input.device handler and its snapshots.
    dock_input_observe (amiga_platform.h) runs on input.device's task. */

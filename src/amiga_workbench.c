@@ -65,22 +65,21 @@ static int acquire_workbench(App *app)
     int fit, ok;
     app->screen = LockPubScreen(NULL);
     if (!app->screen) return 0;
-    select_backend(app,0);
+    select_backend(app);
     app->ui = create_ui(app);
     if (!app->ui) { UnlockPubScreen(NULL,app->screen); app->screen = NULL; return 0; }
     dock_ui_set_blocking_hook(app->ui,ui_blocking,app);
     dock_ui_set_fit_hook(app->ui,ui_fit,app);
     use_pixel_backend(app);
+    /* A screen PiP cannot use: wait for the next Workbench change. */
+    if (app->features.error) return 0;
     app->workbench_closed = 0;
     prefs = current_ui_prefs(app);
     fit = ui_fit(app,&prefs);
     if (fit < app->settings.base_size) {
         prefs.size = fit;
         ok = apply_preferences(app,&prefs);
-    } else if (!(ok = open_surface(app))) {
-        close_surface(app);
-        ok = app->pip_mode && fall_back_to_snapshot(app);
-    }
+    } else ok = open_surface(app);
     /* Like install_input: attach once the backend is final. A failure
        leaves the handler detached while the caller unlocks the screen. */
     if (ok) input_attach_screen(app,app->screen);

@@ -883,3 +883,32 @@ set on the Vampire under ApolloOS ($a47f) and AmigaOS 3.2.3 ($847f), core
       requires bit 11: from the Shell the line and return code 20; from
       Workbench (WBRun) the requester, and the process ended after OK.
       Test files removed from RAM:.
+
+## PiP only (2026-11-15)
+The CPU check admits only the 68080, and a dock without PiP (snapshot or
+opaque window) cut windows behind its zoom room (3.2.3 report). Decision
+(user): PiP is the only backend; when PiP cannot run, say why and quit.
+- [x] Profile: no backend choice. dock_choose_profile reports why PiP
+      cannot run (no AMMX, core, screen); the start shows that reason.
+- [x] Start: open failures show surface_error (pixel format, alignment,
+      PiP2 taken); no fall_back_to_snapshot. A Workbench reopen on a screen
+      PiP cannot use leaves the dock closed until the next change.
+- [x] Removed amiga_surface_window.c, app->snapshot, app->pip_mode,
+      requested_backend, the window-only IDCMP button and refresh paths,
+      the layer check in pointer_inside and the input handler, and the
+      fields only they used.
+- [x] Prefs: "snapshot" and "pip" still read (old files load) and ignored;
+      "pip": true is still written so an older build keeps PiP on rollback.
+- [x] CLI: --snapshot and --opaque go (ignored like unknown options); --pip
+      and --ammx are accepted. --caps prints "pip yes/no" instead of the
+      backend.
+- [x] Tests (test_profile, test_prefs), docs (README, PRODUCT,
+      architecture, pip-backend, hardware, release notes).
+- [x] 3.2.3, build 371 from RAM:: --caps (pip yes); started while the
+      installed dock ran: requester "PiP2 is already in use.", process
+      ended after OK, no crash. Installed dock quit through its menu, the
+      new build ran as the dock: zoom sweep, menu, RAM Disk dropped from
+      Workbench (saved), dragged out (removed), Quit. Config restored from
+      the backup, installed dock restarted with WBRun, RAM: files removed.
+- [ ] ApolloOS (shaped windows path) and a screen PiP cannot use (8-bit)
+      not run yet.
