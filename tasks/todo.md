@@ -1132,9 +1132,24 @@ AmigaOS 3.2.3 (Kickstart 47.13, 24-bit, no shaped windows), build 407,
 - Left: RexxMast started by me (was not running); RAM:DockAwesome (407)
   for the user; installed dock restarted with WBRun, other files removed.
 
-- [ ] Reviewer's notes left open: on ApolloOS check that a change on the
-      plate shows at once (if the driver hands LockBitMap a temporary
-      buffer the peek would see it only every tenth poll); a hover label
+ApolloOS R9.5 (16-bit, shaped windows), build 407, 2026-11-17:
+- [x] The reviewer's doubt about the peek: a probe (LockBitMapTags, unlock,
+      WriteRGBPixel with no lock, read at the remembered address): the
+      memory changed with the pixel, was restored with it, and a second
+      lock gave the same address. Live screen memory between locks.
+- [x] --damage-check 180 frames, 0 and 0. Dock at rest, 94 polls each:
+      capture 787 (build 395) and 781 us a poll: the lock is cheap here,
+      no gain and no loss.
+- [x] Installed in SYS:WBStartup (395 kept as
+      Disabled/DockAwesome-build395.old); Folder Stack opened with its
+      icons from the installed dock.
+- The cross compiler at ~/ApolloCrossDevLocal was gone when I came to build
+  the probe (not removed by me); the probe was built with
+  ~/GitRepos/ApolloCrossDev/Compilers/GCC-6.50-Dev. `make amiga` fails
+  until the path is back or APOLLO_ROOT points elsewhere. Build 407 was
+  already built.
+
+- [ ] Reviewer's notes left open: a hover label
       or popup of the dock's own over the box counts as a window change
       (one step back, half a second without arming); rexx_call polls with
       Delay(1), 20 ms a call; apply_attributions matches by address only.
