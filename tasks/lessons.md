@@ -326,3 +326,11 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
 - Matched --bench-sweep runs before believing a review's cycle estimate:
   "45-50 cycles per translucent pixel" for blend_pixel became 5.5 % of
   compose on hardware (2026-11-17).
+- Test a review's hardware claim with the probe before building on it:
+  "misaligned AMMX stores cost 1.7x" measured as no difference on core
+  12856 (decode and half blend, destination 4 mod 8 against 0 mod 8)
+  (2026-11-17).
+- Wait a few seconds after starting a test dock before the first click:
+  a click during its icon loading is not a press on a pin (2026-11-17).
+- Hover labels on ApolloOS are in PiP1: no screenshot shows them. Find an
+  icon by the row arithmetic (size, gap 5, divider 12) instead (2026-11-17).

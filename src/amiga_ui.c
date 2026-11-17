@@ -1615,6 +1615,10 @@ static void start_folder_clock(FolderView *f, int duration)
     f->motion_prepare_sum = f->motion_present_sum = 0;
 }
 
+static FolderCachedIcon *cached_folder_icon(const DockUI *ui, const char *path,
+    const unsigned long *stamp, int size);
+static int copy_image(DockImage *out, const DockImage *in);
+
 static void reset_folder_page(DockUI *ui)
 {
     FolderView *f = &ui->folder;
@@ -1623,6 +1627,18 @@ static void reset_folder_page(DockUI *ui)
     f->read_count = f->cache_hits = f->fill_reported = 0;
     free_folder_icons(f);
     if (f->motion == FOLDER_OPENING) {
+        /* Icons already in the cache (the prefetch read them) grow with
+           the box; the rest show their placeholder until they are read. */
+        int i, size = f->anchor.icon_size;
+        for (i = 0; i < folder_visible_files(f); ++i) {
+            char path[DOCK_PREFS_PATH_CAP];
+            const DockFolderEntry *entry = &f->entries[f->page*folder_page_size(f)+i];
+            const FolderCachedIcon *cached;
+            strcpy(path,f->path);
+            if (AddPart((STRPTR)path,(STRPTR)entry->name,sizeof(path)) &&
+                (cached = cached_folder_icon(ui,path,entry->stamp,size)))
+                copy_image(&f->loaded[i],&cached->icon);
+        }
         /* Start from the bare backdrop; the box grows out of the tip. */
         if (prepare_folder_scene(ui)) {
             folder_stamp(f->anchor.profile,0);
@@ -1637,6 +1653,21 @@ static void reset_folder_page(DockUI *ui)
         folder_stamp(f->anchor.profile,0);
         start_folder_clock(f,FOLDER_OPEN_MS);
     }
+}
+
+/* Another window lies over the popup: its pixels on the screen are not
+   the popup's own. Unknown (the layers are locked elsewhere) reads as no. */
+static int popup_covered(const DockUI *ui)
+{
+    struct Layer_Info *info = &ui->screen->LayerInfo;
+    const struct Layer *own = ui->popup->WLayer, *layer;
+    int covered = 0;
+    if (!own || !AttemptSemaphore(&info->Lock)) return 0;
+    for (layer = own->front; layer && !covered; layer = layer->front)
+        covered = layer->bounds.MinX <= own->bounds.MaxX && layer->bounds.MaxX >= own->bounds.MinX &&
+            layer->bounds.MinY <= own->bounds.MaxY && layer->bounds.MaxY >= own->bounds.MinY;
+    UnlockLayerInfo(info);
+    return covered;
 }
 
 void dock_ui_dismiss_popup(DockUI *ui)
@@ -1654,8 +1685,10 @@ void dock_ui_dismiss_popup(DockUI *ui)
         f->reveal_shown = folder_reveal_extent(f,ui->popup->Width,ui->popup->Height);
         f->motion_scale = 256;
         f->motion_rect = (DockRect){0,0,ui->popup->Width,ui->popup->Height};
-        /* The box as shown, to shrink and fade: read back from the screen. */
-        if (!f->motion_frame.pixels) {
+        /* The box as shown, to shrink and fade: read back from the screen.
+           Under another window that would shrink a picture of that window;
+           the strips hide the box instead. */
+        if (!f->motion_frame.pixels && !popup_covered(ui)) {
             DockImage *view = &f->motion_frame;
             *view = (DockImage){ui->popup->Width,ui->popup->Height,
                 malloc((size_t)ui->popup->Width*ui->popup->Height*4)};
@@ -1888,7 +1921,11 @@ static void load_folder_icon(DockUI *ui)
     strcpy(path,f->path);
     if (!AddPart((STRPTR)path,(STRPTR)entry->name,sizeof(path))) return;
     cached = cached_folder_icon(ui,path,entry->stamp,size);
-    if (cached) {
+    if (f->loaded[i].pixels) {
+        /* Already taken from the cache for the entrance. */
+        icon = f->loaded[i]; ok = 1;
+        ++f->cache_hits;
+    } else if (cached) {
         ok = copy_image(&icon,&cached->icon);
         ++f->cache_hits;
     } else {
@@ -1903,7 +1940,10 @@ static void load_folder_icon(DockUI *ui)
         }
     }
     if (!ok) return;
-    if (!f->artwork_ready && !prepare_folder_artwork(ui)) { free(icon.pixels); return; }
+    if (!f->artwork_ready && !prepare_folder_artwork(ui)) {
+        free(icon.pixels); f->loaded[i] = (DockImage){0};
+        return;
+    }
     {
         int x = folder_icon_left(f,i), y = folder_icon_top(f,i);
         dock_blend(&f->artwork,&icon,x,y);

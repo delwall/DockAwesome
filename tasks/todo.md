@@ -1014,20 +1014,51 @@ Performance, measured on ApolloOS R9.5, core 12856, 16-bit, 800x96, 12 pins:
       Smaller than the review's estimate: compose is not dominated by
       antialiased edges. Next: find where the 5.3 ms goes before more work.
 - [x] P4 fast live rate only with the dock's screen in front. Not measured.
-Not done, with reasons:
-- [ ] Handler signal filter (wake only near the dock): the drop catcher and
-      labels need pointer events from the whole screen; measure wakeups
-      first.
-- [ ] Aligned pixel buffers: damage boxes start at any column, gain unmeasured.
-- [ ] Capture compare before copy: the Fast RAM row was a measured win on
-      Coffin (27.3 -> 16.7 ms); the review's advice contradicts it.
-- [ ] Folder Stack: reuse the prefetched listing; icons in the entrance
-      animation; glass capture over a just-closed label; closing animation
-      over a foreign window.
-- [ ] Task-address reuse in status attribution; overlay stamp.
-- [ ] Host tests for title matching, shell quoting, script detection, .bak
-      recovery; bench_core through dock_renderer_draw.
-Smoke test, build 388 from RAM: on ApolloOS: hover, plate menu, About, Quit
-through the menu, profile printed. Installed dock (WBStartup) stopped with
+Second round (user: "Kör vidare med alla punkter"), build 393:
+- [x] Overlay stamps: a rebuilt drag picture or preview icon at a reused
+      address is redrawn (DockOverlay.stamp, size compare).
+- [x] Status attribution keeps a hash of the task's name beside its
+      address.
+- [x] Folder Stack entrance shows the icons already in the cache. ApolloOS,
+      Personal:Downloads (22 entries): entrance 4-5 frames, second opening
+      "0 read, 22 cached", dismissal 6 frames; first paint 80-82 ms (the
+      layer stage is 13.5-16.9 ms with the icons blended in).
+- [x] Folder Stack dismissal under another window hides by strips instead
+      of shrinking a picture of that window. Not seen on hardware (needs a
+      window over the open stack); the plain dismissal still animates.
+- [x] Quit: PiP goes off and presses pass through before the status worker
+      is waited for. A reset while a requester is up is answered
+      (BuildEasyRequest + SysReqHandler). Not run.
+- [x] src/dock_text.c: title matching, alias extraction, Shell quoting and
+      text detection moved out of the Amiga files, with tests/test_text.c.
+      The tests found that "Editor - RAM:Copy/Notes.txt" never gave the
+      alias "RAM:Copy/Notes.txt" (the volume search ran across the label);
+      fixed.
+- [x] tests/bench_core.c times dock_renderer_draw (glass, coverage, damage)
+      beside whole frames.
+- [x] --profile prints "Idle passes" (woken, nothing drawn, no live tick).
+Measured and rejected:
+- Handler signal filter: 537 idle passes, 377 us each (ApolloOS). At 60
+  mouse events a second that is 2.3 % of the CPU, only while the pointer
+  moves on the dock's screen; the drop receiver and labels need those
+  events. Not worth the risk.
+- Aligned pixel buffers: ammx_probe, decode to a destination 4 mod 8 and
+  0 mod 8: 60,434 and 60,374 ticks; half blend 187,961 and 186,637. No
+  difference on core 12856.
+- Capture compare before copy: the Fast RAM row was a measured win on
+  Coffin (27.3 -> 16.7 ms).
+- Folder Stack listing kept by the drawer's date: FAT volumes (the SD card
+  here) do not change a drawer's date when its contents change.
+Open:
+- [ ] Menu glass over a just-closed label: not reproduced. On ApolloOS the
+      label is in PiP1, so closing it exposes nothing; needs a system
+      where the label is a window.
+- [ ] .bak recovery and save_config have no host test (they are DOS calls).
+- [ ] Run on Coffin/3.2.3/AmiKit: B3-B9 above and the 24-bit capture.
+- [ ] The Games drawer window on the test machine moved from 351,409 to
+      364,420 during my tests.
+Smoke test, builds 388 and 393 from RAM: on ApolloOS: hover, plate menu,
+About, Quit through the menu, Folder Stack, profile printed. Installed dock (WBStartup) stopped with
 a FindTask/Signal Ctrl-C tool and restarted with WBRun; RAM: test files
-removed. A C:ApolloExplorerSrv that I started stays until the next reboot.
+removed (BreakTask too). A C:ApolloExplorerSrv that I started stays until
+the next reboot.

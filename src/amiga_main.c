@@ -152,7 +152,25 @@ static void message(const char *text)
         app->input_context.ui_busy = 1; app->input_context.active = NULL;
         Enable();
     }
-    EasyRequestArgs(NULL, &req, NULL, arguments);
+    if (app && reset_watch_mask(app)) {
+        /* Wait for the answer here, so Ctrl-Amiga-Amiga is still answered:
+           behind EasyRequest the reset waited ten seconds for the dock. */
+        struct Window *window = BuildEasyRequestArgs(NULL, &req, 0, arguments);
+        if ((ULONG)window > 1) {
+            ULONG reset = reset_watch_mask(app), port = 1UL<<window->UserPort->mp_SigBit;
+            for (;;) {
+                ULONG signals = Wait(port|reset);
+                if (signals & reset) {
+                    amiga_pip_suspend(app->pip); app->pip_visible = 0;
+                    amiga_float_hide(app->float_layer);
+                    reset_watch_done(app);
+                    break;
+                }
+                if (SysReqHandler(window, NULL, FALSE) != -2) break;
+            }
+            FreeSysRequest(window);
+        }
+    } else EasyRequestArgs(NULL, &req, NULL, arguments);
     if (app) {
         /* The next present publishes the snapshot again. */
         Disable(); app->input_context.ui_busy = dock_ui_busy(app->ui); Enable();
@@ -1035,6 +1053,9 @@ static void profile_report(App *app)
     fflush(stdout);
     {
         uint64_t canvas = (uint64_t)app->width*app->height;
+        printf("Idle passes: count=%lu us_avg=%lu (woken, nothing drawn, no live tick)\n",
+            (unsigned long)app->stats.idle_passes,
+            ticks_us(app,app->stats.idle_ticks,app->stats.idle_passes));
         printf("Damage: frames=%lu full=%lu compose_pixels_avg=%lu%% conversion_pixels_avg=%lu%%\n",
             (unsigned long)app->stats.damage_frames, (unsigned long)app->stats.damage_full,
             (unsigned long)(app->stats.damage_frames && canvas ?
@@ -1148,7 +1169,7 @@ static DockOverlay running_dot(const App *app, const DockPlacement *icon)
     if (app->edge == DOCK_EDGE_BOTTOM) y = app->height-1-inset-dot.height/2;
     else if (app->edge == DOCK_EDGE_RIGHT) x = app->width-1-inset-dot.width/2;
     else x = inset-dot.width/2;
-    return (DockOverlay){&dot,x,y};
+    return (DockOverlay){&dot,x,y,0};
 }
 
 /* A capsule from (ax,ay) to (bx,by) with radius r contains (x,y); no
@@ -1324,14 +1345,15 @@ static void draw(App *app)
         /* With a preview window past the surface, its picture where the
            window is: the two halves of the icon stay one picture. */
         const DockImage *shown = amiga_drag_preview_icon(app->drag_preview,&x,&y);
+        unsigned long stamp = shown ? amiga_drag_preview_stamp(app->drag_preview) : 0;
         if (shown) { icon = shown; x -= app->left; y -= app->top; }
         app->drag_overlay_icon = icon; app->drag_overlay_x = x; app->drag_overlay_y = y;
         /* Drawn on the screen, the dock shows the same whole picture on its
            surface (with the Remove pill: only the icon cut the pill). */
         if (app->drag_bob && drag_bob_picture(app,icon))
             overlays[overlay_count++] = (DockOverlay){&app->drag_bob_picture,
-                x-(app->drag_bob_picture.width-icon->width)/2, y};
-        else overlays[overlay_count++] = (DockOverlay){icon, x, y};
+                x-(app->drag_bob_picture.width-icon->width)/2, y, app->drag_bob_stamp};
+        else overlays[overlay_count++] = (DockOverlay){icon, x, y, stamp};
     } else app->drag_overlay_icon = NULL;
     app->renderer.overlays = overlays; app->renderer.overlay_count = overlay_count;
     dock_renderer_draw(&app->renderer, &app->canvas, &app->backdrop,
@@ -1762,6 +1784,7 @@ int drag_bob_picture(App *app, const DockImage *icon)
     if (!drag_picture(app,icon,&remove,&picture)) return 0;
     free(app->drag_bob_picture.pixels);
     app->drag_bob_picture = picture;
+    ++app->drag_bob_stamp;
     app->drag_bob_icon = icon;
     app->drag_bob_new = 1;
     return 1;
@@ -2139,6 +2162,7 @@ static __attribute__((noinline)) void event_loop(App *app)
         DockUIAction action;
         int redraw = app->gesture_redraw, recreate = 0, save = 0, due;
         int dismiss_popup;
+        uint64_t pass_started = app->profile ? profile_clock() : 0;
         ++app->stats.wakes; app->gesture_redraw = 0;
         if (signals & SIGBREAKF_CTRL_C) break;
         if (signals & reset_watch_mask(app)) {
@@ -2322,6 +2346,9 @@ static __attribute__((noinline)) void event_loop(App *app)
         update_hover_label(app);
         animation_schedule(app); live_schedule(app);
         if (redraw) draw(app);
+        else if (app->profile && !due) {
+            ++app->stats.idle_passes; app->stats.idle_ticks += profile_clock()-pass_started;
+        }
         drag_bob_present(app);
         /* --pip-dump: what PiP shows during a drag, frame by frame. */
         if (redraw && app->pip_dump[0] && app->pip && app->gesture.active && app->gesture.dragged)
@@ -2617,6 +2644,9 @@ int main(int argc, char **argv)
     workbench_notify_open(app);
     if (app->bench_speed) bench_sweep(app);
     else { message_app = app; event_loop(app); message_app = NULL; }
+    /* The status worker is waited for below: nothing of the dock stays on
+       screen, and no press is taken for it, meanwhile. */
+    if (app->pip) ui_blocking(app,1);
     workbench_notify_close(app);
     program_poll_close(app);
     status = app->failed ? 20 : 0;

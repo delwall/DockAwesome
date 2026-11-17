@@ -184,7 +184,8 @@ typedef struct {
        attributed to the pin whose launch started them. */
     const struct Task *seen[DOCK_MAX_ITEMS];
     int seen_count;
-    struct { const struct Task *task; uint32_t pin_id; } attributions[DOCK_MAX_ITEMS];
+    /* name: a hash of the task's name; exec reuses a quit task's address. */
+    struct { const struct Task *task; uint32_t pin_id, name; } attributions[DOCK_MAX_ITEMS];
     int attribution_count;
     /* Launches that already got their app (by `at`): one app per launch. */
     uint64_t claimed[LAUNCH_SLOTS];
@@ -217,6 +218,8 @@ void dock_vblank_entry(void);
 /* --profile counters. Only the profile report reads them. */
 typedef struct {
     ULONG wakes;
+    /* Loop passes that drew nothing and were not a live tick, and their time. */
+    ULONG idle_passes; uint64_t idle_ticks;
     uint64_t render_ticks, min_ticks, max_ticks;
     uint64_t present_ticks, conversion_ticks, upload_ticks;
     uint64_t program_poll_ticks, program_poll_peak;
@@ -379,6 +382,7 @@ typedef struct App {
        window preview instead. */
     AmigaDragBob *drag_bob;
     DockImage drag_bob_picture;
+    unsigned long drag_bob_stamp; /* bumped when the picture is rebuilt */
     const DockImage *drag_bob_icon;
     int drag_bob_remove, drag_bob_x, drag_bob_y, drag_bob_due, drag_bob_new, window_drag;
     int use_pip1; /* --pip1: labels and drags may use PiP1 beside a narrow dock */

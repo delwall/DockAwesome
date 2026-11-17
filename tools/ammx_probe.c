@@ -403,8 +403,8 @@ int main(void)
         return result;
     }
     TimerBase = request->tr_node.io_Device;
-    dst = (unsigned char *)malloc(65536);
-    source = (unsigned char *)malloc(65536);
+    dst = (unsigned char *)malloc(65536+8);
+    source = (unsigned char *)malloc(65536+8);
     if (dst && source) {
         memset(dst, 17, 65536);
         memset(source, 93, 65536);
@@ -415,6 +415,11 @@ int main(void)
         measure("RGB24 AMMX", dock_rgba_to_rgb24_ammx, dst, source);
         measure_native("RGB565 decode C",dock_rgb565_to_rgba_c,dst,source);
         measure_native("RGB565 decode AMMX",dock_rgb565_to_rgba_ammx,dst,source);
+        /* The same kernel by destination alignment: malloc returns 4 mod 8. */
+        printf("dst is %lu mod 8\n",(unsigned long)dst&7);
+        measure_native("RGB565 decode AMMX dst+4",dock_rgb565_to_rgba_ammx,dst+4,source);
+        measure("Half blend AMMX dst+4, src+4",dock_mix_half_ammx,dst+4,source+4);
+        measure("Half blend AMMX dst+4, src",dock_mix_half_ammx,dst+4,source);
         measure_native("RGB565 encode C",dock_rgba_to_rgb565_c,dst,source);
         measure_native("RGB565 encode AMMX",dock_rgba_to_rgb565_ammx,dst,source);
         measure_row("RGB24 row to RGB565 C",rgb24_row_c,dst,source);

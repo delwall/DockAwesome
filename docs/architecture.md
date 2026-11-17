@@ -20,6 +20,7 @@ Pointer -> layout -> renderer -> frame -> native window or PiP2
 | `dock_interaction.c` | Button pairs, drag state, and pin actions |
 | `dock_renderer.c` | Pixel backend selection, damage tracking, and damaged PiP conversion |
 | `dock_prefs.c` | JSON preferences |
+| `dock_text.c` | Text rules without OS calls: window titles that name a document, Shell quoting, text detection |
 | `dock_profile.c` | Feature choice from probed capabilities, and why PiP cannot run |
 | `amiga_caps.c` | CPU, chipset and OS capability probes, `--caps` |
 | `amiga_main.c` | Items and icons, gestures, drawing, animation, timers, preferences, profile and the event loop |

@@ -2060,11 +2060,12 @@ static void test_damage_fuzz(void)
                 else dock_edge_animate(&f.s,(DockEdge)edge,&animation,current,target,count);
                 for (i = 0; i < count; ++i) row[i] = i == hidden ? NULL : icons[i];
                 for (i = 0; i < count; ++i) if (row[i] && running[i]) {
+                    overlays[overlay_count].stamp = 0;
                     overlays[overlay_count].image = &fixture_dot;
                     fixture_dot_position(&f,&current[i],&overlays[overlay_count].x,&overlays[overlay_count].y);
                     ++overlay_count;
                 }
-                if (drag) overlays[overlay_count++] = (DockOverlay){&f.cache[1].image[drag_level],drag_x,drag_y};
+                if (drag) overlays[overlay_count++] = (DockOverlay){&f.cache[1].image[drag_level],drag_x,drag_y,0};
                 r.pressed_item = pressed; r.center_panel = center;
                 r.overlays = overlays; r.overlay_count = overlay_count;
                 dock_renderer_draw(&r,&f.canvas,captured ? &f.backdrop : NULL,row,current,count,&f.s);

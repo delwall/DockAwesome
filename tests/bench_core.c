@@ -1,6 +1,8 @@
 #include "dock_core.h"
 #include "dock_compose.h"
 #include "dock_geometry.h"
+#include "dock_renderer.h"
+#include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -34,6 +36,30 @@ int main(void)
         back.pixels[i*4]=80; back.pixels[i*4+1]=100; back.pixels[i*4+2]=130; back.pixels[i*4+3]=255;
     }
     for(i=0;i<COUNT;++i) icons[i]=&cache;
+    /* The path the dock takes: the renderer with glass rows, a coverage
+       mask and damage, under a pointer that sweeps the row. */
+    {
+        static DockRenderer renderer;
+        unsigned char *coverage = (unsigned char *)calloc(WIDTH,HEIGHT);
+        if (!coverage) return 1;
+        memset(&renderer,0,sizeof(renderer));
+        renderer.pixels = dock_backend_portable();
+        renderer.coverage = coverage;
+        renderer.edge = DOCK_EDGE_BOTTOM;
+        begin=clock();
+        for(j=0;j<FRAMES;++j) {
+            if(!dock_layout(&s,COUNT,WIDTH,HEIGHT,j%WIDTH,90,1,p)) return 1;
+            dock_renderer_draw(&renderer,&frame,&back,icons,p,COUNT,&s);
+            checksum+=frame.pixels[(j%(WIDTH*HEIGHT))*4];
+        }
+        end=clock();
+        printf("HOST ONLY: renderer with damage, %d icons, %dx%d, %d frames: %.3f ms/frame, checksum %lu\n",
+            COUNT,WIDTH,HEIGHT,FRAMES,1000.0*(double)(end-begin)/CLOCKS_PER_SEC/FRAMES,checksum);
+        dock_renderer_release(&renderer);
+        free(coverage);
+    }
+    /* For comparison: every frame composed whole, without the renderer. */
+    checksum = 0;
     begin=clock();
     for(j=0;j<FRAMES;++j) {
         if(!dock_layout(&s,COUNT,WIDTH,HEIGHT,j%WIDTH,90,1,p)) return 1;
@@ -41,7 +67,7 @@ int main(void)
         checksum+=frame.pixels[(j%(WIDTH*HEIGHT))*4];
     }
     end=clock();
-    printf("HOST ONLY: %d icons, %dx%d, %d frames: %.3f ms/frame, checksum %lu\n",
+    printf("HOST ONLY: whole frames, %d icons, %dx%d, %d frames: %.3f ms/frame, checksum %lu\n",
         COUNT,WIDTH,HEIGHT,FRAMES,1000.0*(double)(end-begin)/CLOCKS_PER_SEC/FRAMES,checksum);
     printf("Window RGBA buffers: %lu bytes; distinct 16-icon cache: %lu bytes\n",
         2UL*WIDTH*HEIGHT*4,COUNT*(unsigned long)cache.bytes);

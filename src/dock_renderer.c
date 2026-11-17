@@ -201,6 +201,11 @@ static void add_divider(DockDamage *d, int bottom, const DockRect *panel,
     add_span(d, bottom, panel, a0 < b0 ? a0 : b0, a1 > b1 ? a1 : b1, width, height);
 }
 
+static int same_rect(DockRect a, DockRect b)
+{
+    return a.left == b.left && a.top == b.top && a.right == b.right && a.bottom == b.bottom;
+}
+
 void dock_renderer_draw(DockRenderer *r, DockImage *canvas,
     const DockImage *backdrop, const DockCache *const *icons,
     const DockPlacement *p, int count, const DockSettings *s)
@@ -277,7 +282,9 @@ void dock_renderer_draw(DockRenderer *r, DockImage *canvas,
             const DockOverlay *v = i < overlay_count ? &overlays[i] : NULL;
             if (v && i < o->overlay_count && v->image == o->overlay[i].image &&
                 (v->image ? v->image->pixels : NULL) == o->overlay_pixels[i] &&
-                v->x == o->overlay[i].x && v->y == o->overlay[i].y) continue;
+                v->x == o->overlay[i].x && v->y == o->overlay[i].y &&
+                v->stamp == o->overlay[i].stamp &&
+                (!v->image || same_rect(o->overlay_rect[i],image_rect(v->image,v->x,v->y)))) continue;
             if (i < o->overlay_count) dock_damage_add(d, o->overlay_rect[i], width, height);
             if (v && v->image) dock_damage_add(d, image_rect(v->image, v->x, v->y), width, height);
         }

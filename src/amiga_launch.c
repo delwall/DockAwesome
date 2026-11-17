@@ -5,6 +5,7 @@
    process with the icon's stack, and a WBStartup message whose reply says
    the program has ended. The program's code stays loaded until then. */
 #include "amiga_app.h"
+#include "dock_text.h"
 #include <rexx/storage.h>
 #include <proto/rexxsyslib.h>
 #include "amiga_folder.h"
@@ -205,23 +206,6 @@ static LONG embedded_stack(BPTR seglist)
 /* Icons set to "Start from Shell" (tool type CLI) or "Start from ARexx"
    (REXX) run as Shell commands in the object's drawer, with an output
    window that opens only when the command writes. */
-/* Appends `text` in Shell double quotes, where * escapes " and itself.
-   Returns 0 when it does not fit. */
-static int shell_quote(char *out, size_t size, const char *text)
-{
-    size_t n = strlen(out);
-    if (n+1 >= size) return 0;
-    out[n++] = '"';
-    for (; *text; ++text) {
-        if (n+3 >= size) return 0;
-        if (*text == '"' || *text == '*') out[n++] = '*';
-        out[n++] = *text;
-    }
-    out[n++] = '"';
-    out[n] = 0;
-    return 1;
-}
-
 static int shell_launch(const char *path, const struct DiskObject *icon, LONG *error)
 {
     char command[PATH_CAP*4+32], window[PATH_CAP+48];
@@ -232,7 +216,7 @@ static int shell_launch(const char *path, const struct DiskObject *icon, LONG *e
     if (!icon) {
         /* A script without its own icon, as Coffin's WBDock runs them. */
         strcpy(command,"Execute ");
-        fits = shell_quote(command,sizeof(command),path);
+        fits = dock_shell_quote(command,sizeof(command),path);
     } else if (has_tool_type(icon,"REXX")) {
         /* RX runs a quoted argument as ARexx source, not as a file, so a
            one-line program calls the script by its full name. */
@@ -245,12 +229,12 @@ static int shell_launch(const char *path, const struct DiskObject *icon, LONG *e
         }
         call[n++] = '\''; call[n] = 0;
         strcpy(command,"RX ");
-        fits = !*c && shell_quote(command,sizeof(command),call);
+        fits = !*c && dock_shell_quote(command,sizeof(command),call);
     } else if (icon->do_Type == WBPROJECT && icon->do_DefaultTool && icon->do_DefaultTool[0]) {
-        fits = shell_quote(command,sizeof(command),(const char *)icon->do_DefaultTool);
+        fits = dock_shell_quote(command,sizeof(command),(const char *)icon->do_DefaultTool);
         if (fits) strcat(command," ");
-        fits = fits && shell_quote(command,sizeof(command),path);
-    } else fits = shell_quote(command,sizeof(command),path);
+        fits = fits && dock_shell_quote(command,sizeof(command),path);
+    } else fits = dock_shell_quote(command,sizeof(command),path);
     if (!fits) { *error = ERROR_LINE_TOO_LONG; return 0; }
     file = Lock((STRPTR)path,ACCESS_READ);
     dir = file ? ParentDir(file) : 0;
@@ -270,17 +254,6 @@ static int shell_launch(const char *path, const struct DiskObject *icon, LONG *e
         return 0;
     }
     return 1;
-}
-
-/* The start of a file reads as text: a picture, an archive or any other
-   binary document must never reach Execute. */
-static int text_bytes(const UBYTE *bytes, LONG count)
-{
-    LONG i;
-    for (i = 0; i < count; ++i)
-        if (bytes[i] < 32 && bytes[i] != '\t' && bytes[i] != '\n' && bytes[i] != '\r' &&
-            bytes[i] != '\f' && bytes[i] != 27) return 0;
-    return count > 0;
 }
 
 /* A plain file without its own icon that is a script: it has the script
@@ -307,7 +280,7 @@ static int script_without_icon(const char *path, int pinned)
             if (file) {
                 LONG got = Read(file,head,sizeof(head));
                 lock = 0;
-                script = text_bytes(head,got);
+                script = dock_text_bytes(head,(size_t)(got > 0 ? got : 0));
                 Close(file);
             }
         }
