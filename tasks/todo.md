@@ -1199,4 +1199,8 @@ center every frame while the dock zooms.
       x=898, pointer off the dock x=871; old place repainted cleanly.
 - [ ] Not seen: the dock itself (PiP) beside the tip on the monitor;
       side docks (left/right) not run.
-- RAM:DockAwesome (build 412) left for the user; installed build is 408.
+- [x] Installed build 412 in SYS:WBStartup (408 kept as
+      Disabled/DockAwesome-build408.old); the stack opened and its tip
+      moved to x=898 with the pointer left of the pin. RAM: test files
+      removed. Disabled/DockAwesome-build407.old and -build395.old are held
+      by Workbench (WBRun binaries); delete after a reboot.
