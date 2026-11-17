@@ -542,12 +542,18 @@ static int pointer_inside(App *app, int *x, int *y)
     return !native_menu_held(app);
 }
 
-/* The stack pin's morph follows the Folder Stack in quarter steps (and to
-   its ends): redrawing the dock every motion frame took the frame past
-   one 20 ms field on Coffin and halved the box's frame rate. */
-static int morph_due(const App *app, int morph)
+/* The stack pin's morph follows the Folder Stack in quarter steps:
+   redrawing the dock every motion frame took the frame past one 20 ms
+   field on Coffin and halved the box's frame rate. Exact quarters let the
+   three blends between be kept. */
+static int morph_step(int progress)
 {
-    return morph != app->morph && (morph == 0 || morph == 256 || abs(morph-app->morph) >= 64);
+    return progress >= 256 ? 256 : progress <= 0 ? 0 : (progress+32)&~63;
+}
+
+static int morph_due(const App *app, int progress)
+{
+    return morph_step(progress) != app->morph;
 }
 
 int animation_needed(const App *app)
@@ -625,10 +631,10 @@ static int animate_row(App *app)
     DockPlacement *row = app->moving_item ? app->moving_placement : app->placement;
     /* The pin turns into the close button as far as the box is out, so
        both move together, opening and closing. */
-    int morph = dock_ui_folder_progress(app->ui);
+    int morph = morph_step(dock_ui_folder_progress(app->ui));
     int changed = dock_edge_animate(&app->settings, app->edge, &app->animation,
         row, app->target, row_count(app));
-    if (morph_due(app,morph)) {
+    if (morph != app->morph) {
         app->morph = morph;
         changed = 1;
     }
@@ -1076,6 +1082,18 @@ static void profile_report(App *app)
     printf("Frame pacing: one_field=%lu same_field=%lu stalled=%lu vsync=%d\n",
         (unsigned long)app->stats.pace_one, (unsigned long)app->stats.pace_same,
         (unsigned long)app->stats.pace_stall, app->vblank_open && !app->no_vsync);
+    if (app->stats.stall_logged) {
+        ULONG n;
+        printf("Stalls (fields/render_us/present_us/gap_us):");
+        for (n = 0; n < app->stats.stall_logged; ++n)
+            printf(" %u/%u/%u/%u",app->stats.stall_log[n].fields,app->stats.stall_log[n].render_us,
+                app->stats.stall_log[n].present_us,app->stats.stall_log[n].gap_us);
+        printf("\n");
+    }
+    printf("Dock frames during Folder Stack motion: %lu, us_avg=%lu\n",
+        (unsigned long)app->stats.folder_dock_draws,
+        ticks_us(app,app->stats.folder_dock_ticks,app->stats.folder_dock_draws));
+
     if (app->damage_check)
         printf("Damage check: frames=%lu compose_mismatch=%lu convert_mismatch=%lu\n",
             (unsigned long)app->stats.check_frames, (unsigned long)app->stats.compose_mismatch,
@@ -1263,51 +1281,78 @@ void stack_button_build(App *app)
     else { app->button_settings = app->settings; app->button_edge = app->edge; }
 }
 
-/* The stack pin's image between its icon and the close button: alpha
-   weighted, so soft edges do not darken. Full progress uses the button. */
-static const DockCache *stack_morph(App *app, const DockCache *icon, int level)
+/* The stack pin's image t/256 of the way from its icon to the close
+   button (t a quarter step): alpha weighted, so soft edges do not darken.
+   Full progress uses the button. */
+static const DockCache *stack_morph(App *app, const DockCache *icon, int level, int t)
 {
     const DockImage *a, *b;
-    DockImage *out;
-    int t = app->morph, i;
+    MorphSlot *slot;
+    int i, n;
     /* Without a blend, show whichever image is nearer. */
     const DockCache *nearer = t >= 128 ? &app->stack_button : icon;
-    if (t >= 256 || level < 0 || level >= icon->levels || level >= app->stack_button.levels)
-        return nearer;
+    if (t <= 0 || t >= 256 || (t&63) || level < 0 || level >= icon->levels ||
+        level >= app->stack_button.levels) return nearer;
     a = &icon->image[level]; b = &app->stack_button.image[level];
     if (a->width != b->width || a->height != b->height ||
         a->width > DOCK_MAX_ICON_SIZE || a->height > DOCK_MAX_ICON_SIZE) return nearer;
-    if (!app->morph_pixels &&
-        !(app->morph_pixels = malloc((size_t)DOCK_MAX_ICON_SIZE*DOCK_MAX_ICON_SIZE*4)))
+    slot = &app->morph_slot[t/64-1];
+    /* Kept from an earlier opening or redraw: its unchanged stamp leaves
+       the pin's slot undamaged when nothing else changed. */
+    if (slot->cache.stamp && slot->level == level &&
+        slot->icon == icon->stamp && slot->button == app->stack_button.stamp)
+        return &slot->cache;
+    if (!slot->pixels && !(slot->pixels = malloc((size_t)DOCK_MAX_ICON_SIZE*DOCK_MAX_ICON_SIZE*4)))
         return nearer;
-    /* Redraws without a change (a hover label, a running dot) reuse the
-       blend, and its unchanged stamp leaves the slot undamaged. */
-    if (app->morph_cache.stamp && app->morph_key.morph == t && app->morph_key.level == level &&
-        app->morph_key.icon == icon->stamp && app->morph_key.button == app->stack_button.stamp)
-        return &app->morph_cache;
-    memset(&app->morph_cache,0,sizeof(app->morph_cache));
-    app->morph_cache.levels = level+1;
-    out = &app->morph_cache.image[level];
-    *out = (DockImage){a->width,a->height,app->morph_pixels};
-    app->morph_key.morph = t; app->morph_key.level = level;
-    app->morph_key.icon = icon->stamp; app->morph_key.button = app->stack_button.stamp;
-    dock_cache_restamp(&app->morph_cache);
-    for (i = 0; i < a->width*a->height; ++i) {
-        const unsigned char *p = a->pixels+i*4, *q = b->pixels+i*4;
-        unsigned char *o = out->pixels+i*4;
-        unsigned int wa, wb, sum, c;
-        if ((p[3]&q[3]) == 255) {
-            /* Both opaque, as most pixels are: a plain blend, no divide. */
-            for (c = 0; c < 3; ++c) o[c] = (unsigned char)((p[c]*(256-t)+q[c]*t+128)>>8);
-            o[3] = 255;
-            continue;
+    if (slot->cache.levels) free(slot->cache.runs[slot->cache.levels-1]);
+    memset(&slot->cache,0,sizeof(slot->cache));
+    {
+        /* Whole words (RGBA, big-endian), two channels per multiply. The
+           colour weight of a, wa/(wa+wb) in 1/256, depends only on the two
+           alphas: one divide per alpha pair, kept while the next pixel has
+           the same pair (the button's glass is one alpha almost everywhere).
+           Bytes and three divides per pixel took 5 ms for a 68 px pin on
+           the 68080 and cost the Folder Stack's entrance a frame. */
+        const uint32_t *pa = (const uint32_t *)a->pixels, *pb = (const uint32_t *)b->pixels;
+        uint32_t *po = (uint32_t *)slot->pixels;
+        unsigned int last = ~0u, weight = 256;
+        n = a->width*a->height;
+        for (i = 0; i < n; ++i) {
+            uint32_t p = pa[i], q = pb[i], rb, g;
+            unsigned int alpha_p = p&255, alpha_q = q&255, w, alpha;
+            if ((alpha_p&alpha_q) == 255) { w = 256-t; alpha = 255; }
+            else {
+                unsigned int wa = alpha_p*(256-t), wb = alpha_q*t, sum = wa+wb, pair;
+                if (!sum) { po[i] = 0; continue; }
+                pair = alpha_p<<8|alpha_q;
+                if (pair != last) { weight = (wa*256+sum/2)/sum; last = pair; }
+                w = weight; alpha = (sum+128)>>8;
+            }
+            /* R and B in one word (0x00RR00BB), G alone. */
+            rb = (((p>>8)&0x00ff00ffu)*w+((q>>8)&0x00ff00ffu)*(256-w)+0x00800080u)&0xff00ff00u;
+            g = ((p>>16)&255)*w+((q>>16)&255)*(256-w)+128;
+            po[i] = rb|((g&0xff00u)<<8)|alpha;
         }
-        wa = p[3]*(256-t); wb = q[3]*t; sum = wa+wb;
-        if (!sum) { memset(o,0,4); continue; }
-        for (c = 0; c < 3; ++c) o[c] = (unsigned char)((p[c]*wa+q[c]*wb+sum/2)/sum);
-        o[3] = (unsigned char)((sum+128)>>8);
     }
-    return &app->morph_cache;
+    slot->cache.image[level] = (DockImage){a->width,a->height,slot->pixels};
+    slot->cache.levels = level+1;
+    /* Runs skip the clear corners and copy opaque spans, as for any icon;
+       without them the compositor scans every pixel. */
+    slot->cache.runs[level] = dock_image_runs(&slot->cache.image[level]);
+    slot->level = level; slot->icon = icon->stamp; slot->button = app->stack_button.stamp;
+    dock_cache_restamp(&slot->cache);
+    return &slot->cache;
+}
+
+static void free_morph_slots(App *app)
+{
+    int i;
+    for (i = 0; i < 3; ++i) {
+        MorphSlot *slot = &app->morph_slot[i];
+        if (slot->cache.levels) free(slot->cache.runs[slot->cache.levels-1]);
+        free(slot->pixels);
+        memset(slot,0,sizeof(*slot));
+    }
 }
 
 /* Tell the input handler where the close button is while it is shown. */
@@ -1329,7 +1374,7 @@ static void publish_close_button(App *app, const DockPlacement *placement, int c
 
 static void draw(App *app)
 {
-    uint64_t started = app->profile ? profile_clock() : 0;
+    uint64_t started = app->profile ? profile_clock() : 0, presented;
     const DockCache *icons[DOCK_MAX_ITEMS];
     DockOverlay overlays[DOCK_MAX_OVERLAYS];
     const DockPlacement *placement = row_placement(app);
@@ -1351,7 +1396,7 @@ static void draw(App *app)
         int item = row_item(app,i);
         icons[i] = item == dragged ? NULL : &app->items[item].cache;
         if (app->items[item].stack && icons[i] && app->stack_button.levels && app->morph)
-            icons[i] = stack_morph(app,icons[i],placement[i].level);
+            icons[i] = stack_morph(app,icons[i],placement[i].level,app->morph);
         if (selected && selected == app->items[item].pin_id) app->renderer.pressed_item = i+1;
     }
     /* Running dots in slot order, then the dragged icon. */
@@ -1408,19 +1453,38 @@ static void draw(App *app)
                 (uint64_t)(damage->rect[i].bottom-damage->rect[i].top);
     }
     /* The one indirect call per frame. */
+    presented = app->profile ? profile_clock() : 0;
     app->surface->present(app, &app->canvas);
     if (app->profile && app->vblank_open) {
         /* Consecutive frames of one motion: at most five fields apart. */
         ULONG field = app->vblank.fields, fields = field-app->stats.pace_field;
-        if (app->frames && fields <= 5) {
+        /* Only frames that continue a motion: a new one starting a field
+           or two after the last ended is no stall. */
+        if (app->frames && fields <= 5 && app->stats.frame_continues) {
             if (fields == 1) ++app->stats.pace_one;
             else if (!fields) ++app->stats.pace_same;
-            else ++app->stats.pace_stall;
+            else {
+                ++app->stats.pace_stall;
+                if (app->stats.stall_logged < 24) {
+                    uint64_t now = profile_clock();
+                    ULONG n = app->stats.stall_logged++;
+                    app->stats.stall_log[n].fields = (UWORD)fields;
+                    app->stats.stall_log[n].render_us = (UWORD)ticks_us(app,now-started,1);
+                    app->stats.stall_log[n].present_us = (UWORD)ticks_us(app,now-presented,1);
+                    app->stats.stall_log[n].gap_us = (UWORD)ticks_us(app,started-app->stats.frame_end,1);
+                }
+            }
         }
         app->stats.pace_field = field;
     }
     if (app->profile) {
         uint64_t ticks = profile_clock()-started;
+        app->stats.frame_end = started+ticks;
+        app->stats.frame_continues = animation_needed(app) || dock_ui_folder_moving(app->ui);
+        if (dock_ui_folder_moving(app->ui)) {
+            ++app->stats.folder_dock_draws;
+            app->stats.folder_dock_ticks += ticks;
+        }
         ++app->frames;
         app->stats.render_ticks += ticks;
         if (ticks < app->stats.min_ticks) app->stats.min_ticks = ticks;
@@ -1633,6 +1697,13 @@ static void open_stack_view(App *app, int index)
         }
         memcpy(app->target,app->placement,(size_t)app->count*sizeof(*app->placement));
         dock_animation_reset(&app->animation);
+        /* The pin's three blends before the box moves: made during the
+           motion, each one took that field past 20 ms with the box's frame. */
+        if (app->stack_button.levels) {
+            int t;
+            for (t = 64; t < 256; t += 64)
+                stack_morph(app,&app->items[index].cache,app->placement[index].level,t);
+        }
     } else message("Cannot open the Folder Stack.");
     sync_input_ui(app);
 }
@@ -2607,6 +2678,7 @@ int main(int argc, char **argv)
     if (!app->ui) { message("Cannot set up the dock controls."); goto done; }
     dock_ui_set_blocking_hook(app->ui,ui_blocking,app);
     dock_ui_set_fit_hook(app->ui,ui_fit,app);
+    if (app->profile) dock_ui_set_field_counter(app->ui,&app->vblank.fields);
     use_pixel_backend(app);
     {
         DockSettings configured = app->settings;
@@ -2705,7 +2777,7 @@ done:
     }
     for (i = 0; i < app->count; ++i) item_free(&app->items[i]);
     dock_cache_free(&app->stack_button);
-    free(app->morph_pixels);
+    free_morph_slots(app);
     /* PiP, input, the drop receiver and the surface are released. */
     if (app->failed && app->surface_error[0]) message(app->surface_error);
     if (app->screen) UnlockPubScreen(NULL, app->screen);

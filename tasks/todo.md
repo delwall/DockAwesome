@@ -1204,3 +1204,29 @@ center every frame while the dock zooms.
       moved to x=898 with the pointer left of the pin. RAM: test files
       removed. Disabled/DockAwesome-build407.old and -build395.old are held
       by Workbench (WBRun binaries); delete after a reboot.
+
+Smoother animations: Folder Stack box and dock zoom, builds 413-427
+(2026-11-17, ApolloOS). Plan: measure where frames drop, fix the box's
+frame rate, let the user pick the zoom curve.
+- [x] Profile: fields between box frames (fields=), each box frame's time
+      (frame_us), dock frames during the box's motion, and the first
+      stalled dock frames (only frames that continue a motion).
+- [x] Zoom alone drops no frames: 60 of 60 one field apart. The earlier
+      "stalled" count included a new motion starting after the last.
+- [x] Box entrance dropped one frame of 6 (fields=01121, 5 frames):
+      1. PiP converted the whole canvas while a popup was open (12 ms dock
+         frames). Now the popup's rectangle and the one in that buffer's
+         last frame; --damage-check 418 frames, 0 and 0.
+      2. The pin's morph blend: bytes and three divides per pixel, 5 ms.
+         Now words, one divide per alpha pair (max 1 level from the old
+         result), quarter steps kept in three slots with runs, made when
+         the stack opens: morph frames 8.5 -> 1.7-3.4 ms.
+      3. The box's own large frames (21 ms at near full size): runs of
+         consecutive source columns copied whole when they average 4 px
+         or more. Largest frame 21 -> 16 ms.
+      Entrance now 6 frames, fields=011111, in all five runs.
+- [ ] Dismissal: 6 frames as before, but fields=021111: a 7.4 ms dock
+      frame (27426 px, the backdrop under the moved tip) lands with the
+      first box frame. Not fixed.
+- [x] Zoom curve: DOCK_ZOOM_TICKS (default 8). RAM:Dock8 (build 426),
+      Dock10 (424), Dock12 (425) for the user to compare on the monitor.

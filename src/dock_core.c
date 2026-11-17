@@ -103,6 +103,13 @@ void dock_cache_free(DockCache *cache)
 
 /* Runs of nonzero alpha per row, split where opacity changes; see DockCache.
    Run indices and lengths fit 16 bits for images up to 255 px. */
+static uint16_t *build_runs(const DockImage *im);
+
+uint16_t *dock_image_runs(const DockImage *im)
+{
+    return im && im->pixels ? build_runs(im) : NULL;
+}
+
 static uint16_t *build_runs(const DockImage *im)
 {
     uint16_t *runs = NULL;
@@ -751,12 +758,17 @@ static void keep_row_inside(DockAnimation *animation, DockPlacement *current,
         animation->center[i] = (int64_t)current[i].x*256+current[i].size*128;
 }
 
+#ifndef DOCK_ZOOM_TICKS
+#define DOCK_ZOOM_TICKS 8
+#endif
+
 int dock_animate_step(const DockSettings *s, DockAnimation *animation, DockPlacement *current,
                       const DockPlacement *target, int count)
 {
-    enum { TRANSITION_TICKS = 8 };
+    /* The zoom in or out takes this many ticks (one display field each). */
+    enum { TRANSITION_TICKS = DOCK_ZOOM_TICKS, CUBE = TRANSITION_TICKS*TRANSITION_TICKS*TRANSITION_TICKS };
     int i, active = 0, envelope, start, end, target_end;
-    int levels[DOCK_MAX_ITEMS], weight = 512;
+    int levels[DOCK_MAX_ITEMS], weight = CUBE;
     DockPlacement before[DOCK_MAX_ITEMS];
     if (!dock_settings_valid(s) || !animation || !current || !target || count < 1 || count > DOCK_MAX_ITEMS) return 0;
     for (i = 0; i < count; ++i) {
@@ -776,13 +788,13 @@ int dock_animate_step(const DockSettings *s, DockAnimation *animation, DockPlace
     envelope = animation->tick < TRANSITION_TICKS;
     if (envelope) {
         int t = ++animation->tick, rest = TRANSITION_TICKS - t;
-        /* Cubic ease-out, 1-(1-t/8)^3 over 8^3 = 512: a third of the change
-           on the first tick and most of it by the fourth, like the macOS
+        /* Cubic ease-out, 1-(1-t/N)^3 over N^3: with 8 ticks a third of the
+           change on the first and most of it by the fourth, like the macOS
            Dock; a smoothstep start moved one pixel and felt sluggish. */
-        weight = 512 - rest * rest * rest;
+        weight = CUBE - rest * rest * rest;
         for (i = 0; i < count; ++i) {
             int origin = animation->origin_level[i];
-            levels[i] = (origin * (512 - weight) + target[i].level * weight + 256) / 512;
+            levels[i] = (origin * (CUBE - weight) + target[i].level * weight + CUBE/2) / CUBE;
         }
     } else {
         /* Lateral retargeting stays responsive; it never restarts an ease-in. */
@@ -814,7 +826,7 @@ int dock_animate_step(const DockSettings *s, DockAnimation *animation, DockPlace
         DockPlacement next;
         int64_t target_center = (int64_t)target[i].x*256+target[i].size*128;
         int64_t center = envelope ?
-            (animation->origin_center[i]*(512-weight)+target_center*weight+256)/512 :
+            (animation->origin_center[i]*(CUBE-weight)+target_center*weight+CUBE/2)/CUBE :
             ease_center(animation->center[i], target_center);
         animation->center[i] = center;
         next.level = levels[i];

@@ -214,6 +214,9 @@ typedef struct {
 /* flip_register/flip_buffer: a PiP2 buffer flip for the server to do
    (amiga_pip_flip_at_vblank). */
 typedef struct { struct Task *task; ULONG mask; volatile ULONG armed, fields, flip_register, flip_buffer; } VBlankState;
+
+/* One of the stack pin's blends between its icon and the close button. */
+typedef struct { DockCache cache; unsigned char *pixels; int level; unsigned long icon, button; } MorphSlot;
 void dock_vblank_entry(void);
 /* --profile counters. Only the profile report reads them. */
 typedef struct {
@@ -250,6 +253,15 @@ typedef struct {
     /* Display fields between consecutive animation frames: one is even
        motion, zero a frame never shown, two or more a stall. */
     ULONG pace_one, pace_same, pace_stall, pace_field;
+    /* The first stalled frames: fields since the last, this frame's draw
+       and present, and the time from the last frame's end to this draw. */
+    struct { UWORD fields, render_us, present_us, gap_us; } stall_log[24];
+    ULONG stall_logged;
+    uint64_t frame_end;
+    int frame_continues; /* the last frame left motion to draw */
+    /* Dock frames drawn while the Folder Stack box moved. */
+    ULONG folder_dock_draws;
+    uint64_t folder_dock_ticks;
 } ProfileStats;
 /* The surface backend: how the dock reaches the screen. PiP is the only
    one; select_backend sets it while no surface is open. Each entry runs at
@@ -416,6 +428,9 @@ typedef struct App {
        renderer's output). */
     DockDamage pip_pending[2];
     int pip_masked[2];
+    /* Per PiP buffer: the canvas rectangle a popup or dialog masked in the
+       frame it holds, to convert again when the mask moves or goes. */
+    DockRect pip_mask_clip[2];
     unsigned char *scratch;
     /* --damage-check: a full reference frame and conversion per draw. */
     int damage_check;
@@ -437,12 +452,11 @@ typedef struct App {
     DockEdge button_edge;
     int stack_button_shown;
     /* The pin morphs between the stack's icon (0) and the close button
-       (256) over eight animation ticks, in one buffer. The blend is redone
-       and the cache restamped only when its inputs (morph_key) change. */
+       (256) in quarter steps. The three blends between are kept, each with
+       its runs, and rebuilt only when their inputs change: the stack's
+       level or either image. */
     int morph;
-    DockCache morph_cache;
-    unsigned char *morph_pixels;
-    struct { int morph, level; unsigned long icon, button; } morph_key;
+    MorphSlot morph_slot[3];
     int stack_close_press;
     /* Added last so every other field keeps its offset. */
     const SurfaceOps *surface; /* The backend; set with the profile. */

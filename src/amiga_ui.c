@@ -141,6 +141,9 @@ typedef struct {
     int reveal_shown, reveal_presented, reveal_from;
     ULONG motion_start, motion_ticks;
     ULONG motion_prepare_sum, motion_present_sum; /* --profile: EClock ticks per stage */
+    ULONG motion_field; /* --profile: fields between frames, as digits */
+    UWORD motion_frame_us[12]; /* --profile: compose+present per frame */
+    char motion_fields[24];
     DockImage motion_backdrop;
     FolderBackdropLayer backdrop_layers[FOLDER_BACKDROP_LAYERS];
     int backdrop_layer_count;
@@ -239,6 +242,7 @@ struct DockUI {
     DockUIBlocking blocking;
     void *blocking_context;
     DockUIFit fit;
+    const volatile ULONG *fields; /* --profile: the display's field count */
     void *fit_context;
     char dialog_title[64], busy_title[96];
     struct Gadget *gadgets;
@@ -1422,19 +1426,30 @@ static int compose_folder_scale(FolderView *f, DockMixHalf mix, int width, int h
     int scale, unsigned int alpha, DockRect *present)
 {
     DockRect box = folder_scaled_rect(f,width,height,scale), all = f->motion_rect;
-    int ax, ay, y, x, quarters = (int)(alpha+32)/64;
+    int ax, ay, y, x, quarters = (int)(alpha+32)/64, runs = 0, use_runs;
     uint32_t *row_box;
-    int *column;
+    int *column, *run_x, *run_source;
     if (!f->motion_out.pixels) {
         f->motion_out = (DockImage){width,height,malloc((size_t)width*height*4)};
         if (!f->motion_out.pixels) { f->motion_out = (DockImage){0}; return 0; }
     }
-    row_box = malloc((size_t)width*(sizeof(*row_box)+sizeof(*column)));
+    row_box = malloc((size_t)width*(sizeof(*row_box)+3*sizeof(*column))+sizeof(*column));
     if (!row_box) return 0;
     column = (int *)(row_box+width);
+    run_x = column+width;
+    run_source = run_x+width+1;
     folder_anchor(f,width,height,&ax,&ay);
-    for (x = box.left; x < box.right; ++x)
+    for (x = box.left; x < box.right; ++x) {
         column[x] = dock_clamp(ax+(x-ax)*256/scale,0,width-1);
+        /* Runs of consecutive source columns, copied whole: near full size
+           they are about 16 px long, and a per-pixel gather took a large
+           frame past one 20 ms field on the 68080. */
+        if (x == box.left || column[x] != column[x-1]+1) {
+            run_x[runs] = x; run_source[runs] = column[x]; ++runs;
+        }
+    }
+    run_x[runs] = box.right;
+    use_runs = runs*4 <= box.right-box.left;
     if (all.right <= all.left || all.bottom <= all.top) all = box;
     else {
         if (box.left < all.left) all.left = box.left;
@@ -1463,7 +1478,18 @@ static int compose_folder_scale(FolderView *f, DockMixHalf mix, int width, int h
         source = (const uint32_t *)f->motion_frame.pixels+(size_t)sy*width;
         dst = quarters == 4 ? out : row_box;
         if (a > box.left) memcpy(dst+box.left,under+box.left,(size_t)(a-box.left)*4);
-        for (x = a; x < b; ++x) dst[x] = source[column[x]];
+        if (use_runs) {
+            int r;
+            for (r = 0; r < runs; ++r) {
+                int x0 = run_x[r], x1 = run_x[r+1], from = run_source[r];
+                if (x1 <= a) continue;
+                if (x0 >= b) break;
+                if (x0 < a) { from += a-x0; x0 = a; }
+                if (x1 > b) x1 = b;
+                if (x1-x0 >= 8) memcpy(dst+x0,source+from,(size_t)(x1-x0)*4);
+                else for (x = x0; x < x1; ++x) dst[x] = source[from++];
+            }
+        } else for (x = a; x < b; ++x) dst[x] = source[column[x]];
         if (b < box.right) memcpy(dst+b,under+b,(size_t)(box.right-b)*4);
         if (quarters == 4) continue;
         out += box.left; under += box.left; dst += box.left;
@@ -1664,6 +1690,7 @@ static void start_folder_clock(FolderView *f, int duration)
     f->motion_start = now.ev_lo;
     f->motion_frames = 0;
     f->motion_prepare_sum = f->motion_present_sum = 0;
+    f->motion_fields[0] = 0;
 }
 
 static FolderCachedIcon *cached_folder_icon(const DockUI *ui, const char *path,
@@ -1796,6 +1823,24 @@ static int advance_folder_motion(DockUI *ui)
         } else if (closing && present_folder_strip(ui,&f->motion_backdrop,f->reveal_presented,f->reveal_shown))
             f->reveal_presented = f->reveal_shown;
         ++f->motion_frames;
+        if (f->anchor.profile && f->motion_frames <= 12) {
+            ULONG done;
+            ReadEClock(&now); done = now.ev_lo;
+            f->motion_frame_us[f->motion_frames-1] =
+                (UWORD)((uint64_t)(done-f->motion_start-elapsed)*1000000/hz);
+        }
+        if (f->anchor.profile && ui->fields) {
+            /* Fields since the previous frame (since the start for the first). */
+            ULONG field = *ui->fields;
+            size_t used = strlen(f->motion_fields);
+            if (f->motion_frames == 1) f->motion_field = field;
+            if (used+2 < sizeof(f->motion_fields)) {
+                ULONG gap = field-f->motion_field;
+                f->motion_fields[used] = (char)('0'+(gap > 9 ? 9 : gap));
+                f->motion_fields[used+1] = 0;
+            }
+            f->motion_field = field;
+        }
         ReadEClock(&now);
         f->motion_prepare_sum += composed-f->motion_start-elapsed;
         f->motion_present_sum += now.ev_lo-composed;
@@ -1804,12 +1849,18 @@ static int advance_folder_motion(DockUI *ui)
     if (f->anchor.profile && hz) {
         int frames = f->motion_frames ? f->motion_frames : 1;
         printf("Folder Stack %s: %lu us, %d frames, icon %d px, font %d px, "
-            "compose_us_avg=%lu present_us_avg=%lu box=%dx%d\n",
+            "compose_us_avg=%lu present_us_avg=%lu box=%dx%d fields=%s\n",
             closing ? "dismissal" : "entrance",(unsigned long)((uint64_t)elapsed*1000000/hz),
             f->motion_frames,f->anchor.icon_size,folder_font(ui)->tf_YSize,
             (unsigned long)((uint64_t)f->motion_prepare_sum*1000000/hz/frames),
             (unsigned long)((uint64_t)f->motion_present_sum*1000000/hz/frames),
-            ui->popup->Width,ui->popup->Height);
+            ui->popup->Width,ui->popup->Height,f->motion_fields);
+        {
+            int i;
+            printf("  frame_us:");
+            for (i = 0; i < f->motion_frames && i < 12; ++i) printf(" %u",f->motion_frame_us[i]);
+            printf("\n");
+        }
         if (!closing && folder_stages == FOLDER_STAGES) {
             /* read, shape, capture, backdrop copy, tint, window, buffers,
                text, read back, layer, labels, first present */
@@ -2098,6 +2149,11 @@ void dock_ui_set_busy(DockUI *ui, const char *status)
         if (s->browse && ui->asl)
             GT_SetGadgetAttrs(s->browse,ui->dialog,NULL,GA_Disabled,status != NULL,TAG_DONE);
     }
+}
+
+void dock_ui_set_field_counter(DockUI *ui, const volatile ULONG *fields)
+{
+    if (ui) ui->fields = fields;
 }
 
 void dock_ui_set_fit_hook(DockUI *ui, DockUIFit hook, void *context)

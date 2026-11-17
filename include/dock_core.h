@@ -74,6 +74,9 @@ int dock_cache_build_scaled(DockCache *out, const DockImage *source, const DockS
 /* One normalized image of size x size, as level 0 of a cache would be. */
 int dock_icon_build(DockImage *out, const DockImage *source, int size);
 void dock_cache_free(DockCache *cache);
+/* The runs a cache keeps per level, for an image built outside one (the
+   caller frees them); NULL without memory, which the compositor allows. */
+uint16_t *dock_image_runs(const DockImage *im);
 /* Gives the cache a new stamp from the counter builds use. Call it after
    changing a cache's pixels in place so the renderer redraws its slot. */
 void dock_cache_restamp(DockCache *cache);

@@ -331,12 +331,18 @@ static void pip_show(App *app, const DockImage *frame)
         mask.clip.left -= app->left; mask.clip.right -= app->left;
         mask.clip.top -= app->top; mask.clip.bottom -= app->top;
     } else mask.clip = app->dialog_clip;
-    /* A mask can change any covered pixel, so a masked frame converts
-       whole, and so does the next conversion into a buffer that holds
-       a masked frame. */
+    /* The drag image can change any pixel, so its frames convert whole, and
+       so does the next conversion into a buffer that holds one. A popup or
+       dialog masks only inside its rectangle: convert that, and the one
+       masked in the frame this buffer holds (a whole conversion per frame
+       took dock frames to 12 ms while the Folder Stack was open). */
     masked = app->drag_mask_live || mask.popup ||
         (mask.clip.right > mask.clip.left && mask.clip.bottom > mask.clip.top);
-    if (masked || app->pip_masked[back]) dock_damage_set_full(pending);
+    if (app->drag_mask_live || app->pip_masked[back]) dock_damage_set_full(pending);
+    else {
+        dock_damage_add(pending,app->pip_mask_clip[back],app->width,app->height);
+        if (masked) dock_damage_add(pending,mask.clip,app->width,app->height);
+    }
     /* Unmasked, pip_mask changes nothing unless the window is narrower
        than the canvas (the right-edge transport padding). */
     pixels = dock_convert565_damage(buffer,stride,frame,app->coverage,pending,app->scratch,
@@ -350,7 +356,8 @@ static void pip_show(App *app, const DockImage *frame)
        present below succeeds. */
     if (app->drag_mask_live) painted = paint_drag_image(app,buffer,stride);
     dock_damage_clear(pending);
-    app->pip_masked[back] = masked;
+    app->pip_masked[back] = app->drag_mask_live;
+    app->pip_mask_clip[back] = masked && !app->drag_mask_live ? mask.clip : (DockRect){0,0,0,0};
     if (app->check565) {
         PipMask reference = mask;
         DockDamage whole;
@@ -422,6 +429,7 @@ static int pip_open(App *app)
     int right_padding = app->settings.edge_padding;
     dock_damage_set_full(&app->pip_pending[0]); dock_damage_set_full(&app->pip_pending[1]);
     app->pip_masked[0] = app->pip_masked[1] = 0;
+    app->pip_mask_clip[0] = app->pip_mask_clip[1] = (DockRect){0,0,0,0};
     if (app->damage_check) {
         app->check_coverage = malloc((size_t)app->width*app->height);
         app->check565 = malloc((size_t)app->width*app->height*2);

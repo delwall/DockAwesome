@@ -46,6 +46,8 @@ typedef int (*DockUIFit)(void *context, const DockUIPrefs *draft);
    as its title. NULL restores the normal pointer and title. */
 void dock_ui_set_busy(DockUI *ui, const char *status);
 void dock_ui_set_fit_hook(DockUI *ui, DockUIFit hook, void *context);
+/* --profile: the display's field counter, for the Folder Stack's frame log. */
+void dock_ui_set_field_counter(DockUI *ui, const volatile ULONG *fields);
 void dock_ui_destroy(DockUI *ui);
 ULONG dock_ui_signal_mask(const DockUI *ui);
 int dock_ui_open_popup(DockUI *ui, DockEdge edge, int anchor_x, int anchor_y,
