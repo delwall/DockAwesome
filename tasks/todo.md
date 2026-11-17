@@ -1163,3 +1163,14 @@ About, Quit through the menu, Folder Stack, profile printed. Installed dock (WBS
 a FindTask/Signal Ctrl-C tool and restarted with WBRun; RAM: test files
 removed (BreakTask too). A C:ApolloExplorerSrv that I started stays until
 the next reboot.
+
+Folder Stack entrance hitch, build 408 (2026-11-17, ApolloOS):
+- [x] The icons that grew with the box blinked out for a few ms at the end
+      of the entrance: the first still frame was presented before they were
+      blended into the artwork. They are now blended in first
+      (load_folder_icon(ui,0)), then the still frame is painted once.
+- [x] From RAM: with --profile, Personal:Downloads (22 entries), four
+      openings: entrance 4-6 frames, 133-145 ms, all icons in place.
+- [x] Installed in SYS:WBStartup (407 kept as
+      Disabled/DockAwesome-build407.old). Disabled/DockAwesome-build395.old
+      is held by Workbench (WBRun binary); delete after a reboot. 352 deleted.
