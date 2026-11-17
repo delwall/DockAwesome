@@ -150,9 +150,12 @@ DockRect dock_rgb565_refresh(unsigned char *cache, const unsigned char *source,
         /* [a,b) spans the differing pixels. Scanning from both ends costs
            only changed rows, and stops at their first difference. */
         for (a = 0; a < visible && pixel565(line,a) == pixel565(src,a); ++a) {}
-        if (a == visible) while (!pixel565(line,a)) ++a;
+        if (a == visible) while (a < width && !pixel565(line,a)) ++a;
+        /* The source is the live screen: a row that differed in equal() can
+           match again by now. Nothing to copy then. */
+        if (a == width) continue;
         for (b = width; b > visible && !pixel565(line,b-1); --b) {}
-        if (b == visible) while (pixel565(line,b-1) == pixel565(src,b-1)) --b;
+        if (b == visible) while (b > a+1 && pixel565(line,b-1) == pixel565(src,b-1)) --b;
         low = a > visible ? a : visible; high = b < visible ? b : visible;
         if (a < high) memcpy(line+a*2, src+a*2, (size_t)(high-a)*2);
         if (low < b) memset(line+low*2, 0, (size_t)(b-low)*2);

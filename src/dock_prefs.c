@@ -146,6 +146,38 @@ static int read_edge(FILE *file, DockEdge *edge)
     return 0;
 }
 
+/* A value of a key this build does not know: a newer build wrote it. */
+static int skip_value(FILE *file, int depth)
+{
+    int c = next_token(file), close;
+    if (c == '"') {
+        while ((c = fgetc(file)) != '"') {
+            if (c == '\\') c = fgetc(file);
+            if (c == EOF) return 0;
+        }
+        return 1;
+    }
+    if (c == '[' || c == '{') {
+        close = c == '[' ? ']' : '}';
+        if (depth >= 8) return 0;
+        c = next_token(file);
+        if (c == close) return 1;
+        if (c == EOF || ungetc(c,file) == EOF) return 0;
+        do {
+            if (close == '}' && (!skip_value(file,depth+1) || next_token(file) != ':')) return 0;
+            if (!skip_value(file,depth+1)) return 0;
+            c = next_token(file);
+        } while (c == ',');
+        return c == close;
+    }
+    /* A number, true, false or null. */
+    if (c != '-' && !(c >= '0' && c <= '9') && !(c >= 'a' && c <= 'z')) return 0;
+    do c = fgetc(file);
+    while (c == '-' || c == '+' || c == '.' || (c >= '0' && c <= '9') ||
+        (c >= 'a' && c <= 'z') || c == 'E');
+    return c == EOF || ungetc(c,file) != EOF;
+}
+
 static int read_paths(FILE *file, DockPrefs *prefs)
 {
     int c;
@@ -166,14 +198,23 @@ static int read_object(FILE *file, DockPrefs *prefs)
 {
     unsigned int seen = 0;
     int c;
-    if (next_token(file) != '{') return 0;
+    c = next_token(file);
+    /* A UTF-8 byte order mark from an editor on another system. */
+    if (c == 0xef) c = fgetc(file) == 0xbb && fgetc(file) == 0xbf ? next_token(file) : EOF;
+    if (c != '{') return 0;
     do {
-        char key[24];
+        char key[64];
         int field, ok = 0, version, ignored;
         if (!read_string(file,key,sizeof(key)) || next_token(file) != ':') return 0;
         for (field = 0; field < FIELD_COUNT; ++field)
             if (!strcmp(key,keys[field])) break;
-        if (field == FIELD_COUNT || (seen & (1U<<field))) return 0;
+        if (field == FIELD_COUNT) {
+            /* Going back from a newer build must not cost the user's dock. */
+            if (!skip_value(file,0)) return 0;
+            c = next_token(file);
+            continue;
+        }
+        if (seen & (1U<<field)) return 0;
         seen |= 1U<<field;
         switch (field) {
         case VERSION: ok = read_integer(file,&version) && version == 1; break;

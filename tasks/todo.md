@@ -969,3 +969,32 @@ working on 2026-11-10.
   running (started by the user from a lister). A C:ApolloExplorerSrv that I
   started (none ran at boot) stays until the next reboot.
 
+
+## Code review fixes (2026-11-17)
+Whole-codebase review (five slices, checked against ApolloKnowledgeBase and
+amiga-refs). User: "Fixa rubbet!". Branch review-fixes, commits local.
+Bugs:
+- [ ] B1 launch: a document without .info must not run as a script.
+- [ ] B2 dock_rgb565_refresh: bound the edge scans.
+- [ ] B3 Apollo bit (SR bit 11) set once after the CPU check.
+- [ ] B4 Delete key hit test uses screen coordinates.
+- [ ] B5 native-menu branch keeps serving timers and Workbench notify.
+- [ ] B6 unreplied close message: free the signal bit.
+- [ ] B7 status worker: bounded ARexx wait and bounded close.
+- [ ] B8 reset: mask while Workbench is closed, PiP off before DONE.
+- [ ] B9 requester: presses pass through while it is up.
+- [ ] B10 prefs: skip unknown keys and a BOM.
+- [ ] B11 new temporary item index with a Folder Stack.
+- [ ] B12 About leak on a failed window.
+- [ ] B13 pip_coexist_probe error text.
+- [ ] Minor: lister quoting, Makefile release/DELETE_ON_ERROR, fill_rounded,
+      NULL guards, overlay stamp, Folder Stack entrance icons.
+Performance (each measured on the Vampire with --profile before it stays):
+- [ ] P1 AMMX row kernels for 24/32-bit capture.
+- [ ] P2 blend_pixel inline, two multiplies.
+- [ ] P3 opaque runs by memcpy.
+- [ ] P4 idle wakeups (handler signal, fast live rate).
+- [ ] P5 aligned pixel buffers.
+- [ ] P6 capture compare before copy.
+- [ ] P7 Folder Stack reuses the prefetched listing.
+Tests: host tests for the new pure code.

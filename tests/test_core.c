@@ -1829,6 +1829,12 @@ static void test_damage_stamp(void)
     free(shape);
 }
 
+static int never_equal(const unsigned char *a, const unsigned char *b, unsigned long bytes)
+{
+    (void)a; (void)b; (void)bytes;
+    return 0;
+}
+
 /* dock_rgb565_refresh leaves the cache equal to a whole capture (visible
    source columns, zero tail) and reports exactly the bounding box of the
    pixels that differed, including a stale tail and no visible columns. */
@@ -1870,6 +1876,12 @@ static void test_rgb565_refresh(void)
     }
     assert(changed > ROUNDS/2 && changed < ROUNDS);
     box = dock_rgb565_refresh(NULL,source,STRIDE,W,W,H,NULL);
+    assert(box.left == box.right);
+    /* The source is the live screen: a row can differ when compared and
+       match again when scanned. The scans stay inside the row (the
+       sanitizer build checks) and report nothing. */
+    for (y = 0; y < H; ++y) memcpy(cache+y*W*2,source+y*STRIDE,W*2);
+    box = dock_rgb565_refresh(cache,source,STRIDE,W,W,H,never_equal);
     assert(box.left == box.right);
 }
 

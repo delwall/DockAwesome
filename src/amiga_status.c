@@ -616,6 +616,14 @@ static int send_close_message(struct Window *window)
         if (GetMsg(reply)) replied = 1;
         else Delay(1);
     }
+    if (!replied) {
+        /* Keep the message and the port's memory for a late reply, but
+           not the signal bit: a task has sixteen, and the dock needs most. */
+        Forbid();
+        if (GetMsg(reply)) replied = 1;
+        else { reply->mp_Flags = PA_IGNORE; FreeSignal(reply->mp_SigBit); }
+        Permit();
+    }
     if (replied) { FreeVec(message); DeleteMsgPort(reply); }
     return 1;
 }
@@ -1001,7 +1009,7 @@ int program_poll_result(App *app, int *recreate)
             item = append_item(app,poll->new_path,PIN_PROGRAM,&poll->new_cache);
             item->running = RUNNING_WINDOW;
             item->temporary = 1;
-            added = app->count-1;
+            added = (int)(item-app->items);
             layout_changed = 1;
         }
         /* Like drops and unpins: a new icon appears in its slot and the rest

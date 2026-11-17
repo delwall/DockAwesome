@@ -46,7 +46,7 @@ int main(void)
        Even unexpected success is closed without ever calling present. */
     unexpected=amiga_pip_open(pub,0,1,32,16,0,error,sizeof(error));
     if(unexpected) { puts("FAIL: PiP2 had no existing Dock lease");goto done; }
-    if(!strstr(error,"already reserved")) { printf("FAIL: unexpected lease error: %s\n",error);goto done; }
+    if(!strstr(error,"already in use")) { printf("FAIL: unexpected lease error: %s\n",error);goto done; }
     puts("PASS: second PiP2 open refused existing Dock lease; no presentation requested");fflush(stdout);
     mode=GetVPModeID(&pub->ViewPort);
     private_screen=OpenScreenTags(NULL,SA_DisplayID,mode,SA_Width,pub->Width,

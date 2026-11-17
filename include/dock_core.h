@@ -112,9 +112,17 @@ void dock_rgb565_to_rgba_ammx(unsigned char *dst, const unsigned char *src, unsi
 void dock_rgba_to_rgb565_ammx(unsigned char *dst, const unsigned char *src, unsigned long pixels);
 int dock_bytes_equal_ammx(const unsigned char *a, const unsigned char *b, unsigned long bytes);
 void dock_rgb565_key_ammx(unsigned char *dst, const unsigned char *source, unsigned long pixels);
+/* Screen rows of 24- and 32-bit pixels to big-endian RGB565, channels cut
+   to 5, 6 and 5 bits. Exact ranges; dst and src must not overlap. */
+void dock_argb_to_rgb565_ammx(unsigned char *dst, const unsigned char *src, unsigned long pixels);
+void dock_bgra_to_rgb565_ammx(unsigned char *dst, const unsigned char *src, unsigned long pixels);
+void dock_rgb24_to_rgb565_ammx(unsigned char *dst, const unsigned char *src, unsigned long pixels);
+void dock_bgr24_to_rgb565_ammx(unsigned char *dst, const unsigned char *src, unsigned long pixels);
 #endif
 void dock_mix_half_c(unsigned char *dst, const unsigned char *src, unsigned long pixels);
 #ifdef DOCK_AMMX
 void dock_mix_half_ammx(unsigned char *dst, const unsigned char *src, unsigned long pixels);
+/* Call once per task before any AMMX kernel (68080 only). */
+void dock_apollo_bit(void);
 #endif
 #endif

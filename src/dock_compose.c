@@ -9,20 +9,47 @@
 int dock_settings_valid(const DockSettings *s) __attribute__((pure));
 #endif
 
-/* Blend one translucent pixel exactly as blend_mask does. */
-static void blend_pixel(unsigned char *d, const unsigned char *s, int pressed)
+#if defined(__GNUC__) && defined(__mc68000__)
+/* One pixel as a single long move. GCC 6 routes a 4-byte memcpy through a
+   stack slot on the 68k; pixels are long-aligned there. */
+typedef uint32_t __attribute__((may_alias)) pixel32;
+#define LOAD_PIXEL(p) (*(const pixel32 *)(const void *)(p))
+#define STORE_PIXEL(p,v) (*(pixel32 *)(void *)(p) = (v))
+#define ALWAYS_INLINE inline __attribute__((always_inline))
+#else
+#define LOAD_PIXEL(p) load32(p)
+#define STORE_PIXEL(p,v) store32(p,v)
+#define ALWAYS_INLINE inline
+#endif
+
+/* Copy `n` > 0 opaque pixels. Long runs go to memcpy (exec's CopyMem on
+   the Amiga); short ones are not worth the call. */
+static ALWAYS_INLINE void copy_pixels(unsigned char *d, const unsigned char *s, int n)
 {
-    uint32_t a = s[3], inv = 255 - a, t;
+    if (n >= 16) { memcpy(d,s,(size_t)n*4); return; }
+    do { STORE_PIXEL(d,LOAD_PIXEL(s)); s += 4; d += 4; } while (--n);
+}
+
+/* Blend one translucent pixel exactly as blend_mask does. Inlined with a
+   constant `pressed`: a call per antialiased pixel cost more than the blend. */
+static ALWAYS_INLINE void blend_pixel(unsigned char *d, const unsigned char *s, int pressed)
+{
+    uint32_t a = s[3];
     if (!pressed) {
         /* Two channels per multiply in 16-bit lanes, each (v+127)/255
-           without a divide. The alpha lane is reset below. */
-        uint32_t sw = load32(s), dw = load32(d), lo, hi;
-        lo = (sw & UINT32_C(0x00ff00ff))*a + (dw & UINT32_C(0x00ff00ff))*inv + UINT32_C(0x00800080);
-        hi = ((sw>>8) & UINT32_C(0x00ff00ff))*a + ((dw>>8) & UINT32_C(0x00ff00ff))*inv + UINT32_C(0x00800080);
+           without a divide. s*a + d*(255-a) is (s-d)*a + d*255 modulo 2^32,
+           and every lane's true sum fits its 16 bits, so one multiply per
+           pair gives the same bits. The alpha lane is reset below. */
+        uint32_t sw = LOAD_PIXEL(s), dw = LOAD_PIXEL(d), lo, hi, sl, dl, sh, dh;
+        sl = sw & UINT32_C(0x00ff00ff); dl = dw & UINT32_C(0x00ff00ff);
+        sh = (sw>>8) & UINT32_C(0x00ff00ff); dh = (dw>>8) & UINT32_C(0x00ff00ff);
+        lo = (sl-dl)*a + (dl<<8) - dl + UINT32_C(0x00800080);
+        hi = (sh-dh)*a + (dh<<8) - dh + UINT32_C(0x00800080);
         lo = ((lo + ((lo>>8) & UINT32_C(0x00ff00ff))) >> 8) & UINT32_C(0x00ff00ff);
         hi = (hi + ((hi>>8) & UINT32_C(0x00ff00ff))) & UINT32_C(0xff00ff00);
-        store32(d, lo | hi);
+        STORE_PIXEL(d, lo | hi);
     } else {
+        uint32_t inv = 255 - a, t;
         int c;
         for (c = 0; c < 3; ++c) {
             /* (v+127)/255 without a divide; exact for v <= 65025. */
@@ -81,7 +108,7 @@ static void blend_mask(DockImage *dst, const DockImage *src, int x, int y,
                 }
             }
             if (sx < right) {
-                blend_pixel(d, s, pressed);
+                if (pressed) blend_pixel(d, s, 1); else blend_pixel(d, s, 0);
                 if (m) *m++ = 255;
                 s += 4; d += 4; ++sx;
             }
@@ -111,10 +138,9 @@ static void blend_runs(DockImage *dst, const DockImage *src, const uint16_t *run
             /* Clipped, so a+x is inside the destination row. */
             n = b-a; s = srow+a*4; d = dst->pixels+(row+(size_t)(a+x))*4;
             if (coverage) memset(coverage+row+(size_t)(a+x),255,(size_t)n);
-            if ((r[1] & RUN_OPAQUE) && !pressed)
-                for (; n; --n, s += 4, d += 4) memcpy(d,s,4);
-            else
-                for (; n; --n, s += 4, d += 4) blend_pixel(d,s,pressed);
+            if (pressed) for (; n; --n, s += 4, d += 4) blend_pixel(d,s,1);
+            else if (r[1] & RUN_OPAQUE) copy_pixels(d,s,n);
+            else for (; n; --n, s += 4, d += 4) blend_pixel(d,s,0);
         }
     }
 }

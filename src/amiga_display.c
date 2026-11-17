@@ -212,6 +212,19 @@ static int rgb565_source(ULONG format, ULONG bytes)
     }
 static void row_to_rgb565(unsigned char *out, const unsigned char *in, int n, ULONG format)
 {
+#ifdef DOCK_AMMX
+    /* Four pixels per PACK3216; the byte loops below cost about thirteen
+       times as much per pixel on a 24-bit screen. */
+    if (n <= 0) return;
+    switch (format) {
+    case PIXFMT_RGB24: dock_rgb24_to_rgb565_ammx(out,in,(unsigned long)n); return;
+    case PIXFMT_BGR24: dock_bgr24_to_rgb565_ammx(out,in,(unsigned long)n); return;
+    case PIXFMT_ARGB32: dock_argb_to_rgb565_ammx(out,in,(unsigned long)n); return;
+    case PIXFMT_BGRA32: dock_bgra_to_rgb565_ammx(out,in,(unsigned long)n); return;
+    case PIXFMT_RGBA32: dock_rgba_to_rgb565_ammx(out,in,(unsigned long)n); return;
+    default: break;
+    }
+#endif
     switch (format) {
     case PIXFMT_RGB16: memcpy(out,in,(size_t)n*2); return;
     case PIXFMT_RGB16PC:

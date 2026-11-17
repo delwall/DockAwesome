@@ -138,12 +138,46 @@ static void test_bad_file(void)
     assert(fclose(file) == 0);
 }
 
+/* A key from a newer build is skipped with its value, whatever its type,
+   and a byte order mark is accepted: neither costs the user's dock. */
+static void test_unknown_keys(void)
+{
+    static const char *const good[] = {
+        "{\"version\":1,\"future\":\"a \\\" quote \xe5\",\"size\":40,\"zoom\":80,\"paths\":[\"SYS:One\"]}",
+        "{\"future\":-12.5e3,\"version\":1,\"size\":40,\"zoom\":80,\"paths\":[\"SYS:One\"]}",
+        "{\"version\":1,\"size\":40,\"zoom\":80,\"paths\":[\"SYS:One\"],\"future\":[1,[true,null],{\"a\":\"b\"}]}",
+        "{\"version\":1,\"a_rather_long_key_name_from_a_later_build\":{},\"b\":[],\"size\":40,\"zoom\":80,\"paths\":[\"SYS:One\"]}",
+        "\xef\xbb\xbf{\"version\":1,\"size\":40,\"zoom\":80,\"paths\":[\"SYS:One\"]}"
+    };
+    static const char *const bad[] = {
+        "{\"version\":1,\"future\":}", "{\"version\":1,\"future\":\"open}",
+        "{\"version\":1,\"future\":[1,}", "{\"version\":1,\"future\":{\"a\"}}",
+        "{\"version\":1,\"future\":[[[[[[[[[[1]]]]]]]]]]}", "\xef\xbb{\"version\":1}",
+        "{\"version\":1,\"future\":1 2}"
+    };
+    DockPrefs prefs, original;
+    size_t i;
+    for (i = 0; i < sizeof(good)/sizeof(*good); ++i) {
+        dock_prefs_defaults(&prefs);
+        assert(read_text(good[i],&prefs));
+        assert(prefs.size == 40 && prefs.zoom == 80 && prefs.count == 1);
+        assert(!strcmp(prefs.paths[0],"SYS:One"));
+    }
+    dock_prefs_defaults(&original);
+    prefs = original;
+    for (i = 0; i < sizeof(bad)/sizeof(*bad); ++i) {
+        assert(!read_text(bad[i],&prefs));
+        assert(!memcmp(&prefs,&original,sizeof(prefs)));
+    }
+}
+
 int main(void)
 {
+    test_unknown_keys();
     test_roundtrip();
     test_edited_file();
     test_scale();
     test_bad_file();
-    puts("JSON preferences: ordered paths, escapes, bounds and transactional read PASS");
+    puts("JSON preferences: ordered paths, escapes, bounds, unknown keys and transactional read PASS");
     return 0;
 }

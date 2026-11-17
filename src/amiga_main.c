@@ -135,12 +135,29 @@ void interaction_cancel_for(App *app, uint32_t token)
     if (app->flash_pin_id) { app->flash_pin_id = 0; app->gesture_redraw = 1; }
 }
 
+/* The running dock, for message(): while its requester is up the main loop
+   does not run, and the input handler must not take presses for it. */
+static App *message_app;
+
 static void message(const char *text)
 {
     struct EasyStruct req = { sizeof(req), 0, (STRPTR)"DockAwesome", (STRPTR)"%s", (STRPTR)"OK" };
     ULONG arguments[] = { (ULONG)text };
-    if (IntuitionBase) EasyRequestArgs(NULL, &req, NULL, arguments);
-    else puts(text);
+    App *app = message_app;
+    if (!IntuitionBase) { puts(text); return; }
+    if (app) {
+        /* Presses pass through to the screen; queued ones would replay as
+           launches after OK. */
+        Disable();
+        app->input_context.ui_busy = 1; app->input_context.active = NULL;
+        Enable();
+    }
+    EasyRequestArgs(NULL, &req, NULL, arguments);
+    if (app) {
+        /* The next present publishes the snapshot again. */
+        Disable(); app->input_context.ui_busy = dock_ui_busy(app->ui); Enable();
+        app->gesture_redraw = 1;
+    }
 }
 
 static int dump_ppm(const char *prefix, const char *suffix, const DockImage *image)
@@ -803,7 +820,11 @@ static void live_schedule(App *app)
 {
     int fast;
     if (!app->live_open) return;
-    fast = animation_needed(app) || buttons_engaged(app,ANY_BUTTON);
+    /* A button held on another screen (a game's fire button) moves nothing
+       behind the dock: the fast rate would only wake the loop 60 times a
+       second to find PiP hidden. */
+    fast = animation_needed(app) || (IntuitionBase->FirstScreen == app->screen &&
+        buttons_engaged(app,ANY_BUTTON));
     if (app->live_pending && fast && !app->live_fast) live_cancel(app);
     if (app->live_pending) return;
     app->live_io->tr_node.io_Command = TR_ADDREQUEST;
@@ -1493,7 +1514,7 @@ static void record_launch(App *app, uint32_t pin_id)
 /* Opens a pin through Workbench, or starts it the way Workbench would when
    another desktop (Directory Opus on AmiKit) runs instead. A failure names
    the path and the reason dos reports. */
-static int launch_pin(App *app, const char *path)
+static int launch_pin(App *app, const char *path, int pinned)
 {
     LONG default_icon = FALSE, error = 0;
     struct TagItem get[] = {
@@ -1502,7 +1523,7 @@ static int launch_pin(App *app, const char *path)
         { TAG_DONE, 0 }
     };
     struct DiskObject *icon = NULL;
-    int opened = launch_script(path,&error);
+    int opened = launch_script(path,pinned,&error);
     if (opened >= 0) {
         /* A script without its own icon runs; Workbench would open it in
            an editor through its default text icon. */
@@ -1630,7 +1651,7 @@ static void apply_gesture(App *app, const DockGestureInput *in, int *redraw, int
         if (item->stack && app->stack_close_press) dock_ui_dismiss_popup(app->ui);
         else if (item->stack) open_stack_view(app,index);
         else if (!focused && !item->temporary) {
-            if (launch_pin(app,item->path)) {
+            if (launch_pin(app,item->path,1)) {
                 record_launch(app,item->pin_id);
                 status_changed(app);
             }
@@ -1966,7 +1987,7 @@ static void shell_menu_action(App *app, int action)
     } else if (action == DOCK_UI_QUIT_SHELL) {
         if (quit_shell_window(app)) status_changed(app);
         else message("Could not close the selected Shell.");
-    } else if (launch_pin(app,app->items[index].path)) status_changed(app);
+    } else if (launch_pin(app,app->items[index].path,1)) status_changed(app);
 }
 
 static int displayed_scale(const App *app)
@@ -2094,12 +2115,14 @@ static __attribute__((noinline)) void event_loop(App *app)
     draw(app);
     animation_profile_end(app);
     animation_schedule(app); live_schedule(app);
+    ULONG deferred = 0;
     while (running) {
         ULONG workbench = app->workbench_port ? 1UL<<app->workbench_port->mp_SigBit : 0;
         if (app->workbench_closed) {
             /* Nothing is on screen: wait for Workbench to open again. */
-            ULONG closed_signals = Wait(workbench|SIGBREAKF_CTRL_C);
+            ULONG closed_signals = Wait(workbench|reset_watch_mask(app)|SIGBREAKF_CTRL_C);
             if (closed_signals & SIGBREAKF_CTRL_C) break;
+            if (closed_signals & reset_watch_mask(app)) { reset_watch_done(app); break; }
             if (workbench_notify_poll(app) && !full_frame(app)) break;
             continue;
         }
@@ -2119,7 +2142,11 @@ static __attribute__((noinline)) void event_loop(App *app)
         ++app->stats.wakes; app->gesture_redraw = 0;
         if (signals & SIGBREAKF_CTRL_C) break;
         if (signals & reset_watch_mask(app)) {
-            /* Ctrl-Amiga-Amiga: PiP is off; let the reset go on. */
+            /* Ctrl-Amiga-Amiga: the handler turned PiP off, but it may have
+               interrupted a present that then turned it on again. Turn it
+               off from here too, then let the reset go on. */
+            amiga_pip_suspend(app->pip); app->pip_visible = 0;
+            amiga_float_hide(app->float_layer);
             reset_watch_done(app);
             break;
         }
@@ -2130,8 +2157,16 @@ static __attribute__((noinline)) void event_loop(App *app)
                aside for the menu, then wait for it to close. */
             pip_menu_check(app);
             interaction_cancel(app);
+            /* Wait() cleared what woke this pass: keep it for the pass
+               after the menu, and keep the 100 ms tick running so that
+               pass comes without a mouse event. */
+            deferred |= signals & (workbench |
+                (app->status_notify ? (1UL<<app->status_notify_bit) : 0));
+            if (redraw) app->gesture_redraw = 1;
+            live_due(app); live_schedule(app);
             continue;
         }
+        signals |= deferred; deferred = 0;
         if (amiga_drag_preview_settle(app->drag_preview)) redraw = 1;
         if (launch_reap(app)) { redraw = 1; status_changed(app); }
         if ((signals & workbench) && (workbench_notify_poll(app) || app->workbench_closed)) {
@@ -2167,7 +2202,7 @@ static __attribute__((noinline)) void event_loop(App *app)
                 int index = pin_index(app,app->menu_pin_id);
                 if (index >= 0 && app->items[index].stack) open_stack_view(app,index);
             } else if (action.type == DOCK_UI_OPEN_PATH) {
-                if (launch_pin(app,action.path)) status_changed(app);
+                if (launch_pin(app,action.path,0)) status_changed(app);
             }
             else if (action.type == DOCK_UI_KEEP_ITEM) keep_menu_item(app);
             else if (action.type >= DOCK_UI_NEW_SHELL && action.type <= DOCK_UI_QUIT_SHELL)
@@ -2202,7 +2237,6 @@ static __attribute__((noinline)) void event_loop(App *app)
         while ((msg = (struct IntuiMessage *)GetMsg(app->window->UserPort))) {
             ULONG cls = msg->Class;
             UWORD code = msg->Code;
-            int x = msg->MouseX, y = msg->MouseY;
             ReplyMsg((struct Message *)msg);
             if (recreate && !(cls == IDCMP_RAWKEY && code == 0x45)) continue;
             if (cls == IDCMP_INACTIVEWINDOW && app->gesture.active) {
@@ -2211,7 +2245,10 @@ static __attribute__((noinline)) void event_loop(App *app)
             } else if (cls == IDCMP_RAWKEY && !(code & IECODE_UP_PREFIX)) {
                 if (code == 0x45) { running = 0; break; }
                 else if (code == 0x46) {
-                    int hit = input_hit_test(app, x, y);
+                    /* The window rests at 0,0 where it has no shape: take
+                       the pointer from the screen, not from the message. */
+                    int hit = input_hit_test(app, app->screen->MouseX-app->left,
+                        app->screen->MouseY-app->top);
                     if (hit >= 0 && remove_pin(app, app->items[hit].pin_id)) {
                         recreate = !rest_after_pin_change(app,app->count+1);
                         redraw = save = 1;
@@ -2395,6 +2432,10 @@ int main(int argc, char **argv)
     int i, status = 20, initial_count, config_state;
     int caps_only = 0;
     if (!app) return 20;
+#ifdef DOCK_AMMX
+    /* The CPU check has passed: this is a 68080. */
+    dock_apollo_bit();
+#endif
     app->settings = dock_settings_default(); app->input_bit = app->vblank_bit = -1;
     app->reset.bit = -1;
     {
@@ -2575,7 +2616,7 @@ int main(int argc, char **argv)
     program_poll_open(app);
     workbench_notify_open(app);
     if (app->bench_speed) bench_sweep(app);
-    else event_loop(app);
+    else { message_app = app; event_loop(app); message_app = NULL; }
     workbench_notify_close(app);
     program_poll_close(app);
     status = app->failed ? 20 : 0;

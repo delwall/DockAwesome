@@ -760,7 +760,8 @@ static void paint_ui_text(DockUI *ui, struct RastPort *rp, AmigaFontAA *font,
 static void fill_rounded(struct RastPort *rp, int x, int y, int width, int height, int radius)
 {
     int row, right = x+width-1, bottom = y+height-1;
-    RectFill(rp,x,y+radius,right,bottom-radius);
+    /* RectFill needs ymax >= ymin: an even height of two radii has no middle. */
+    if (bottom-radius >= y+radius) RectFill(rp,x,y+radius,right,bottom-radius);
     for (row = 0; row < radius; ++row) {
         int inset = rounded_inset(radius,row);
         RectFill(rp,x+inset,y+row,right-inset,y+row);
@@ -1801,6 +1802,7 @@ int dock_ui_folder_moving(const DockUI *ui)
 
 int dock_ui_folder_pending(const DockUI *ui)
 {
+    if (!ui) return 0;
     const FolderView *f = &ui->folder;
     return ui->folder_reveal ||
         (ui->popup && (f->motion || (f->count && f->next_icon < folder_visible_files(f))));
@@ -2421,11 +2423,13 @@ static int window_bounds(const struct Window *window, DockRect *bounds)
 
 int dock_ui_popup_bounds(const DockUI *ui, DockRect *bounds)
 {
+    if (!ui) return 0;
     return window_bounds(ui->popup,bounds);
 }
 
 int dock_ui_dialog_bounds(const DockUI *ui, DockRect *bounds)
 {
+    if (!ui) return 0;
     return window_bounds(ui->dialog,bounds);
 }
 
@@ -2947,7 +2951,7 @@ int dock_ui_open_about(DockUI *ui)
     ui->link_pen = ui->openurl ? ObtainBestPen(ui->screen->ViewPort.ColorMap,
         0x20202020UL,0x50505050UL,0xb0b0b0b0UL,OBP_Precision,PRECISION_GUI,TAG_DONE) : -1;
     ui->dialog = open_dialog(ui,"About",width,height,BUTTONIDCMP|IDCMP_MOUSEBUTTONS);
-    if (!ui->dialog) return 0;
+    if (!ui->dialog) { dock_ui_close_dialog(ui); return 0; }
     previous = CreateContext(&ui->gadgets);
     if (!previous || !gadget(ui,previous,BUTTON_KIND,GID_CANCEL,"OK",
             (ui->dialog->Width-button_width)/2,ui->dialog->BorderTop+height-button_height-12,

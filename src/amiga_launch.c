@@ -109,17 +109,33 @@ static int rexx_send(struct MsgPort *reply, const char *command)
     return msg != NULL;
 }
 
-/* Sends and waits. The result string, if any, goes to `result`. Returns
-   the ARexx return code, or -1 when Directory Opus is not there. */
+/* Sends and waits, from the status worker. The result string, if any, goes
+   to `result`. Returns the ARexx return code, or -1 when Directory Opus is
+   not there. Directory Opus answers at once; one that did not kept the
+   worker waiting for good (no status, and a dock that could not quit), so
+   the reply gets two seconds. After that the message and its port are left
+   behind, ignored, and Directory Opus is not asked again. */
 static LONG rexx_call(const char *command, char *result, size_t size)
 {
-    struct MsgPort *reply = CreateMsgPort();
+    enum { REPLY_TICKS = 2*TICKS_PER_SECOND };
+    static int silent;
+    struct MsgPort *reply = silent ? NULL : CreateMsgPort();
     struct RexxMsg *msg = reply ? rexx_message(reply,command,RXCOMM|RXFF_RESULT) : NULL;
     LONG rc = -1;
     if (size) result[0] = 0;
     if (msg && rexx_put(msg)) {
-        WaitPort(reply);
-        GetMsg(reply);
+        int ticks;
+        struct Message *answer = NULL;
+        for (ticks = 0; !(answer = GetMsg(reply)) && ticks < REPLY_TICKS; ++ticks) Delay(1);
+        if (!answer) {
+            Forbid();
+            if (!(answer = GetMsg(reply))) {
+                reply->mp_Flags = PA_IGNORE; FreeSignal(reply->mp_SigBit);
+                silent = 1;
+            }
+            Permit();
+            if (!answer) return -1;
+        }
         rc = msg->rm_Result1;
         if (!rc && msg->rm_Result2 && size) {
             strncpy(result,(const char *)msg->rm_Result2,size-1);
@@ -256,16 +272,28 @@ static int shell_launch(const char *path, const struct DiskObject *icon, LONG *e
     return 1;
 }
 
+/* The start of a file reads as text: a picture, an archive or any other
+   binary document must never reach Execute. */
+static int text_bytes(const UBYTE *bytes, LONG count)
+{
+    LONG i;
+    for (i = 0; i < count; ++i)
+        if (bytes[i] < 32 && bytes[i] != '\t' && bytes[i] != '\n' && bytes[i] != '\r' &&
+            bytes[i] != '\f' && bytes[i] != 27) return 0;
+    return count > 0;
+}
+
 /* A plain file without its own icon that is a script: it has the script
-   bit, or it is not a loadable program (no hunk header). Workbench would
-   give it a default text icon and open it in an editor; a dock entry such
-   as ShapeShifter's Launch or C:WOMyFiles means to run it. */
-static int script_without_icon(const char *path)
+   bit, or (`pinned`) it is text and not a loadable program. Workbench would
+   give the latter a default text icon and open it in an editor; a dock pin
+   such as ShapeShifter's Launch or C:WOMyFiles means to run it. A file
+   picked in the Folder Stack is a document unless it has the script bit. */
+static int script_without_icon(const char *path, int pinned)
 {
     char info[PATH_CAP+8];
     struct FileInfoBlock *fib;
     BPTR lock;
-    ULONG magic = 0;
+    UBYTE head[64];
     int script = 0;
     if (strlen(path)+6 > sizeof(info)) return 0;
     sprintf(info,"%s.info",path);
@@ -274,11 +302,12 @@ static int script_without_icon(const char *path)
     fib = AllocDosObject(DOS_FIB,NULL);
     if (fib && Examine(lock,fib) && fib->fib_DirEntryType < 0) {
         if (fib->fib_Protection & FIBF_SCRIPT) script = 1;
-        else if (fib->fib_Size > 0) {
+        else if (pinned && fib->fib_Size > 0) {
             BPTR file = OpenFromLock(lock);
             if (file) {
+                LONG got = Read(file,head,sizeof(head));
                 lock = 0;
-                script = Read(file,&magic,4) == 4 ? magic != 0x000003f3UL : 1;
+                script = text_bytes(head,got);
                 Close(file);
             }
         }
@@ -288,10 +317,10 @@ static int script_without_icon(const char *path)
     return script;
 }
 
-int launch_script(const char *path, LONG *error)
+int launch_script(const char *path, int pinned, LONG *error)
 {
     *error = 0;
-    return script_without_icon(path) ? shell_launch(path,NULL,error) : -1;
+    return script_without_icon(path,pinned) ? shell_launch(path,NULL,error) : -1;
 }
 
 int launch_object(App *app, const char *path, LONG *error)
@@ -304,7 +333,6 @@ int launch_object(App *app, const char *path, LONG *error)
     const char *pri;
     *error = 0;
     if (!app->launch_port) { *error = ERROR_NO_FREE_STORE; return 0; }
-    if (script_without_icon(path)) return shell_launch(path,NULL,error);
     if (!(launch = AllocVec(sizeof(*launch),MEMF_PUBLIC|MEMF_CLEAR))) { *error = ERROR_NO_FREE_STORE; return 0; }
     strncpy(launch->path,path,PATH_CAP-1);
     {
@@ -314,8 +342,10 @@ int launch_object(App *app, const char *path, LONG *error)
     if (icon && icon->do_Type != WBTOOL && icon->do_Type != WBPROJECT) {
         /* Drawers and disks open in the desktop's own windows. */
         char command[PATH_CAP+16];
+        /* A quote would end the ARexx argument: no such drawer opens. */
         snprintf(command,sizeof(command),"lister new \"%s\"",path);
-        if (rexx_send(app->launch_port,command)) ++app->rexx_pending;
+        if (strchr(path,'"')) *error = ERROR_OBJECT_WRONG_TYPE;
+        else if (rexx_send(app->launch_port,command)) ++app->rexx_pending;
         else *error = ERROR_OBJECT_WRONG_TYPE;
         FreeDiskObject(icon);
         launch_free(launch);
@@ -508,7 +538,7 @@ void dopus_close_lister(App *app, ULONG lister)
 /* Status worker: open Directory Opus listers count as open drawers. */
 void dopus_drawers(ProgramPoll *poll)
 {
-    char handles[256], *cursor, *end;
+    char handles[1024], *cursor, *end;
     void *requesters;
     int i;
     if (rexx_call("lister query all",handles,sizeof(handles)) < 0) return;
@@ -520,6 +550,8 @@ void dopus_drawers(ProgramPoll *poll)
         ULONG lister = strtoul(cursor,&end,10);
         BPTR place;
         if (end == cursor) break;
+        /* A list cut at the buffer's end: its last number is partial. */
+        if (!*end && strlen(handles) == sizeof(handles)-1) break;
         snprintf(command,sizeof(command),"lister query %lu path",(unsigned long)lister);
         if (rexx_call(command,path,sizeof(path)) || !(place = Lock((STRPTR)path,ACCESS_READ))) continue;
         for (i = 0; i < poll->count; ++i) {

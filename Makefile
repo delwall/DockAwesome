@@ -29,6 +29,8 @@ AMIGA_C_OBJECTS := $(patsubst src/%.c,$(AMIGA_OBJDIR)/%.o,$(AMIGA_C_SOURCES))
 AMIGA_OBJECTS := $(AMIGA_C_OBJECTS) $(AMIGA_OBJDIR)/amiga_input.o $(AMIGA_ASM_OBJECTS)
 
 .DEFAULT_GOAL := all
+# A failed step must not leave an older or half-made target behind.
+.DELETE_ON_ERROR:
 .PHONY: all amiga host-test host-bench host-sanitize check-toolchain verify package deploy release clean
 all: amiga
 amiga: $(AMIGA_OUTPUT) $(AMIGA_OUTPUT).info
@@ -57,6 +59,7 @@ $(AMIGA_OBJDIR)/ammx.o: src/ammx.s Makefile | check-toolchain
 	"$(AMIGA_AS)" -Fhunk -m68080 -opt-speed -o "$@" "$<"
 
 $(AMIGA_OUTPUT): $(AMIGA_OBJECTS) tools/build-version.py Makefile
+	$(RM) "$@"
 	"$(PYTHON)" tools/build-version.py "$(notdir $@)" "$(AMIGA_OBJDIR)/build_version.c" "$(RELEASE)"
 	"$(AMIGA_CC)" $(AMIGA_INCLUDES) $(AMIGA_FLAGS) $(CPU_FLAGS) -c "$(AMIGA_OBJDIR)/build_version.c" -o "$(AMIGA_OBJDIR)/build_version.o"
 	"$(AMIGA_CC)" $(CPU_FLAGS) -noixemul -Wl,-u,___stkinit $(AMIGA_OBJECTS) "$(AMIGA_OBJDIR)/build_version.o" -o "$@"
@@ -93,6 +96,7 @@ verify: amiga
 	"$(AMIGA_OBJDUMP)" -f "$(AMIGA_OUTPUT)"
 
 package: amiga
+	$(RM) -r build/dist
 	@mkdir -p build/dist/DockAwesome
 	cp "$(AMIGA_OUTPUT)" "$(AMIGA_OUTPUT).info" build/dist/DockAwesome/
 	cp README.md build/dist/DockAwesome/
@@ -106,7 +110,7 @@ deploy: amiga
 # in build/release/DockAwesome. Pack that drawer with LhA on the Amiga.
 release:
 	@test -n "$(RELEASE)" || { echo 'Set RELEASE, for example: make release RELEASE="1.0 beta 1"' >&2; exit 1; }
-	$(RM) build/DockAwesome
+	$(RM) -r build/DockAwesome $(AMIGA_OBJDIR)
 	$(MAKE) RELEASE="$(RELEASE)" amiga
 	$(RM) -r build/release
 	@mkdir -p build/release/DockAwesome
