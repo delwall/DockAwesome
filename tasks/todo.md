@@ -972,29 +972,62 @@ working on 2026-11-10.
 
 ## Code review fixes (2026-11-17)
 Whole-codebase review (five slices, checked against ApolloKnowledgeBase and
-amiga-refs). User: "Fixa rubbet!". Branch review-fixes, commits local.
-Bugs:
-- [ ] B1 launch: a document without .info must not run as a script.
-- [ ] B2 dock_rgb565_refresh: bound the edge scans.
-- [ ] B3 Apollo bit (SR bit 11) set once after the CPU check.
-- [ ] B4 Delete key hit test uses screen coordinates.
-- [ ] B5 native-menu branch keeps serving timers and Workbench notify.
-- [ ] B6 unreplied close message: free the signal bit.
-- [ ] B7 status worker: bounded ARexx wait and bounded close.
-- [ ] B8 reset: mask while Workbench is closed, PiP off before DONE.
-- [ ] B9 requester: presses pass through while it is up.
-- [ ] B10 prefs: skip unknown keys and a BOM.
-- [ ] B11 new temporary item index with a Folder Stack.
-- [ ] B12 About leak on a failed window.
-- [ ] B13 pip_coexist_probe error text.
-- [ ] Minor: lister quoting, Makefile release/DELETE_ON_ERROR, fill_rounded,
-      NULL guards, overlay stamp, Folder Stack entrance icons.
-Performance (each measured on the Vampire with --profile before it stays):
-- [ ] P1 AMMX row kernels for 24/32-bit capture.
-- [ ] P2 blend_pixel inline, two multiplies.
-- [ ] P3 opaque runs by memcpy.
-- [ ] P4 idle wakeups (handler signal, fast live rate).
-- [ ] P5 aligned pixel buffers.
-- [ ] P6 capture compare before copy.
-- [ ] P7 Folder Stack reuses the prefetched listing.
-Tests: host tests for the new pure code.
+amiga-refs). User: "Fixa rubbet!". Branch review-fixes, commits local, not
+pushed. Build 388.
+Bugs (built; host tests and sanitizer pass; hardware only where said):
+- [x] B1 launch: a document without .info runs as a script only with the
+      script bit; a dock pin also when it is text and not a program (the
+      ShapeShifter Launch case). Never from the Folder Stack, never binary.
+      Not run on hardware.
+- [x] B2 dock_rgb565_refresh: edge scans bounded (test with a lying equal).
+- [x] B3 Apollo bit (SR bit 11) set at the start of main. Ran on ApolloOS;
+      not run on 3.2.3 or Coffin, where it matters.
+- [x] B4 Delete key hit test uses screen coordinates. Not run.
+- [x] B5 native-menu branch defers its Workbench and status signals and
+      keeps the live tick. Not run (needs MagicMenu on Coffin).
+- [x] B6 unreplied close message gives its signal bit back. Not run.
+- [x] B7 status worker: Directory Opus gets two seconds per ARexx call,
+      then is not asked again. program_poll_close still waits for the
+      worker (its code must stay loaded). Not run (needs AmiKit).
+- [x] B8 reset signal served while Workbench is closed; PiP and the float
+      layer go off before RESETHANDLERDONE. Not run. Open: a reset while
+      an EasyRequest is up still waits for keyboard.device's timeout.
+- [x] B9 presses pass through while a requester is up. Not run.
+- [x] B10 prefs: unknown keys are skipped, a byte order mark is accepted
+      (tests/test_prefs.c).
+- [x] B11 new temporary item index with a Folder Stack.
+- [x] B12 About releases openurl.library and its pen when the window fails.
+- [x] B13 pip_coexist_probe matches "already in use".
+- [x] Minor: lister path with a quote refused, 1024-byte handle list,
+      Makefile (.DELETE_ON_ERROR, release rebuilds all objects, package
+      clears build/dist), fill_rounded, NULL guards in three UI getters.
+Performance, measured on ApolloOS R9.5, core 12856, 16-bit, 800x96, 12 pins:
+- [x] P1 AMMX row kernels for 24/32-bit capture (ARGB, BGRA, RGB24, BGR24;
+      RGBA uses the existing kernel). ammx_probe: all counts and alignments
+      pass; RGB24 row 1,220,421 -> 150,797 ticks per 16,384,000 pixels (105
+      -> 13 ns per pixel). The dock's capture on a 24-bit screen (Coffin)
+      is not measured yet: this machine runs 16-bit.
+- [x] P2+P3 blend_pixel inlined with two multiplies, opaque runs as longs
+      or memcpy. --bench-sweep 4, two matched runs each: compose_us_avg
+      5625/5655 -> 5329/5336 (5.5 %), render 7412/7415 -> 7085/7096.
+      --damage-check: 180 frames, 0 compose and 0 convert mismatches.
+      Smaller than the review's estimate: compose is not dominated by
+      antialiased edges. Next: find where the 5.3 ms goes before more work.
+- [x] P4 fast live rate only with the dock's screen in front. Not measured.
+Not done, with reasons:
+- [ ] Handler signal filter (wake only near the dock): the drop catcher and
+      labels need pointer events from the whole screen; measure wakeups
+      first.
+- [ ] Aligned pixel buffers: damage boxes start at any column, gain unmeasured.
+- [ ] Capture compare before copy: the Fast RAM row was a measured win on
+      Coffin (27.3 -> 16.7 ms); the review's advice contradicts it.
+- [ ] Folder Stack: reuse the prefetched listing; icons in the entrance
+      animation; glass capture over a just-closed label; closing animation
+      over a foreign window.
+- [ ] Task-address reuse in status attribution; overlay stamp.
+- [ ] Host tests for title matching, shell quoting, script detection, .bak
+      recovery; bench_core through dock_renderer_draw.
+Smoke test, build 388 from RAM: on ApolloOS: hover, plate menu, About, Quit
+through the menu, profile printed. Installed dock (WBStartup) stopped with
+a FindTask/Signal Ctrl-C tool and restarted with WBRun; RAM: test files
+removed. A C:ApolloExplorerSrv that I started stays until the next reboot.

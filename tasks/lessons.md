@@ -318,3 +318,11 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
 - Measure before the next guess: a per-frame count of painted drag pixels
   (all 1561 or 0, never partial) showed whole reads between Directory Opus's
   erase and redraw, where the "keep half-torn reads" guess had made it worse.
+
+- A dock started from WBStartup has no CLI number for Break. Stop it with a
+  small tool that does FindTask("DockAwesome") and Signal(SIGBREAKF_CTRL_C)
+  under Forbid; restart it with WBRun SYS:WBStartup/DockAwesome and check
+  for its 800x96 window (2026-11-17).
+- Matched --bench-sweep runs before believing a review's cycle estimate:
+  "45-50 cycles per translucent pixel" for blend_pixel became 5.5 % of
+  compose on hardware (2026-11-17).

@@ -47,6 +47,8 @@ the kernels in RAM.
 | Byte comparison | 490,806 | 65,783 | 16,384,000 bytes |
 | Key transport, clear | — | 79,191 | 4,096,000 pixels |
 | Key transport, covered | — | 79,364 | 4,096,000 pixels |
+| RGB24 screen row to RGB565 (core 12856) | 1,220,421 | 150,797 | 16,384,000 pixels |
+| ARGB32 screen row to RGB565 (core 12856) | — | 91,216 | 16,384,000 pixels |
 
 ## SAGA registers
 
