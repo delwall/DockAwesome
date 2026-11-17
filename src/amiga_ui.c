@@ -1493,7 +1493,7 @@ static void clear_folder_motion(FolderView *f)
     f->handoff_bitmap = NULL;
 }
 
-static void load_folder_icon(DockUI *ui);
+static void load_folder_icon(DockUI *ui, int present);
 
 void dock_ui_finish_folder_motion(DockUI *ui)
 {
@@ -1505,11 +1505,12 @@ void dock_ui_finish_folder_motion(DockUI *ui)
         close_popup(ui,0);
     } else if (f->motion == FOLDER_OPENING) {
         f->motion = FOLDER_STILL;
-        paint_folder(ui);
-        /* The icons that grew with the box go into the still picture at
-           once: without them the first still frame showed empty slots. */
+        /* The icons that grew with the box go into the still picture
+           before it is shown: drawn one by one after it, they blinked out
+           for a few ms at the end of the entrance. */
         while (f->count && f->next_icon < folder_visible_files(f) && f->loaded[f->next_icon].pixels)
-            load_folder_icon(ui);
+            load_folder_icon(ui,0);
+        paint_folder(ui);
         clear_folder_motion(f);
     }
 }
@@ -1913,9 +1914,10 @@ static int read_folder_icon(DockUI *ui, const char *path, const unsigned long *s
     return ok;
 }
 
-/* Load and show the page's next icon: from the cache while the entry's
-   dates match, else read and built (and kept). */
-static void load_folder_icon(DockUI *ui)
+/* Load the page's next icon into the artwork, and show it if present:
+   from the cache while the entry's dates match, else read and built (and
+   kept). */
+static void load_folder_icon(DockUI *ui, int present)
 {
     FolderView *f = &ui->folder;
     char path[DOCK_PREFS_PATH_CAP];
@@ -1954,8 +1956,8 @@ static void load_folder_icon(DockUI *ui)
         int x = folder_icon_left(f,i), y = folder_icon_top(f,i);
         dock_blend(&f->artwork,&icon,x,y);
         f->loaded[i] = icon;
-        if (!ui->popup_glass.pixels ||
-            !amiga_display_present_tile(ui->popup_display,ui->popup,&f->artwork,x,y,size,size))
+        if (present && (!ui->popup_glass.pixels ||
+            !amiga_display_present_tile(ui->popup_display,ui->popup,&f->artwork,x,y,size,size)))
             f->needs_repaint = 1;
     }
 }
@@ -1980,7 +1982,7 @@ int dock_ui_folder_step(DockUI *ui)
     budget = (ULONG)((uint64_t)hz*FOLDER_LOAD_BUDGET_US/1000000);
     if (!f->next_icon) f->fill_start = start.ev_lo;
     do {
-        load_folder_icon(ui);
+        load_folder_icon(ui,1);
         ReadEClock(&now);
     } while (f->next_icon < folder_visible_files(f) && now.ev_lo-start.ev_lo < budget);
     if (dock_ui_folder_pending(ui)) return 0;
