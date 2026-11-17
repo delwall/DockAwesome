@@ -11,6 +11,16 @@
 ## Build and test
 
 - Build successfully before uploading. An old binary can survive a failed build.
+- A different compiler is a different program. After a toolchain change,
+  build clean and compare the dock's frame with --pip-dump against the
+  installed build before judging any other change. GCC 6.5.0b
+  (GCC-6.50-Dev) at -O2 -m68080 got an int64_t expression in the layout
+  wrong; objects left from the old compiler hid it until a header change
+  rebuilt them.
+- Cross-compile the host tests for the Amiga to find such miscompiles,
+  and run them from an Execute script that sets Stack and FailAt first:
+  extra lines in one amiga_shell call do not run, and a 4 KB stack
+  crashed the machine. A test that ignores Ctrl-C needs a reset.
 - Wait for the native window or gadget before sending input or reading saved
   preferences. A visible window alone does not prove the dock responds.
 - Redirect the profiled command's output from an AmigaDOS script.

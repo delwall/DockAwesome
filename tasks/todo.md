@@ -1230,3 +1230,23 @@ frame rate, let the user pick the zoom curve.
       first box frame. Not fixed.
 - [x] Zoom curve: DOCK_ZOOM_TICKS (default 8). RAM:Dock8 (build 426),
       Dock10 (424), Dock12 (425) for the user to compare on the monitor.
+
+Regression report: the zoomed row slid left and lost the pointer
+(all three zoom variants, 2026-11-18).
+- [x] Cause: the toolchain, not the zoom change. ~/ApolloCrossDevLocal
+      (GCC-6.50-Stable) is gone; builds since 408 use GCC-6.50-Dev
+      (6.5.0b). Clean builds of the committed 412 source show the same
+      shift; the installed 412 still held old-compiler objects. With
+      dock_core.c (or only dock_layout) at -O1 the frame matches 412.
+- [x] logical_positions: focus*span/rest_pitch in 32 bits. A layout
+      harness on the Vampire (12 icons, 36 px, 190%, end gap 12, every x
+      0-799) now matches the host exactly; at -O2 before, 463 of 800 x
+      differed (row pinned to the left padding).
+- [x] Host tests cross-compiled at -O2 on the Vampire: geometry, prefs,
+      profile, bob, text pass.
+- [ ] test_core ran over 17 minutes without finishing (1.6 s on the Mac);
+      test_interaction hung earlier (possibly the 4 KB stack). The Amiga
+      stopped answering after ChangeTaskPri on the stuck test: needs a
+      reset. Unknown whether more Dev miscompiles remain.
+- [ ] The fixed dock itself not yet checked with --pip-dump. Built:
+      Dock8 (430), Dock10 (428), Dock12 (429) in the scratchpad.
