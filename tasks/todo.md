@@ -1117,6 +1117,21 @@ Coffin (AmigaOS 3.9, 24-bit, no shaped windows, core 12856), 2026-11-17:
       in SYS:WBStartup. Disabled/DockAwesome-build406.old could not be
       deleted (Workbench still holds a WBRun binary); delete after a
       reboot. Disabled/DockAwesome-build399.old is the rollback.
+AmigaOS 3.2.3 (Kickstart 47.13, 24-bit, no shaped windows), build 407,
+2026-11-17:
+- [x] ammx_probe: every kernel passes. --damage-check 194 frames, 0 and 0
+      (Apollo bit set).
+- [x] --bench-sweep 4 against the installed build (272452 bytes): compose
+      5363/5355 -> 5229/4905 us.
+- [x] Dock at rest, 95-100 polls: capture 4766 -> 1513 us a poll.
+- [x] Band: receiver armed (pointer on the RAM Disk icon, window at
+      224,624 832x96), Archives window over the box closed by ARexx, dock
+      running: clean; arms=disarms=5.
+- [ ] Not run: the dock's menu (a right-click at 640,717 opened none with
+      the installed build either), Delete, drops, B5-B9.
+- Left: RexxMast started by me (was not running); RAM:DockAwesome (407)
+  for the user; installed dock restarted with WBRun, other files removed.
+
 - [ ] Reviewer's notes left open: on ApolloOS check that a change on the
       plate shows at once (if the driver hands LockBitMap a temporary
       buffer the peek would see it only every tenth poll); a hover label
