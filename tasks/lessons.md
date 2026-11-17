@@ -349,3 +349,9 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
 - One run of a profile average is noise here (unchanged polls 1.8-4.5 ms
   across runs with motion). Measure old/new/old in one script with the
   scenario reduced to the one thing compared (2026-11-17).
+- A screenshot taken after the test dock has quit proves nothing about a
+  screen artefact the dock causes: quitting clears it. Capture first,
+  then Break (2026-11-17).
+- The independent review of a day's fixes found seven defects in them,
+  two in code that had passed on hardware. Run it before installing, not
+  after (2026-11-17).

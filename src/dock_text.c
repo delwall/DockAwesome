@@ -75,7 +75,9 @@ size_t dock_title_document_alias(const char *title, const char *path, char *cand
         volume = memchr(start,':',(size_t)(limit-start));
         if (!volume || volume == start || volume[1] == ' ' ||
             memchr(start,'/',(size_t)(volume-start))) continue;
-        for (file = volume+1; file < limit; ++file) {
+        /* A drawer name may hold what reads as a separator ("A - B"): the
+           file name is looked for in the rest of the title, as before. */
+        for (file = volume+1; *file; ++file) {
             size_t n;
             const char *end;
             if (file[-1] != ':' && file[-1] != '/') continue;
@@ -95,11 +97,12 @@ size_t dock_title_document_alias(const char *title, const char *path, char *cand
    Returns 0 when it does not fit. */
 int dock_shell_quote(char *out, size_t size, const char *text)
 {
-    size_t n = strlen(out);
-    if (n+1 >= size) return 0;
+    size_t start = strlen(out), n = start;
+    /* Room for both quotes and the NUL. */
+    if (n+2 >= size) return 0;
     out[n++] = '"';
     for (; *text; ++text) {
-        if (n+3 >= size) return 0;
+        if (n+3 >= size) { out[start] = 0; return 0; }
         if (*text == '"' || *text == '*') out[n++] = '*';
         out[n++] = *text;
     }

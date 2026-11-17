@@ -1098,6 +1098,31 @@ Coffin (AmigaOS 3.9, 24-bit, no shaped windows, core 12856), 2026-11-17:
   rebooted Coffin. The installed builds never held that code.
 - Build 406: --damage-check 262 frames, 0 and 0; installed in
   SYS:WBStartup (399 kept as Disabled/DockAwesome-build399.old).
+- [x] Independent review of the whole branch diff (one reviewer, with
+      host harnesses): no crash or data loss; seven defects in today's
+      changes, all fixed in build 407:
+      a reset answered inside a requester let the loop show PiP again
+      (app->resetting); the Folder Stack's first still frame lacked the
+      preloaded icons; the alias search no longer found a path whose
+      drawer name holds " - "; dock_shell_quote wrote one byte past size
+      with two bytes left (moved code, ASan); the menu branch ran the fast
+      tick; a busy layer list at arming stored 0 and stepped back at once;
+      popup_covered released with UnlockLayerInfo after AttemptSemaphore.
+      Also: PiP1 goes off at quit before the worker is waited for.
+      Confirmed by the reviewer: VPERM constants, exact kernel ranges,
+      blend bit-identical (200 million triples), peek bounds and
+      invalidation, prefs skip_value, loaded[] ownership.
+- [x] Build 407 on Coffin: --damage-check twice, 262 frames, 0 and 0; the
+      band sequence with the dock running: clean, arms=disarms; installed
+      in SYS:WBStartup. Disabled/DockAwesome-build406.old could not be
+      deleted (Workbench still holds a WBRun binary); delete after a
+      reboot. Disabled/DockAwesome-build399.old is the rollback.
+- [ ] Reviewer's notes left open: on ApolloOS check that a change on the
+      plate shows at once (if the driver hands LockBitMap a temporary
+      buffer the peek would see it only every tenth poll); a hover label
+      or popup of the dock's own over the box counts as a window change
+      (one step back, half a second without arming); rexx_call polls with
+      Delay(1), 20 ms a call; apply_attributions matches by address only.
 - [ ] Not run on Coffin: the dock's own menu (my right-click at 640,717
       missed the plate), Delete key, Folder Stack, B5-B9.
 - Cleaned: test docks quit, installed dock restarted with WBRun, RAM: test

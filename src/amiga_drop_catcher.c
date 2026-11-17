@@ -319,7 +319,7 @@ static unsigned int arm_for_pointer(AmigaDropCatcher *c, uint64_t now, uint32_t 
         }
     }
     if (now < c->rearm_at) return 0;
-    /* On the dock itself the armed window is the front layer: stay put. */
+    /* On the dock itself the pointer is on no drawer: stay as it is. */
     if (inside(c, c->screen->MouseX, c->screen->MouseY)) return 0;
     client = workbench_client_start(c, c->screen->MouseX, c->screen->MouseY);
     /* Armed on the Directory Opus desktop, the window clipped a selection
@@ -327,12 +327,13 @@ static unsigned int arm_for_pointer(AmigaDropCatcher *c, uint64_t now, uint32_t 
     if (client == 2) client = 0;
     if (client < 0 || client == c->armed) return 0;
     if (!client) return end_catch(c, 1);
+    /* Taken with the copy: what the copy shows on the box. With the layer
+       list busy, arm on a later pass. */
+    if (!(c->windows = box_windows(c))) return 0;
     BltBitMap(c->screen->RastPort.BitMap,c->left,c->top,
         c->backing,0,0,c->width,c->height,0xc0,0xff,NULL);
     WaitBlit();
     c->backing_valid = 1;
-    /* Taken with the copy: what the copy shows on the box. */
-    c->windows = box_windows(c);
     set_catching(c, 1);
     c->armed = 1;
     ++c->stats.arms;

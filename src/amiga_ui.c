@@ -1493,6 +1493,8 @@ static void clear_folder_motion(FolderView *f)
     f->handoff_bitmap = NULL;
 }
 
+static void load_folder_icon(DockUI *ui);
+
 void dock_ui_finish_folder_motion(DockUI *ui)
 {
     FolderView *f = &ui->folder;
@@ -1504,6 +1506,10 @@ void dock_ui_finish_folder_motion(DockUI *ui)
     } else if (f->motion == FOLDER_OPENING) {
         f->motion = FOLDER_STILL;
         paint_folder(ui);
+        /* The icons that grew with the box go into the still picture at
+           once: without them the first still frame showed empty slots. */
+        while (f->count && f->next_icon < folder_visible_files(f) && f->loaded[f->next_icon].pixels)
+            load_folder_icon(ui);
         clear_folder_motion(f);
     }
 }
@@ -1666,7 +1672,7 @@ static int popup_covered(const DockUI *ui)
     for (layer = own->front; layer && !covered; layer = layer->front)
         covered = layer->bounds.MinX <= own->bounds.MaxX && layer->bounds.MaxX >= own->bounds.MinX &&
             layer->bounds.MinY <= own->bounds.MaxY && layer->bounds.MaxY >= own->bounds.MinY;
-    UnlockLayerInfo(info);
+    ReleaseSemaphore(&info->Lock);
     return covered;
 }
 

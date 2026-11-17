@@ -328,7 +328,6 @@ static int capture_raw(AmigaDisplay *d, unsigned char *cache, const unsigned cha
             while (a < b && copy[a] == fresh[a]) ++a;
             while (b >= a+4 && *(const ULONG *)(copy+b-4) == *(const ULONG *)(fresh+b-4)) b -= 4;
             while (b > a && copy[b-1] == fresh[b-1]) --b;
-            /* Redrawn back between the compare and the copy. */
             if (a >= b) continue;
         }
         /* Only the changed span, widened to whole pixels: a window moved

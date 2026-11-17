@@ -394,6 +394,8 @@ typedef struct App {
     int drag_overlay_x, drag_overlay_y;
     int pip_tail; /* keyed columns at the far side of a left PiP dock */
     int drag_bob_gx, drag_bob_gy; /* the pointer at the drawn pin's last frame */
+    /* Ctrl-Amiga-Amiga was answered: PiP stays off and the loop ends. */
+    int resetting;
     int menu_decided, menu_hides; /* the native menu held now: whether PiP steps aside */
     ResetWatch reset; /* amiga_reset.c */
     int drop_preview_slot, displayed_drop_slot, snap_wait_motion, snap_x, snap_y;

@@ -161,6 +161,9 @@ static void message(const char *text)
             for (;;) {
                 ULONG signals = Wait(port|reset);
                 if (signals & reset) {
+                    /* The caller goes on as after OK: nothing may show
+                       PiP again before the machine resets. */
+                    app->resetting = 1;
                     amiga_pip_suspend(app->pip); app->pip_visible = 0;
                     amiga_float_hide(app->float_layer);
                     reset_watch_done(app);
@@ -842,7 +845,7 @@ static void live_schedule(App *app)
        behind the dock: the fast rate would only wake the loop 60 times a
        second to find PiP hidden. */
     fast = animation_needed(app) || (IntuitionBase->FirstScreen == app->screen &&
-        buttons_engaged(app,ANY_BUTTON));
+        buttons_engaged(app,ANY_BUTTON) && !native_menu_held(app));
     if (app->live_pending && fast && !app->live_fast) live_cancel(app);
     if (app->live_pending) return;
     app->live_io->tr_node.io_Command = TR_ADDREQUEST;
@@ -2145,7 +2148,7 @@ static __attribute__((noinline)) void event_loop(App *app)
     animation_profile_end(app);
     animation_schedule(app); live_schedule(app);
     ULONG deferred = 0;
-    while (running) {
+    while (running && !app->resetting) {
         ULONG workbench = app->workbench_port ? 1UL<<app->workbench_port->mp_SigBit : 0;
         if (app->workbench_closed) {
             /* Nothing is on screen: wait for Workbench to open again. */
@@ -2175,6 +2178,7 @@ static __attribute__((noinline)) void event_loop(App *app)
             /* Ctrl-Amiga-Amiga: the handler turned PiP off, but it may have
                interrupted a present that then turned it on again. Turn it
                off from here too, then let the reset go on. */
+            app->resetting = 1;
             amiga_pip_suspend(app->pip); app->pip_visible = 0;
             amiga_float_hide(app->float_layer);
             reset_watch_done(app);
@@ -2653,6 +2657,7 @@ int main(int argc, char **argv)
     /* The status worker is waited for below: nothing of the dock stays on
        screen, and no press is taken for it, meanwhile. */
     if (app->pip) ui_blocking(app,1);
+    amiga_float_hide(app->float_layer);
     workbench_notify_close(app);
     program_poll_close(app);
     status = app->failed ? 20 : 0;

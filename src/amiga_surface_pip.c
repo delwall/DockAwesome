@@ -108,7 +108,7 @@ static int pip_blocked_by_screen(App *app)
         app->menu_hides = menu_near_dock(app);
         if (app->menu_hides) ++app->stats.menu_suspends;
     }
-    if (IntuitionBase->FirstScreen == app->screen && !(menu && app->menu_hides)) return 0;
+    if (!app->resetting && IntuitionBase->FirstScreen == app->screen && !(menu && app->menu_hides)) return 0;
     interaction_cancel(app);
     amiga_pip_suspend(app->pip); app->pip_visible = 0; input_publish(app);
     return 1;

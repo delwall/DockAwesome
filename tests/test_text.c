@@ -43,6 +43,8 @@ static void test_title_alias(void)
     assert(n && !strcmp(candidate,"RAM:My Dir/Notes.txt"));
     n = dock_title_document_alias("ram:notes.TXT","Work:Notes.txt",candidate,sizeof(candidate));
     assert(n && !strcmp(candidate,"ram:notes.TXT"));
+    n = dock_title_document_alias("RAM:A - B/Notes.txt","Work:Notes.txt",candidate,sizeof(candidate));
+    assert(n && !strcmp(candidate,"RAM:A - B/Notes.txt"));
     assert(!dock_title_document_alias("Notes.txt - Editor","Work:Notes.txt",candidate,sizeof(candidate)));
     assert(!dock_title_document_alias("RAM:Notes.txt.bak","Work:Notes.txt",candidate,sizeof(candidate)));
     assert(!dock_title_document_alias("RAM:MyNotes.txt","Work:Notes.txt",candidate,sizeof(candidate)));
@@ -65,7 +67,12 @@ static void test_shell_quote(void)
     small[0] = 0;
     assert(dock_shell_quote(small,sizeof(small),"abcd") && !strcmp(small,"\"abcd\""));
     small[0] = 0;
-    assert(!dock_shell_quote(small,sizeof(small),"abcdef"));
+    assert(!dock_shell_quote(small,sizeof(small),"abcdef") && !small[0]);
+    /* The string already fills all but two bytes: no room for two quotes. */
+    strcpy(small,"abcdef");
+    assert(!dock_shell_quote(small,sizeof(small),"") && !strcmp(small,"abcdef"));
+    strcpy(small,"abcde");
+    assert(dock_shell_quote(small,sizeof(small),"") && !strcmp(small,"abcde\"\""));
     memset(guarded,'#',sizeof(guarded));
     guarded[0] = 0;
     assert(!dock_shell_quote(guarded,8,"\"\"\"\"\"\""));
