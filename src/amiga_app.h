@@ -235,6 +235,8 @@ typedef struct {
     ULONG desktop_scans;
     ULONG drag_reveal_frames, drag_reveal_peak, popup_reveal_frames, dialog_reveal_frames;
     uint64_t capture_ticks, decode_ticks, source_pixels;
+    /* Polls that found a change, and their share of capture_ticks. */
+    uint64_t capture_changed_ticks; ULONG capture_changed;
     uint64_t settle_ticks, settle_peak;
     ULONG settles, settle_ms[16];
     int settle_samples;

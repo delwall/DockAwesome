@@ -308,7 +308,9 @@ static int capture_raw(AmigaDisplay *d, unsigned char *cache, const unsigned cha
         unsigned char *copy = d->raw+(size_t)row*raw_row;
         size_t a = 0, b = visible_raw;
         int l, r;
-        /* One burst read of video memory; the rest works in Fast RAM. */
+        /* One burst read of video memory; the rest works in Fast RAM.
+           Comparing in place first and copying only changed rows measured
+           no faster on Coffin (changed polls 7.9 against 8.1 ms). */
         memcpy(fresh,source+(size_t)row*stride,visible_raw);
         if (!force) {
             if (equal(copy,fresh,(unsigned long)visible_raw)) continue;
@@ -318,6 +320,8 @@ static int capture_raw(AmigaDisplay *d, unsigned char *cache, const unsigned cha
             while (a < b && copy[a] == fresh[a]) ++a;
             while (b >= a+4 && *(const ULONG *)(copy+b-4) == *(const ULONG *)(fresh+b-4)) b -= 4;
             while (b > a && copy[b-1] == fresh[b-1]) --b;
+            /* Redrawn back between the compare and the copy. */
+            if (a >= b) continue;
         }
         /* Only the changed span, widened to whole pixels: a window moved
            sideways changes a few. */

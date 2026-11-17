@@ -1111,6 +1111,12 @@ static void profile_report(App *app)
         printf("PiP receiver: arms=%lu disarms=%lu presses_armed=%lu presses_unarmed=%lu\n",
             drop.arms,drop.disarms,drop.presses_armed,drop.presses_unarmed);
     }
+    printf("PiP2 capture: changed=%lu us_avg=%lu unchanged=%lu us_avg=%lu\n",
+        (unsigned long)app->stats.capture_changed,
+        ticks_us(app,app->stats.capture_changed_ticks,app->stats.capture_changed),
+        (unsigned long)(app->stats.source_polls-app->stats.capture_changed),
+        ticks_us(app,app->stats.capture_ticks-app->stats.capture_changed_ticks,
+            app->stats.source_polls-app->stats.capture_changed));
     printf("PiP2: polls=%lu source_changes=%lu front_requests=%lu capture_compare_us_avg=%lu decode_us_avg=%lu changed_px_avg=%lu (settled100ms, motion10ms)\n",
         (unsigned long)app->stats.source_polls, (unsigned long)app->stats.source_changes,
         (unsigned long)app->stats.front_requests,

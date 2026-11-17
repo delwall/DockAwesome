@@ -1057,6 +1057,35 @@ Open:
 - [ ] Run on Coffin/3.2.3/AmiKit: B3-B9 above and the 24-bit capture.
 - [ ] The Games drawer window on the test machine moved from 351,409 to
       364,420 during my tests.
+Coffin (AmigaOS 3.9, 24-bit, no shaped windows, core 12856), 2026-11-17:
+- [x] ammx_probe: every kernel passes, also the new screen-row kernels.
+- [x] --bench-sweep 4, build 395 against the installed 352-era build:
+      compose 5028/4799 -> 5016/5482 us (no gain here, noisy);
+      --damage-check 262 frames, 0 compose and 0 convert mismatches. The
+      Apollo bit is set in these runs.
+- [x] 24-bit capture, matched (baseline 7a74a3d and the new build with the
+      same new counter, one script: Archives window moved in 38 steps of
+      10 px over the dock's box, 2 ticks apart): a poll that finds a change
+      10735 -> 7899 us (second pair 11052 -> 8146); a poll that finds none
+      about 3 ms in both (2751-3677). New profile line "PiP2 capture:
+      changed/unchanged".
+- [x] Compare in place before copying the row: changed polls 8146 against
+      7899 us, unchanged 2888 against 2751-3677. No gain; reverted, the
+      measurement is in the comment. Kept: a row redrawn back between
+      compare and copy is skipped instead of giving an inverted box.
+- [ ] Open: an unchanged poll still costs about 3 ms on a 24-bit screen.
+      Find what it is (LockBitMap, the check box, or full compares).
+- [ ] Open, also in the baseline build: with a window over the dock's box,
+      a MagicMenu pop-up opened by a right-click at 640,717 and then Esc
+      (which closed the window too) left a band in the screen bitmap where
+      the window met the box (340..740 x 620..680), black or the stale
+      window, with a row of coloured garbage on top. It stays until the
+      dock quits. Closing the window by ARexx leaves the screen clean.
+- [ ] Not run on Coffin: the dock's own menu (my right-click at 640,717
+      missed the plate), Delete key, Folder Stack, B5-B9.
+- Cleaned: test docks quit, installed dock restarted with WBRun, RAM: test
+  files removed. RAM:DockAwesome (build 399) left for the user to try.
+
 Smoke test, builds 388 and 393 from RAM: on ApolloOS: hover, plate menu,
 About, Quit through the menu, Folder Stack, profile printed. Installed dock (WBStartup) stopped with
 a FindTask/Signal Ctrl-C tool and restarted with WBRun; RAM: test files

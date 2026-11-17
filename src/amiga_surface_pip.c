@@ -205,7 +205,11 @@ static int live_capture(App *app, int full_compare)
     result = amiga_display_capture565(app->display, app->source565,
         app->left, app->top, force, check, app->renderer.pixels->bytes_equal, &box);
     ++app->stats.source_polls;
-    if (app->profile) app->stats.capture_ticks += profile_clock()-started;
+    if (app->profile) {
+        uint64_t spent = profile_clock()-started;
+        app->stats.capture_ticks += spent;
+        if (result > 0 && !force) { app->stats.capture_changed_ticks += spent; ++app->stats.capture_changed; }
+    }
     if (result < 0) {
         amiga_pip_suspend(app->pip); app->pip_visible = 0; input_publish(app); app->failed = 1;
         strcpy(app->surface_error, "PiP lost the screen. Restart the dock on a supported screen.");
