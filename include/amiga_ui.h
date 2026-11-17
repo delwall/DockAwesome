@@ -61,6 +61,9 @@ int dock_ui_folder_pending(const DockUI *ui);
 int dock_ui_folder_open(const DockUI *ui);
 /* The Folder Stack view is opening or closing. */
 int dock_ui_folder_moving(const DockUI *ui);
+/* Turn the still Folder Stack's tip toward the stack pin's center at
+   (x,y) on the screen; the box stays where it is. */
+void dock_ui_point_folder_tip(DockUI *ui, int x, int y);
 /* How far the Folder Stack box is out on screen: 0 (hidden) to 256 (open). */
 int dock_ui_folder_progress(const DockUI *ui);
 ULONG dock_ui_folder_frame_delay(const DockUI *ui);
@@ -93,5 +96,8 @@ int dock_ui_poll(DockUI *ui, DockUIAction *action);
 void dock_ui_close_dialog(DockUI *ui);
 int dock_ui_owns_window(const DockUI *ui, const struct Window *window);
 int dock_ui_busy(const DockUI *ui);
+/* A dialog, a menu or a moving Folder Stack is open: the dock holds its
+   row and passes presses through. A still Folder Stack does not. */
+int dock_ui_holds_dock(const DockUI *ui);
 
 #endif

@@ -176,7 +176,7 @@ static void message(const char *text)
     } else EasyRequestArgs(NULL, &req, NULL, arguments);
     if (app) {
         /* The next present publishes the snapshot again. */
-        Disable(); app->input_context.ui_busy = dock_ui_busy(app->ui); Enable();
+        Disable(); app->input_context.ui_busy = dock_ui_holds_dock(app->ui); Enable();
         app->gesture_redraw = 1;
     }
 }
@@ -521,6 +521,7 @@ static void fail_after_cleanup(App *app, const char *fallback)
 
 static int pointer_inside(App *app, int *x, int *y)
 {
+    DockRect popup;
     int inside;
     if (app->bench_active) {
         *x = app->bench_x; *y = app->bench_y;
@@ -529,7 +530,11 @@ static int pointer_inside(App *app, int *x, int *y)
                 app->width, app->height, *x, *y);
     }
     *x = app->screen->MouseX-app->left; *y = app->screen->MouseY-app->top;
-    if (dock_ui_busy(app->ui)) return 0;
+    if (dock_ui_holds_dock(app->ui)) return 0;
+    /* An open Folder Stack's lower edge can lie in the hover band. */
+    if (dock_ui_popup_bounds(app->ui,&popup) &&
+        app->screen->MouseX >= popup.left && app->screen->MouseX < popup.right &&
+        app->screen->MouseY >= popup.top && app->screen->MouseY < popup.bottom) return 0;
     inside = IntuitionBase->FirstScreen == app->screen && *x >= 0 && *x < app->width && *y >= 0 && *y < app->height;
     if (!inside) return 0;
     if (!dock_edge_hover(&app->settings, app->edge, app->placement, app->count,
@@ -635,10 +640,10 @@ static int animate_row(App *app)
 
 static void update_target(App *app)
 {
-    DockRect popup;
     int x, y, inside;
     int catching = amiga_drop_catcher_active(app->drop_catcher);
-    if (dock_ui_popup_bounds(app->ui,&popup)) return;
+    /* A still Folder Stack leaves the row to follow the pointer. */
+    if (dock_ui_holds_dock(app->ui)) return;
     if (app->gesture.active && app->gesture.dragged && !app->gesture.cancelled) {
         DockGesture *gesture = &app->gesture;
         int count = row_count(app), zoom = !gesture->remove_armed;
@@ -799,7 +804,7 @@ void animation_cancel(App *app)
 static int animation_step(App *app)
 {
     LONG error = 0;
-    int closed;
+    int closed, held;
     if (app->vblank.armed && (app->vblank.fields != app->vblank_field ||
             profile_clock()-app->vblank_armed_at > app->clock_hz*3/50)) {
         /* No field for three periods: the interrupt is off; use the timer. */
@@ -819,8 +824,10 @@ static int animation_step(App *app)
         animation_finish(app);
         return 1;
     }
+    held = dock_ui_holds_dock(app->ui);
     closed = dock_ui_folder_step(app->ui);
-    if (closed) {
+    /* The entrance ended: presses on the dock count again. */
+    if (closed || held != dock_ui_holds_dock(app->ui)) {
         sync_input_ui(app);
         Signal(FindTask(NULL),1UL<<app->timer_port->mp_SigBit);
     }
@@ -1334,6 +1341,12 @@ static void draw(App *app)
     app->renderer.pressed_item = 0;
     app->stack_button_shown = dock_ui_folder_open(app->ui);
     publish_close_button(app,placement,count);
+    /* The open stack's tip points at the pin as the row zooms (before this
+       frame, so PiP's cut-out for the box follows it too). */
+    if (app->stack_button_shown && !app->moving_item)
+        for (i = 0; i < count; ++i) if (app->items[row_item(app,i)].stack)
+            dock_ui_point_folder_tip(app->ui,app->left+placement[i].x+placement[i].size/2,
+                app->top+placement[i].y+placement[i].size/2);
     for (i = 0; i < count; ++i) {
         int item = row_item(app,i);
         icons[i] = item == dragged ? NULL : &app->items[item].cache;
@@ -1681,7 +1694,13 @@ static void apply_gesture(App *app, const DockGestureInput *in, int *redraw, int
            consumes it in the handler) closes it rather than reopening. */
         if (item->stack && app->stack_close_press) dock_ui_dismiss_popup(app->ui);
         else if (item->stack) open_stack_view(app,index);
-        else if (!focused && !item->temporary) {
+        /* A click on another pin closes the open stack, as on the Mac. */
+        else if (dock_ui_folder_open(app->ui)) {
+            dock_ui_dismiss_popup(app->ui);
+            if (app->timer_failed) dock_ui_finish_folder_motion(app->ui);
+            sync_input_ui(app);
+        }
+        if (!item->stack && !focused && !item->temporary) {
             if (launch_pin(app,item->path,1)) {
                 record_launch(app,item->pin_id);
                 status_changed(app);
@@ -1938,7 +1957,7 @@ static void sync_input_ui(App *app)
     DockRect bounds;
     Disable();
     app->input_context.popup_open = dock_ui_popup_bounds(app->ui,&bounds);
-    app->input_context.ui_busy = dock_ui_busy(app->ui);
+    app->input_context.ui_busy = dock_ui_holds_dock(app->ui);
     if (app->input_context.ui_busy) app->input_context.active = NULL;
     Enable();
 }

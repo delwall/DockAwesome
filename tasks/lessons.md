@@ -63,6 +63,9 @@
 - Compare original PNG alpha with the decoded icon before changing scaling.
 - Use a Vampire screenshot as the baseline for Workbench icon comparisons.
 - Keep running dots small and sharp, near the screen-side icon baseline.
+- A reference video from the user is the specification. Extract frames,
+  crop the detail at full resolution and measure it (for example, where
+  the stack tip points in each frame) before planning or building.
 
 ## PiP and Intuition
 
@@ -83,6 +86,9 @@
 - Pass a full `ULONG` count to ApolloOS text calls. A classic `UWORD` inline
   can leave stale upper bits. Check generated register writes.
 - If a task stays in a library call after Ctrl-C, use a user-approved restart.
+- Do not change a window shape per frame: Workbench redraws the desktop
+  behind each change (dock frames 10 -> 24 ms). Shape the whole area a
+  part moves in once and repaint it from the saved backdrop.
 
 ## Workbench input and drops
 

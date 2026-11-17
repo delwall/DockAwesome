@@ -1174,3 +1174,29 @@ Folder Stack entrance hitch, build 408 (2026-11-17, ApolloOS):
 - [x] Installed in SYS:WBStartup (407 kept as
       Disabled/DockAwesome-build407.old). Disabled/DockAwesome-build395.old
       is held by Workbench (WBRun binary); delete after a reboot. 352 deleted.
+
+The dock stays live while a Folder Stack is open, builds 410-412
+(2026-11-17, ApolloOS). Reference: the user's macOS screencast; the box
+stays put, its tip slides along the edge to point at the stack button's
+center every frame while the dock zooms.
+- [x] dock_ui_holds_dock: a dialog, a menu or a moving box holds the row;
+      a still box does not. Hover, zoom and presses on the dock follow it
+      (pointer_inside, update_target, input_publish, sync_input_ui,
+      message). The pointer over the box never counts as dock hover.
+- [x] A click on another pin closes the stack and goes on as a click
+      (at the launch, not the press: the press would clear the snapshot
+      and the release would miss the pin). CLI pin with the stack open:
+      stack closed, new Shell.
+- [x] dock_ui_point_folder_tip: draw() points the tip at the stack pin's
+      center; the band by the tip is retinted from the clean backdrop and
+      presented. A page change in the same window keeps the tip.
+- [x] Build 411 changed the window shape per tip move: Workbench redrew
+      the desktop behind each time, dock frames 10 -> 24 ms, settle
+      avg/max 184/312 -> 351/876 ms, 168 stalled frames. Build 412 shapes
+      the whole tip strip once and paints its backdrop: settle 174/319 ms,
+      23 stalled, entrance 5 frames.
+- [x] Measured tip on screen: pointer on the stack x=870, left of it
+      x=898, pointer off the dock x=871; old place repainted cleanly.
+- [ ] Not seen: the dock itself (PiP) beside the tip on the monitor;
+      side docks (left/right) not run.
+- RAM:DockAwesome (build 412) left for the user; installed build is 408.

@@ -105,6 +105,7 @@ enum {
 
     FOLDER_OPEN_MS = 130, FOLDER_CLOSE_MS = 130,
     FOLDER_TIP = 7, FOLDER_TIP_HALF = 9, FOLDER_BACKDROP_LAYERS = 16,
+    FOLDER_TINT_SHIFT = 3, /* the glass passes an eighth of the backdrop */
     FOLDER_OUTSIDE = -1, FOLDER_BACK = -2, FOLDER_PREV = -3, FOLDER_NEXT = -4
 };
 enum { FOLDER_STILL, FOLDER_OPENING, FOLDER_CLOSING };
@@ -630,6 +631,12 @@ int dock_ui_busy(const DockUI *ui)
     return ui && (ui->popup || ui->dialog);
 }
 
+int dock_ui_holds_dock(const DockUI *ui)
+{
+    return ui && (ui->dialog ||
+        (ui->popup && !(ui->folder.path[0] && ui->folder.motion == FOLDER_STILL)));
+}
+
 static int popup_hit(const DockUI *ui, int x, int y)
 {
     if (x < 3 || x >= ui->popup->Width-3 || y < 3 || y >= 3+ui->popup_rows*ui->popup_row) return -1;
@@ -691,16 +698,31 @@ void dock_ui_popup_span(const DockUI *ui, int row, int *left, int *right)
         width,height,POPUP_RADIUS,row,left,right);
 }
 
-static struct Region *make_folder_shape(const FolderView *folder, int width, int height)
+/* The outline in the window's span; with a glass band, the strip the tip
+   slides in is whole: the tip follows the stack pin by repainting it from
+   the backdrop, without a shape change (each one had Workbench redraw the
+   desktop behind and took dock frames from 10 to 24 ms on the 68080). */
+static void folder_shape_span(const FolderView *folder, int width, int height, int band,
+    int row, int *left, int *right)
+{
+    popup_span(folder,width,height,POPUP_RADIUS,row,left,right);
+    if (!folder || !band) return;
+    if (folder->anchor.edge == DOCK_EDGE_BOTTOM) {
+        if (row >= folder->body_height) { *left = 0; *right = folder->body_width; }
+    } else if (folder->anchor.edge == DOCK_EDGE_LEFT) *left = 0;
+    else *right = width;
+}
+
+static struct Region *make_folder_shape(const FolderView *folder, int width, int height, int band)
 {
     struct Region *shape = NewRegion();
     int start = 0, left, right, row;
     if (!shape) return NULL;
-    popup_span(folder,width,height,POPUP_RADIUS,0,&left,&right);
+    folder_shape_span(folder,width,height,band,0,&left,&right);
     for (row = 1; row <= height; ++row) {
         int next_left = 0, next_right = 0;
         if (row < height)
-            popup_span(folder,width,height,POPUP_RADIUS,row,&next_left,&next_right);
+            folder_shape_span(folder,width,height,band,row,&next_left,&next_right);
         if (left != next_left || right != next_right) {
             struct Rectangle rect = {left,start,right-1,row-1};
             if (!OrRectRegion(shape,&rect)) { DisposeRegion(shape); return NULL; }
@@ -839,6 +861,28 @@ static void tint_popup_glass(DockUI *ui)
         for (x = lo; x < inner_lo; ++x) row[x] = rim;
         for (; x < inner_hi; ++x) row[x] = ((row[x]>>tint_shift)&mask)+tint;
         for (; x < hi; ++x) row[x] = rim;
+    }
+}
+
+/* tint_popup_glass for the rectangle [x0,x1) x [y0,y1) of a folder's
+   glass, from the clean backdrop under it: outside the outline the
+   backdrop, then rim and tinted glass as the outline now runs. */
+static void retint_folder_glass(const FolderView *f, DockImage *glass, const DockImage *under,
+    int x0, int y0, int x1, int y1)
+{
+    int width = glass->width, height = glass->height, y;
+    const uint32_t rim = (menu_colors[MENU_RIM]<<8)|255;
+    const uint32_t mask = (255U>>FOLDER_TINT_SHIFT)*UINT32_C(0x01010100);
+    const uint32_t tint = glass_tint(FOLDER_TINT_SHIFT);
+    for (y = y0; y < y1; ++y) {
+        int lo, hi, inner_lo, inner_hi, x;
+        uint32_t *row = (uint32_t *)glass->pixels+(size_t)y*width;
+        const uint32_t *clean = (const uint32_t *)under->pixels+(size_t)y*width;
+        popup_span(f,width,height,POPUP_RADIUS,y,&lo,&hi);
+        popup_inner_span(f,width,height,POPUP_RADIUS,y,lo,hi,&inner_lo,&inner_hi);
+        for (x = x0; x < x1; ++x)
+            row[x] = x < lo || x >= hi ? clean[x] :
+                x >= inner_lo && x < inner_hi ? ((clean[x]>>FOLDER_TINT_SHIFT)&mask)+tint : rim;
     }
 }
 
@@ -2485,12 +2529,18 @@ static int open_popup_window(DockUI *ui, int left, int top, int width, int heigh
     int report_mouse, int capture_backdrop)
 {
     int profile = ui->folder.path[0] && ui->folder.anchor.profile;
+    const FolderView *folder = ui->folder.path[0] ? &ui->folder : NULL;
     if (ui->window_shapes)
-        ui->popup_shape = make_folder_shape(ui->folder.path[0] ? &ui->folder : NULL,width,height);
+        ui->popup_shape = make_folder_shape(folder,width,height,ui->popup_rgb && capture_backdrop);
     ui->popup_round = ui->popup_shape || ui->popup_rgb;
     prepare_popup_colors(ui);
     folder_stamp(profile,0);
-    if (capture_backdrop) capture_popup_glass(ui,left,top,width,height,report_mouse ? 2 : 3);
+    if (capture_backdrop) capture_popup_glass(ui,left,top,width,height,report_mouse ? 2 : FOLDER_TINT_SHIFT);
+    if (ui->popup_shape && folder && !ui->popup_glass.pixels) {
+        /* No glass to paint the strip's backdrop: the outline alone. */
+        struct Region *outline = make_folder_shape(folder,width,height,0);
+        if (outline) { DisposeRegion(ui->popup_shape); ui->popup_shape = outline; }
+    }
     folder_stamp(profile,0);
     ui->popup = OpenWindowTags(NULL, WA_CustomScreen, (ULONG)ui->screen,
         WA_Left, left, WA_Top, top, WA_Width, width, WA_Height, height,
@@ -2630,6 +2680,8 @@ static int show_folder(DockUI *ui, FolderAnchor anchor, const char *path, size_t
     if (ui->folder.path[0] && ui->popup->Width == width && ui->popup->Height == height &&
         ui->popup->LeftEdge == left && ui->popup->TopEdge == top) {
         next.artwork = ui->folder.artwork;
+        /* The glass and shape were made for the tip where it points now. */
+        next.tip = ui->folder.tip;
         free(ui->folder.entries);
         next.motion_backdrop = ui->folder.motion_backdrop;
         next.backdrop_layer_count = ui->folder.backdrop_layer_count;
@@ -2667,6 +2719,51 @@ int dock_ui_open_folder(DockUI *ui, DockEdge edge, int x, int y, const char *pat
 {
     return ui && !ui->dialog && *path &&
         show_folder(ui,(FolderAnchor){edge,x,y,icon_size,profile,read_icon,context},path,strlen(path),1);
+}
+
+void dock_ui_point_folder_tip(DockUI *ui, int x, int y)
+{
+    FolderView *f;
+    DockImage *glass;
+    int width, height, tip, old, low, high, x0, y0, x1, y1;
+    if (!ui || !ui->popup) return;
+    f = &ui->folder;
+    glass = &ui->popup_glass;
+    width = ui->popup->Width; height = ui->popup->Height;
+    /* Only a still box with its tinted glass and the clean backdrop. */
+    if (!f->path[0] || f->motion != FOLDER_STILL || ui->glass_tint_shift || !glass->pixels ||
+        !f->motion_backdrop.pixels || glass->width != width || glass->height != height ||
+        f->motion_backdrop.width != width || f->motion_backdrop.height != height) return;
+    if (f->anchor.edge == DOCK_EDGE_BOTTOM)
+        tip = dock_clamp(x-ui->popup->LeftEdge,POPUP_RADIUS+FOLDER_TIP_HALF,
+            f->body_width-POPUP_RADIUS-FOLDER_TIP_HALF-1);
+    else tip = dock_clamp(y-ui->popup->TopEdge,POPUP_RADIUS+FOLDER_TIP_HALF,
+            f->body_height-POPUP_RADIUS-FOLDER_TIP_HALF-1);
+    if (tip == f->tip) return;
+    old = f->tip;
+    f->tip = tip;
+    /* The band by the edge facing the dock that both tips lie in: the tip
+       and the rim rows (or columns) next to it, three deep into the box. */
+    low = (old < tip ? old : tip)-FOLDER_TIP_HALF-2;
+    high = (old > tip ? old : tip)+FOLDER_TIP_HALF+3;
+    if (f->anchor.edge == DOCK_EDGE_BOTTOM) {
+        x0 = low; x1 = high; y0 = f->body_height-3; y1 = height;
+    } else {
+        y0 = low; y1 = high;
+        x0 = f->anchor.edge == DOCK_EDGE_LEFT ? 0 : f->body_left+f->body_width-3;
+        x1 = f->anchor.edge == DOCK_EDGE_LEFT ? f->body_left+3 : width;
+    }
+    x0 = dock_clamp(x0,0,width); x1 = dock_clamp(x1,x0,width);
+    y0 = dock_clamp(y0,0,height); y1 = dock_clamp(y1,y0,height);
+    retint_folder_glass(f,glass,&f->motion_backdrop,x0,y0,x1,y1);
+    if (f->artwork_ready && f->artwork.pixels) {
+        int row;
+        for (row = y0; row < y1; ++row)
+            memcpy(f->artwork.pixels+((size_t)row*width+x0)*4,
+                glass->pixels+((size_t)row*width+x0)*4,(size_t)(x1-x0)*4);
+    }
+    amiga_display_present_tile(ui->popup_display,ui->popup,folder_background(ui),
+        x0,y0,x1-x0,y1-y0);
 }
 
 static struct Gadget *gadget(DockUI *ui, struct Gadget *previous, ULONG kind,

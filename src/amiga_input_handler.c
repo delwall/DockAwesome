@@ -33,7 +33,7 @@ void input_publish(App *app)
     if (!app->pip_visible) {
         Disable(); c->active = NULL; Enable(); return;
     }
-    if (dock_ui_busy(app->ui) ||
+    if (dock_ui_holds_dock(app->ui) ||
         IntuitionBase->FirstScreen != app->screen || native_menu_held(app)) {
         Disable(); c->active = NULL; Enable(); return;
     }
