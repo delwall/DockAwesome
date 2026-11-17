@@ -334,3 +334,18 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
   a click during its icon loading is not a press on a pin (2026-11-17).
 - Hover labels on ApolloOS are in PiP1: no screenshot shows them. Find an
   icon by the row arithmetic (size, gap 5, divider 12) instead (2026-11-17).
+- Temporary timing code must not use TimerBase outside the dock's own
+  profile window: profile_close clears it before the surface closes, and a
+  capture during cleanup then jumped through NULL (Software Failure, PiP2
+  lease kept, reboot). Guard diagnostics, and run a start-and-quit of any
+  diagnostic build before a measured run (2026-11-17).
+- After BreakTask on the installed dock, wait a few seconds before starting
+  a test dock: the old one still holds the PiP2 lease while it quits.
+- Time each OS call before blaming our own loops: the "3 ms compare" on a
+  24-bit screen was LockBitMap (2.6 ms a call under P96 on Coffin).
+- A fix that depends on a time window (first band fix: "exposures within
+  half a second of arming are the initial fill") failed on the first test.
+  Compare state instead (which layers lie on the box).
+- One run of a profile average is noise here (unchanged polls 1.8-4.5 ms
+  across runs with motion). Measure old/new/old in one script with the
+  scenario reduced to the one thing compared (2026-11-17).

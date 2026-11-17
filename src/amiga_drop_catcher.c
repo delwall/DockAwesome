@@ -47,6 +47,11 @@ struct AmigaDropCatcher {
     /* No shapes: a press on the Directory Opus desktop arms only once the
        held drag shows its image on the dock's box, see arm_late. */
     int late;
+    /* No shapes, armed: the window shows a copy of the screen taken when it
+       armed. windows: the other layers on the dock's box at that moment,
+       see box_windows; once they differ the copy shows what is gone. */
+    ULONG windows;
+    uint64_t rearm_at;
     struct Library *cyber; /* reads pixels for arm_late; NULL arms at once */
     struct RastPort screen_rp, backing_rp;
     volatile int backing_valid;
@@ -180,6 +185,26 @@ static int workbench_client_start(const AmigaDropCatcher *c, int x, int y)
     return result;
 }
 
+/* The layers that lie on the dock's box, other than the receiver's own, as
+   one number: which they are and where. 0 when the layer list is busy. */
+static ULONG box_windows(const AmigaDropCatcher *c)
+{
+    struct Layer_Info *info = &c->screen->LayerInfo;
+    const struct Layer *layer;
+    ULONG stamp = 2166136261UL;
+    if (!AttemptSemaphore(&info->Lock)) return 0;
+    for (layer = info->top_layer; layer; layer = layer->back) {
+        const struct Rectangle *b = &layer->bounds;
+        if (layer == c->window->WLayer || b->MaxX < c->left || b->MinX >= c->left+c->width ||
+            b->MaxY < c->top || b->MinY >= c->top+c->height) continue;
+        stamp = (stamp ^ (ULONG)layer) * 16777619UL;
+        stamp = (stamp ^ (((ULONG)(UWORD)b->MinX<<16) | (UWORD)b->MinY)) * 16777619UL;
+        stamp = (stamp ^ (((ULONG)(UWORD)b->MaxX<<16) | (UWORD)b->MaxY)) * 16777619UL;
+    }
+    ReleaseSemaphore(&info->Lock);
+    return stamp ? stamp : 1;
+}
+
 static int inside(const AmigaDropCatcher *c, int x, int y)
 {
     return x >= c->left && x < c->left + c->width &&
@@ -276,10 +301,24 @@ unsigned int amiga_drop_catcher_cancel(AmigaDropCatcher *c)
    drag (AmigaOS 3.9 cancels the drag if windows move). With the buttons up,
    arm while the pointer is on a Workbench icon or drawer and disarm when it
    leaves. */
-static unsigned int arm_for_pointer(AmigaDropCatcher *c)
+static unsigned int arm_for_pointer(AmigaDropCatcher *c, uint64_t now, uint32_t frequency)
 {
     int client;
     if (c->shaped || c->active || c->waiting) return 0;
+    if (c->armed) {
+        ULONG windows = box_windows(c);
+        if (windows && windows != c->windows) {
+            /* A window on the dock's box closed or moved while the armed
+               window lay behind it: the part it uncovered was filled from
+               the copy, which still shows that window (a band of it stayed
+               on the screen for as long as the pointer rested on the dock,
+               Coffin). Step back so the desktop redraws, and arm again
+               only after it has. */
+            c->rearm_at = now+frequency/2;
+            return end_catch(c, 1);
+        }
+    }
+    if (now < c->rearm_at) return 0;
     /* On the dock itself the armed window is the front layer: stay put. */
     if (inside(c, c->screen->MouseX, c->screen->MouseY)) return 0;
     client = workbench_client_start(c, c->screen->MouseX, c->screen->MouseY);
@@ -292,6 +331,8 @@ static unsigned int arm_for_pointer(AmigaDropCatcher *c)
         c->backing,0,0,c->width,c->height,0xc0,0xff,NULL);
     WaitBlit();
     c->backing_valid = 1;
+    /* Taken with the copy: what the copy shows on the box. */
+    c->windows = box_windows(c);
     set_catching(c, 1);
     c->armed = 1;
     ++c->stats.arms;
@@ -410,7 +451,7 @@ unsigned int amiga_drop_catcher_update(AmigaDropCatcher *c,
         return flags;
     }
     if (c->late && external_held && !c->active) flags |= arm_late(c);
-    if (!external_held && !c->active && !c->waiting) flags |= arm_for_pointer(c);
+    if (!external_held && !c->active && !c->waiting) flags |= arm_for_pointer(c, now, frequency);
     if (!c->active || external_held) return flags;
     if (release_known && (!inside(c, release_x, release_y) ||
         (!external_dragged && release_x == down_x && release_y == down_y)))

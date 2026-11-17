@@ -1073,14 +1073,31 @@ Coffin (AmigaOS 3.9, 24-bit, no shaped windows, core 12856), 2026-11-17:
       7899 us, unchanged 2888 against 2751-3677. No gain; reverted, the
       measurement is in the comment. Kept: a row redrawn back between
       compare and copy is skipped instead of giving an inverted box.
-- [ ] Open: an unchanged poll still costs about 3 ms on a 24-bit screen.
-      Find what it is (LockBitMap, the check box, or full compares).
-- [ ] Open, also in the baseline build: with a window over the dock's box,
-      a MagicMenu pop-up opened by a right-click at 640,717 and then Esc
-      (which closed the window too) left a band in the screen bitmap where
-      the window met the box (340..740 x 620..680), black or the stale
-      window, with a row of coloured garbage on top. It stays until the
-      dock quits. Closing the window by ARexx leaves the screen clean.
+- [x] The 3 ms of an unchanged poll: LockBitMap. A diagnostic build timed
+      94 locks at 2.6 ms each (245 ms of 93 polls); the plate compare
+      passed in 75 of 76 unchanged polls. Now a poll with a check box looks
+      at the screen's memory without the lock, at the address the last lock
+      gave; a change, or every tenth poll, takes the lock. Dock at rest,
+      84-87 polls each, old/new/old in one script: 4340 -> 2202 us a poll.
+      What is left is the compare itself (memory-bound) and one lock a
+      second. The same path serves 16-bit screens; not run on ApolloOS.
+- [x] The band: the receiver without shapes, armed behind the other windows
+      while the pointer is on a drawer or icon, holds a copy of the screen.
+      A window over the dock's box that closed uncovered the receiver,
+      which Layers filled from the copy: the closed window, or garbage.
+      With the pointer then resting on the dock it never stepped back. Now
+      it remembers which layers lay on the box when the copy was taken
+      (box_windows) and steps back when they differ, arming again half a
+      second later. The first try, a time window after arming, failed: the
+      window closed within it. Same sequence as the report (right-click at
+      640,717, Esc), build 405: clean. Pointer parked on a desktop icon
+      for 12 s: arms=1 disarms=0. Window closed by ARexx while armed, build
+      406 installed: clean.
+- My diagnostic build crashed at exit (it read the EClock after
+  profile_close had cleared TimerBase) and kept the PiP2 lease: the user
+  rebooted Coffin. The installed builds never held that code.
+- Build 406: --damage-check 262 frames, 0 and 0; installed in
+  SYS:WBStartup (399 kept as Disabled/DockAwesome-build399.old).
 - [ ] Not run on Coffin: the dock's own menu (my right-click at 640,717
       missed the plate), Delete key, Folder Stack, B5-B9.
 - Cleaned: test docks quit, installed dock restarted with WBRun, RAM: test

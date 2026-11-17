@@ -41,6 +41,14 @@ struct AmigaDisplay {
        and compared and converted from here. */
     unsigned char *row;
     size_t row_capacity;
+    /* The screen's memory as the last lock found it. LockBitMap took 2.6 ms
+       a call on Coffin's 24-bit screen, ten times a second at rest, to
+       compare a plate that had not changed. A poll with a check box first
+       looks there without the lock; only a change, or every tenth poll,
+       takes the lock and reads the address again. */
+    const unsigned char *peek_base, *peek_cache;
+    ULONG peek_stride, peek_bytes, peek_format;
+    int peek_x, peek_y, peek_width, peek_height, peek_left;
 };
 
 /* One palette lookup serves every display on the same palette. Building it
@@ -175,7 +183,7 @@ int amiga_display_resize(AmigaDisplay *d, int width, int height)
     }
     if (d->frame_bitmap) { WaitBlit(); FreeBitMap(d->frame_bitmap); d->frame_bitmap = NULL; }
     d->width = width; d->height = height; d->stride = width*3;
-    d->raw_valid = 0;
+    d->raw_valid = 0; d->peek_left = 0;
     return 1;
 }
 
@@ -355,6 +363,30 @@ int amiga_display_capture565(AmigaDisplay *d, unsigned char *cache,
         x >= d->screen->Width || y+d->height > d->screen->Height) return -1;
     visible_width = d->screen->Width-x;
     if (visible_width > d->width) visible_width = d->width;
+    if (!equal) equal = dock_bytes_equal_c;
+    if (!force && check && d->peek_left > 0 && d->peek_cache == cache &&
+        d->peek_x == x && d->peek_y == y && d->peek_width == d->width && d->peek_height == d->height &&
+        (d->peek_format == PIXFMT_RGB16 || (d->raw_valid && d->raw_bytes == (int)d->peek_bytes)) &&
+        check->left >= 0 && check->right <= visible_width && check->top >= 0 &&
+        check->bottom <= d->height && check->left < check->right && check->top < check->bottom) {
+        /* Reading without the lock cannot harm: at worst the pixels are
+           mid-draw or the address is old, and then they differ (the lock
+           follows) or the next lock, at most a second away, finds out. */
+        int raw = d->peek_format != PIXFMT_RGB16;
+        const unsigned char *held = raw ? d->raw : cache;
+        size_t held_row = (size_t)d->width*d->peek_bytes;
+        const unsigned char *seen = d->peek_base+(size_t)y*d->peek_stride+(size_t)x*d->peek_bytes;
+        size_t offset = (size_t)check->left*d->peek_bytes;
+        unsigned long span = (unsigned long)(check->right-check->left)*d->peek_bytes;
+        for (row = check->top; row < check->bottom; ++row)
+            if (!equal(held+(size_t)row*held_row+offset,seen+(size_t)row*d->peek_stride+offset,span)) break;
+        if (row == check->bottom) {
+            --d->peek_left;
+            if (box) *box = (DockRect){0,0,0,0};
+            return 0;
+        }
+    }
+    d->peek_left = 0;
     lock = LockBitMapTags(d->source_bitmap, LBMI_BASEADDRESS, (ULONG)&base,
         LBMI_BYTESPERROW, (ULONG)&stride, LBMI_BYTESPERPIX, (ULONG)&bytes,
         LBMI_PIXFMT, (ULONG)&format, LBMI_WIDTH, (ULONG)&width,
@@ -365,7 +397,10 @@ int amiga_display_capture565(AmigaDisplay *d, unsigned char *cache,
         stride < width*bytes) {
         UnLockBitMap(lock); return -1;
     }
-    if (!equal) equal = dock_bytes_equal_c;
+    d->peek_base = base; d->peek_cache = cache;
+    d->peek_stride = stride; d->peek_bytes = bytes; d->peek_format = format;
+    d->peek_x = x; d->peek_y = y; d->peek_width = d->width; d->peek_height = d->height;
+    d->peek_left = 9;
     row_bytes = (size_t)d->width*2;
     visible_bytes = (size_t)visible_width*2;
     if (format != PIXFMT_RGB16) {
@@ -411,7 +446,7 @@ int amiga_display_drag_reference565(AmigaDisplay *d, struct BitMap *backing,
     if (!d || !d->cyber || d->depth < 15 ||
         !backing || visible_width < 1 || visible_width > d->width) return 0;
     /* reference is the capture's RGB565 cache: the raw copy no longer matches. */
-    d->raw_valid = 0;
+    d->raw_valid = 0; d->peek_left = 0;
     if (GetCyberMapAttr(backing,CYBRMATTR_PIXFMT) != PIXFMT_RGB16) {
         if (!read_rect565(d,backing,0,0,visible_width,d->height,reference,(size_t)d->width*2)) return 0;
     } else {
