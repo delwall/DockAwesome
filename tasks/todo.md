@@ -1327,3 +1327,13 @@ to the same slot (inverted offset test, store attributes required).
       the reboot; 479 locked, Disabled/DockAwesome-locked-delete until the
       next reboot). Label in the dock's image, sweep 0 late frames,
       damage-check 399 clean. RAM: cleaned.
+
+## Release 1.0 beta 3 (2026-11-18)
+
+- [x] PR #11 (review-fixes) merged into main (d7c396e); tag v1.0b3; GitHub
+      prerelease "DockAwesome 1.0 beta 3" with DockAwesome-1.0b3.lha
+      (167,265 bytes, SHA-256 40c7a442...0fd77bf97), packed with LhA 2.15 on
+      ApolloOS; lha t passes and all five files match build/release.
+- [x] Release binary (DockAwesome 1.0 (2026-11-18) beta 3) installed on
+      ApolloOS. Disabled/DockAwesome-locked-delete and -locked-delete-482:
+      delete after the next reboot.

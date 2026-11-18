@@ -417,3 +417,8 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
   library at all) and make it work everywhere instead.
 - On AmigaOS 3.9 (Coffin) a Run'd command's task is not named after the
   command: stop it with Break <process number> from Status.
+- LhA 2.15 keeps a folder in the archive only with a base directory
+  argument: `LhA -r -x a RAM:X.lha RAM:pkg/ DockAwesome/#?` stores
+  DockAwesome/...; `CD RAM:pkg` + `DockAwesome/` drops the folder.
+- Check the generated release body before publishing (a sed error left
+  only the install line; fixed with gh release edit).
