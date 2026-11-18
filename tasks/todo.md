@@ -1250,3 +1250,17 @@ Regression report: the zoomed row slid left and lost the pointer
       reset. Unknown whether more Dev miscompiles remain.
 - [ ] The fixed dock itself not yet checked with --pip-dump. Built:
       Dock8 (430), Dock10 (428), Dock12 (429) in the scratchpad.
+
+Compiler fixed, 2026-11-18. The zoomed row slid left in every build made
+with GCC-6.50-Dev: bbb's opt_elim_dead_assign deleted a reload because
+track_var::invalidate_mem kept a register's cached MEM over a DImode store
+to the same slot (inverted offset test, store attributes required).
+- [x] Patch bbb-invalidate-mem-fix.patch in ApolloCrossDev (Dev scripts),
+      PR WDrijver/ApolloCrossDev#30. Toolchain rebuilt with the script:
+      ~/GitRepos/ApolloCrossDev/Compilers/GCC-6.50-Dev is the only one.
+- [x] dock_core.c back to the original int64_t expression; Makefile and
+      README default to the ApolloCrossDev toolchain.
+- [x] Layout harness on the Vampire with the installed compiler and the
+      original code: 800 of 800 pointer positions equal to the host.
+- [x] 720 compilations (373 C files, -O2/-O3/-Os): 703 identical, 17 keep
+      loads the old pass had replaced with register copies.

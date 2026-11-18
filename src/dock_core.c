@@ -523,12 +523,7 @@ static void logical_positions(const DockSettings *s, int count, int width, int m
         for (i = 0; i+1 < count; ++i) {
             int span = (sizes[i]+sizes[i+1])/2+gaps[i];
             int rest_pitch = pitch+extra_gap(s,count,i)*256;
-            /* 32-bit: focus is at most a pitch here (Q8, about 13,000) and
-               span an icon pair (under 40,000), so the product fits. GCC
-               6.5.0b (ApolloCrossDev GCC-6.50-Dev) at -O2 -m68080 got the
-               int64_t form wrong and pinned the zoomed row to the left edge;
-               tests/test_core.c's anchor test caught it on the Vampire. */
-            if (focus <= rest_pitch) { mapped += (int32_t)focus*span/rest_pitch; break; }
+            if (focus <= rest_pitch) { mapped += focus*span/rest_pitch; break; }
             mapped += span; focus -= rest_pitch;
         }
     }

@@ -52,7 +52,7 @@ make                           # build/DockAwesome for the 68080
 make release RELEASE="1.0 beta 2"
 ```
 
-The default toolchain is `~/ApolloCrossDevLocal/Compilers/GCC-6.50-Stable`;
+The default toolchain is `~/GitRepos/ApolloCrossDev/Compilers/GCC-6.50-Dev`;
 set `TOOLCHAIN` to change it. More in [Architecture](docs/architecture.md),
 [Hardware](docs/hardware.md), [PiP](docs/pip-backend.md) and
 [Verification](docs/verification.md).

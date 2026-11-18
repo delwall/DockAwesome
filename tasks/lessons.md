@@ -19,8 +19,15 @@
   rebuilt them.
 - Cross-compile the host tests for the Amiga to find such miscompiles,
   and run them from an Execute script that sets Stack and FailAt first:
-  extra lines in one amiga_shell call do not run, and a 4 KB stack
-  crashed the machine. A test that ignores Ctrl-C needs a reset.
+  extra lines in one amiga_shell call do not run.
+- Run CPU-bound work on ApolloOS below priority -21 (ChangeTaskPri -30 in
+  the script). The SD card tasks SDIO0/SDIO1 run at -21: at -5 the tests
+  starved them, so Workbench, WBRun and the dock hung on disk access and
+  the machine looked frozen. It was never a crash.
+- Find a compiler bug by halving: optimization flags (-fbbb=-, one bbb
+  letter at a time), then a counter on the suspect pass in a self-built
+  cc1, run on the Vampire. Fix it in ApolloCrossDev as a patch; build the
+  toolchain with its script and a PATH without spaces.
 - Wait for the native window or gadget before sending input or reading saved
   preferences. A visible window alone does not prove the dock responds.
 - Redirect the profiled command's output from an AmigaDOS script.

@@ -1,7 +1,7 @@
 SHELL := /bin/sh
 
-APOLLO_ROOT ?= $(HOME)/ApolloCrossDevLocal
-TOOLCHAIN ?= $(APOLLO_ROOT)/Compilers/GCC-6.50-Stable
+APOLLO_ROOT ?= $(HOME)/GitRepos/ApolloCrossDev
+TOOLCHAIN ?= $(APOLLO_ROOT)/Compilers/GCC-6.50-Dev
 SDK := $(TOOLCHAIN)/m68k-amigaos
 AMIGA_CC ?= $(TOOLCHAIN)/bin/m68k-amigaos-gcc
 AMIGA_AS ?= $(TOOLCHAIN)/bin/vasmm68k_mot
