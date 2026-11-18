@@ -1,7 +1,7 @@
 SHELL := /bin/sh
 
-APOLLO_ROOT ?= $(HOME)/ApolloCrossDevLocal
-TOOLCHAIN ?= $(APOLLO_ROOT)/Compilers/GCC-6.50-Stable
+APOLLO_ROOT ?= $(HOME)/GitRepos/ApolloCrossDev
+TOOLCHAIN ?= $(APOLLO_ROOT)/Compilers/GCC-6.50-Dev
 SDK := $(TOOLCHAIN)/m68k-amigaos
 AMIGA_CC ?= $(TOOLCHAIN)/bin/m68k-amigaos-gcc
 AMIGA_AS ?= $(TOOLCHAIN)/bin/vasmm68k_mot
@@ -29,6 +29,8 @@ AMIGA_C_OBJECTS := $(patsubst src/%.c,$(AMIGA_OBJDIR)/%.o,$(AMIGA_C_SOURCES))
 AMIGA_OBJECTS := $(AMIGA_C_OBJECTS) $(AMIGA_OBJDIR)/amiga_input.o $(AMIGA_ASM_OBJECTS)
 
 .DEFAULT_GOAL := all
+# A failed step must not leave an older or half-made target behind.
+.DELETE_ON_ERROR:
 .PHONY: all amiga host-test host-bench host-sanitize check-toolchain verify package deploy release clean
 all: amiga
 amiga: $(AMIGA_OUTPUT) $(AMIGA_OUTPUT).info
@@ -45,6 +47,9 @@ $(AMIGA_OBJDIR)/%.o: src/%.c include/dock_core.h Makefile | check-toolchain
 	@mkdir -p "$(@D)"
 	"$(AMIGA_CC)" $(AMIGA_INCLUDES) $(AMIGA_FLAGS) $(CPU_FLAGS) -MMD -MP -c "$<" -o "$@"
 
+# The CPU check runs before any 68080 code, so it must run on any 68020+.
+$(AMIGA_OBJDIR)/amiga_cpu_guard.o: CPU_FLAGS := -m68020
+
 $(AMIGA_OBJDIR)/amiga_input.o: src/amiga_input.s Makefile | check-toolchain
 	@mkdir -p "$(@D)"
 	"$(AMIGA_AS)" -Fhunk -m68020 -opt-speed -o "$@" "$<"
@@ -54,6 +59,7 @@ $(AMIGA_OBJDIR)/ammx.o: src/ammx.s Makefile | check-toolchain
 	"$(AMIGA_AS)" -Fhunk -m68080 -opt-speed -o "$@" "$<"
 
 $(AMIGA_OUTPUT): $(AMIGA_OBJECTS) tools/build-version.py Makefile
+	$(RM) "$@"
 	"$(PYTHON)" tools/build-version.py "$(notdir $@)" "$(AMIGA_OBJDIR)/build_version.c" "$(RELEASE)"
 	"$(AMIGA_CC)" $(AMIGA_INCLUDES) $(AMIGA_FLAGS) $(CPU_FLAGS) -c "$(AMIGA_OBJDIR)/build_version.c" -o "$(AMIGA_OBJDIR)/build_version.o"
 	"$(AMIGA_CC)" $(CPU_FLAGS) -noixemul -Wl,-u,___stkinit $(AMIGA_OBJECTS) "$(AMIGA_OBJDIR)/build_version.o" -o "$@"
@@ -62,23 +68,24 @@ HOST_CORE := src/dock_core.c src/dock_compose.c src/dock_renderer.c src/dock_geo
 HOST_HEADERS := include/dock_core.h include/dock_compose.h include/dock_renderer.h include/dock_geometry.h include/dock_interaction.h src/dock_pixel.h
 
 SANITIZE := -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer
-HOST_TESTS := build/test_core build/test_interaction build/test_geometry build/test_prefs build/test_profile build/test_bob
+HOST_TESTS := build/test_core build/test_interaction build/test_geometry build/test_prefs build/test_profile build/test_bob build/test_text
 HOST_SANITIZE_TESTS := $(HOST_TESTS:=_sanitize)
 
-$(HOST_TESTS) build/bench_core: build/%: $(HOST_CORE) $(HOST_HEADERS) tests/%.c
+$(HOST_TESTS) build/bench_core: build/%: $(HOST_CORE) $(HOST_HEADERS) tests/%.c Makefile
 	@mkdir -p build
 	$(HOST_CC) $(HOST_FLAGS) $(filter %.c,$^) -o "$@"
-$(HOST_SANITIZE_TESTS): build/%_sanitize: $(HOST_CORE) $(HOST_HEADERS) tests/%.c
+$(HOST_SANITIZE_TESTS): build/%_sanitize: $(HOST_CORE) $(HOST_HEADERS) tests/%.c Makefile
 	@mkdir -p build
 	$(HOST_CC) $(HOST_FLAGS) $(SANITIZE) $(filter %.c,$^) -o "$@"
 build/test_prefs build/test_prefs_sanitize: src/dock_prefs.c include/dock_prefs.h
 build/test_profile build/test_profile_sanitize: src/dock_profile.c include/dock_profile.h
 build/test_bob build/test_bob_sanitize: src/dock_bob.c include/dock_bob.h
+build/test_text build/test_text_sanitize: src/dock_text.c include/dock_text.h
 build/test_core_be: $(HOST_CORE) $(HOST_HEADERS) tests/test_core.c
 	@mkdir -p build
 	$(HOST_CC) $(HOST_FLAGS) -DDOCK_EMULATE_BIG_ENDIAN $(filter %.c,$^) -o "$@"
 
-host-test: build/test_core build/test_core_be build/test_interaction build/test_geometry build/test_prefs build/test_profile build/test_bob
+host-test: build/test_core build/test_core_be build/test_interaction build/test_geometry build/test_prefs build/test_profile build/test_bob build/test_text
 	for t in $^; do ./$$t || exit 1; done
 host-bench: build/bench_core
 	./build/bench_core
@@ -90,6 +97,7 @@ verify: amiga
 	"$(AMIGA_OBJDUMP)" -f "$(AMIGA_OUTPUT)"
 
 package: amiga
+	$(RM) -r build/dist
 	@mkdir -p build/dist/DockAwesome
 	cp "$(AMIGA_OUTPUT)" "$(AMIGA_OUTPUT).info" build/dist/DockAwesome/
 	cp README.md build/dist/DockAwesome/
@@ -103,7 +111,7 @@ deploy: amiga
 # in build/release/DockAwesome. Pack that drawer with LhA on the Amiga.
 release:
 	@test -n "$(RELEASE)" || { echo 'Set RELEASE, for example: make release RELEASE="1.0 beta 1"' >&2; exit 1; }
-	$(RM) build/DockAwesome
+	$(RM) -r build/DockAwesome $(AMIGA_OBJDIR)
 	$(MAKE) RELEASE="$(RELEASE)" amiga
 	$(RM) -r build/release
 	@mkdir -p build/release/DockAwesome

@@ -150,9 +150,12 @@ DockRect dock_rgb565_refresh(unsigned char *cache, const unsigned char *source,
         /* [a,b) spans the differing pixels. Scanning from both ends costs
            only changed rows, and stops at their first difference. */
         for (a = 0; a < visible && pixel565(line,a) == pixel565(src,a); ++a) {}
-        if (a == visible) while (!pixel565(line,a)) ++a;
+        if (a == visible) while (a < width && !pixel565(line,a)) ++a;
+        /* The source is the live screen: a row that differed in equal() can
+           match again by now. Nothing to copy then. */
+        if (a == width) continue;
         for (b = width; b > visible && !pixel565(line,b-1); --b) {}
-        if (b == visible) while (pixel565(line,b-1) == pixel565(src,b-1)) --b;
+        if (b == visible) while (b > a+1 && pixel565(line,b-1) == pixel565(src,b-1)) --b;
         low = a > visible ? a : visible; high = b < visible ? b : visible;
         if (a < high) memcpy(line+a*2, src+a*2, (size_t)(high-a)*2);
         if (low < b) memset(line+low*2, 0, (size_t)(b-low)*2);
@@ -196,6 +199,11 @@ static void add_divider(DockDamage *d, int bottom, const DockRect *panel,
     int64_t a0 = bottom ? a->x : a->y, b0 = bottom ? b->x : b->y;
     int64_t a1 = a0+a->size, b1 = b0+b->size;
     add_span(d, bottom, panel, a0 < b0 ? a0 : b0, a1 > b1 ? a1 : b1, width, height);
+}
+
+static int same_rect(DockRect a, DockRect b)
+{
+    return a.left == b.left && a.top == b.top && a.right == b.right && a.bottom == b.bottom;
 }
 
 void dock_renderer_draw(DockRenderer *r, DockImage *canvas,
@@ -274,7 +282,9 @@ void dock_renderer_draw(DockRenderer *r, DockImage *canvas,
             const DockOverlay *v = i < overlay_count ? &overlays[i] : NULL;
             if (v && i < o->overlay_count && v->image == o->overlay[i].image &&
                 (v->image ? v->image->pixels : NULL) == o->overlay_pixels[i] &&
-                v->x == o->overlay[i].x && v->y == o->overlay[i].y) continue;
+                v->x == o->overlay[i].x && v->y == o->overlay[i].y &&
+                v->stamp == o->overlay[i].stamp &&
+                (!v->image || same_rect(o->overlay_rect[i],image_rect(v->image,v->x,v->y)))) continue;
             if (i < o->overlay_count) dock_damage_add(d, o->overlay_rect[i], width, height);
             if (v && v->image) dock_damage_add(d, image_rect(v->image, v->x, v->y), width, height);
         }

@@ -103,6 +103,13 @@ void dock_cache_free(DockCache *cache)
 
 /* Runs of nonzero alpha per row, split where opacity changes; see DockCache.
    Run indices and lengths fit 16 bits for images up to 255 px. */
+static uint16_t *build_runs(const DockImage *im);
+
+uint16_t *dock_image_runs(const DockImage *im)
+{
+    return im && im->pixels ? build_runs(im) : NULL;
+}
+
 static uint16_t *build_runs(const DockImage *im)
 {
     uint16_t *runs = NULL;
@@ -690,18 +697,22 @@ int dock_layout(const DockSettings *s, int count, int width, int height,
     return 1;
 }
 
+/* Following the pointer closes half the gap per tick (a third trailed
+   ~40 ms, a quarter or fifth more; the user chose a half). */
+enum { DOCK_FOLLOW_DIV = 2 };
+
 static int ease(int from, int to)
 {
     int delta = to - from;
-    if (delta > 0) return from + (delta + 2) / 3;
-    if (delta < 0) return from - (-delta + 2) / 3;
+    if (delta > 0) return from + (delta + DOCK_FOLLOW_DIV-1) / DOCK_FOLLOW_DIV;
+    if (delta < 0) return from - (-delta + DOCK_FOLLOW_DIV-1) / DOCK_FOLLOW_DIV;
     return from;
 }
 
 static int64_t ease_center(int64_t from, int64_t to)
 {
     int64_t delta = to-from, distance = delta < 0 ? -delta : delta;
-    int64_t step = ((distance+767)/768)*256;
+    int64_t step = ((distance+256*DOCK_FOLLOW_DIV-1)/(256*DOCK_FOLLOW_DIV))*256;
     /* Retain the old one-pixel minimum correction. A 1/256px minimum would
        add a long visible tail without providing subpixel raster rendering. */
     if (step > distance) step = distance;
@@ -751,12 +762,17 @@ static void keep_row_inside(DockAnimation *animation, DockPlacement *current,
         animation->center[i] = (int64_t)current[i].x*256+current[i].size*128;
 }
 
+#ifndef DOCK_ZOOM_TICKS
+#define DOCK_ZOOM_TICKS 8
+#endif
+
 int dock_animate_step(const DockSettings *s, DockAnimation *animation, DockPlacement *current,
                       const DockPlacement *target, int count)
 {
-    enum { TRANSITION_TICKS = 8 };
+    /* The zoom in or out takes this many ticks (one display field each). */
+    enum { TRANSITION_TICKS = DOCK_ZOOM_TICKS, CUBE = TRANSITION_TICKS*TRANSITION_TICKS*TRANSITION_TICKS };
     int i, active = 0, envelope, start, end, target_end;
-    int levels[DOCK_MAX_ITEMS], weight = 512;
+    int levels[DOCK_MAX_ITEMS], weight = CUBE;
     DockPlacement before[DOCK_MAX_ITEMS];
     if (!dock_settings_valid(s) || !animation || !current || !target || count < 1 || count > DOCK_MAX_ITEMS) return 0;
     for (i = 0; i < count; ++i) {
@@ -767,7 +783,11 @@ int dock_animate_step(const DockSettings *s, DockAnimation *animation, DockPlace
     if (animation->count != count || animation->active != active) {
         if (animation->count != count) for (i = 0; i < count; ++i)
             animation->center[i] = (int64_t)current[i].x*256+current[i].size*128;
-        for (i = 0; i < count; ++i) animation->origin_level[i] = current[i].level;
+        for (i = 0; i < count; ++i) {
+            animation->origin_level[i] = current[i].level;
+            animation->follow_level[i] = target[i].level;
+            animation->follow_center[i] = (int64_t)target[i].x*256+target[i].size*128;
+        }
         memcpy(animation->origin_center, animation->center, (size_t)count*sizeof(*animation->center));
         animation->tick = 0;
         animation->active = active;
@@ -776,13 +796,19 @@ int dock_animate_step(const DockSettings *s, DockAnimation *animation, DockPlace
     envelope = animation->tick < TRANSITION_TICKS;
     if (envelope) {
         int t = ++animation->tick, rest = TRANSITION_TICKS - t;
-        /* Cubic ease-out, 1-(1-t/8)^3 over 8^3 = 512: a third of the change
-           on the first tick and most of it by the fourth, like the macOS
+        /* Cubic ease-out, 1-(1-t/N)^3 over N^3: with 8 ticks a third of the
+           change on the first and most of it by the fourth, like the macOS
            Dock; a smoothstep start moved one pixel and felt sluggish. */
-        weight = 512 - rest * rest * rest;
+        weight = CUBE - rest * rest * rest;
+        /* Aim at where the row trails a moving pointer after the zoom, not at
+           the pointer: aiming at the pointer caught up with it, then the row
+           braked when the zoom ended. */
         for (i = 0; i < count; ++i) {
             int origin = animation->origin_level[i];
-            levels[i] = (origin * (512 - weight) + target[i].level * weight + 256) / 512;
+            animation->follow_level[i] = ease(animation->follow_level[i], target[i].level);
+            animation->follow_center[i] = ease_center(animation->follow_center[i],
+                (int64_t)target[i].x*256+target[i].size*128);
+            levels[i] = (origin * (CUBE - weight) + animation->follow_level[i] * weight + CUBE/2) / CUBE;
         }
     } else {
         /* Lateral retargeting stays responsive; it never restarts an ease-in. */
@@ -814,7 +840,7 @@ int dock_animate_step(const DockSettings *s, DockAnimation *animation, DockPlace
         DockPlacement next;
         int64_t target_center = (int64_t)target[i].x*256+target[i].size*128;
         int64_t center = envelope ?
-            (animation->origin_center[i]*(512-weight)+target_center*weight+256)/512 :
+            (animation->origin_center[i]*(CUBE-weight)+animation->follow_center[i]*weight+CUBE/2)/CUBE :
             ease_center(animation->center[i], target_center);
         animation->center[i] = center;
         next.level = levels[i];

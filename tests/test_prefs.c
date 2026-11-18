@@ -25,8 +25,6 @@ static void test_roundtrip(void)
     dock_prefs_defaults(&before);
     before.edge = DOCK_EDGE_RIGHT;
     before.zoom = 70;
-    before.pip_mode = 1;
-    before.snapshot = 0;
     before.pip_x_offset = -128;
     before.pip_y_offset = 128;
     strcpy(before.folder,"SYS:My \"folder\"/F\xf6r");
@@ -41,6 +39,7 @@ static void test_roundtrip(void)
     assert(strstr(json,"\\\"tool\\\"\\\\here"));
     assert(strstr(json,"\\u0009\\u0001\\u007f\\u00e5\\u00ff"));
     assert(strstr(json,"\"folder\": \"SYS:My \\\"folder\\\"/F\\u00f6r\""));
+    assert(!strstr(json,"snapshot") && strstr(json,"\"pip\": true"));
     rewind(file);
     assert(dock_prefs_read(file,&after));
     assert(!memcmp(&before,&after,sizeof(before)));
@@ -55,10 +54,13 @@ static void test_edited_file(void)
     assert(prefs.count == 2);
     assert(!strcmp(prefs.paths[0],"RAM:\xe5"));
     assert(!strcmp(prefs.paths[1],"SYS:Prefs/"));
-    assert(prefs.edge == DOCK_EDGE_LEFT && prefs.pip_mode && !prefs.snapshot);
+    assert(prefs.edge == DOCK_EDGE_LEFT);
     assert(prefs.size == dock_settings_default().base_size);
     assert(read_text("{\"version\":1,\"paths\":[]}",&prefs));
-    assert(prefs.count == 0 && prefs.snapshot && !prefs.pip_mode && !prefs.folder[0]);
+    assert(prefs.count == 0 && !prefs.folder[0]);
+    /* Files from before PiP only still load; their backend keys are ignored. */
+    assert(read_text("{\"version\":1,\"snapshot\":true,\"pip\":true,\"edge\":\"right\"}",&prefs));
+    assert(prefs.edge == DOCK_EDGE_RIGHT);
 }
 
 static void test_scale(void)
@@ -100,7 +102,6 @@ static void test_bad_file(void)
         "{\"version\":1,\"size\":96,\"scale_percent\":201}",
         "{\"version\":1,\"zoom\":64,\"scale_percent\":200}",
         "{\"version\":1,\"snapshot\":1}",
-        "{\"version\":1,\"snapshot\":true,\"pip\":true}",
         "{\"version\":1,\"pip_x_offset\":129}",
         "{\"version\":1,\"edge\":\"top\"}",
         "{\"version\":1,}",
@@ -137,12 +138,46 @@ static void test_bad_file(void)
     assert(fclose(file) == 0);
 }
 
+/* A key from a newer build is skipped with its value, whatever its type,
+   and a byte order mark is accepted: neither costs the user's dock. */
+static void test_unknown_keys(void)
+{
+    static const char *const good[] = {
+        "{\"version\":1,\"future\":\"a \\\" quote \xe5\",\"size\":40,\"zoom\":80,\"paths\":[\"SYS:One\"]}",
+        "{\"future\":-12.5e3,\"version\":1,\"size\":40,\"zoom\":80,\"paths\":[\"SYS:One\"]}",
+        "{\"version\":1,\"size\":40,\"zoom\":80,\"paths\":[\"SYS:One\"],\"future\":[1,[true,null],{\"a\":\"b\"}]}",
+        "{\"version\":1,\"a_rather_long_key_name_from_a_later_build\":{},\"b\":[],\"size\":40,\"zoom\":80,\"paths\":[\"SYS:One\"]}",
+        "\xef\xbb\xbf{\"version\":1,\"size\":40,\"zoom\":80,\"paths\":[\"SYS:One\"]}"
+    };
+    static const char *const bad[] = {
+        "{\"version\":1,\"future\":}", "{\"version\":1,\"future\":\"open}",
+        "{\"version\":1,\"future\":[1,}", "{\"version\":1,\"future\":{\"a\"}}",
+        "{\"version\":1,\"future\":[[[[[[[[[[1]]]]]]]]]]}", "\xef\xbb{\"version\":1}",
+        "{\"version\":1,\"future\":1 2}"
+    };
+    DockPrefs prefs, original;
+    size_t i;
+    for (i = 0; i < sizeof(good)/sizeof(*good); ++i) {
+        dock_prefs_defaults(&prefs);
+        assert(read_text(good[i],&prefs));
+        assert(prefs.size == 40 && prefs.zoom == 80 && prefs.count == 1);
+        assert(!strcmp(prefs.paths[0],"SYS:One"));
+    }
+    dock_prefs_defaults(&original);
+    prefs = original;
+    for (i = 0; i < sizeof(bad)/sizeof(*bad); ++i) {
+        assert(!read_text(bad[i],&prefs));
+        assert(!memcmp(&prefs,&original,sizeof(prefs)));
+    }
+}
+
 int main(void)
 {
+    test_unknown_keys();
     test_roundtrip();
     test_edited_file();
     test_scale();
     test_bad_file();
-    puts("JSON preferences: ordered paths, escapes, bounds and transactional read PASS");
+    puts("JSON preferences: ordered paths, escapes, bounds, unknown keys and transactional read PASS");
     return 0;
 }

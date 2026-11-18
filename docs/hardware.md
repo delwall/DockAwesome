@@ -3,10 +3,12 @@
 ## Builds
 
 `make` builds DockAwesome for the Vampire 68080 with AMMX (`-m68080`,
-`DOCK_AMMX`). There is no build for other CPUs, so every backend uses the
-AMMX kernels; `--ammx` is still accepted. The dock does not refuse to start
-when exec `AttnFlags` bit 10 (`AFF_68080`) is clear: ApolloOS sets it, but
-AmigaOS 3.2 on a Vampire need not. `--caps` shows the flags. See the
+`DOCK_AMMX`). There is no build for other CPUs, so the dock always uses the
+AMMX kernels; `--ammx` is still accepted. `src/amiga_cpu_guard.c`, built for
+the 68020, runs as the first libnix constructor and stops the start with a
+message when exec `AttnFlags` bit 10 (`AFF_68080`) is clear. ApolloOS and
+AmigaOS 3.2.3 on the Vampire set it (`$a47f` and `$847f` on core 12856).
+`--caps` shows the flags. See the
 [build instructions](../README.md#build-and-test).
 
 The build links with `-noixemul`. The app and larger probes request a
@@ -45,6 +47,8 @@ the kernels in RAM.
 | Byte comparison | 490,806 | 65,783 | 16,384,000 bytes |
 | Key transport, clear | — | 79,191 | 4,096,000 pixels |
 | Key transport, covered | — | 79,364 | 4,096,000 pixels |
+| RGB24 screen row to RGB565 (core 12856) | 1,220,421 | 150,797 | 16,384,000 pixels |
+| ARGB32 screen row to RGB565 (core 12856) | — | 91,216 | 16,384,000 pixels |
 
 ## SAGA registers
 

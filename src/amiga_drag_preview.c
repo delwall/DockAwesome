@@ -28,6 +28,7 @@ struct AmigaDragPreview {
        save-under, as for a BOB) and draws the icon over it. */
     AmigaDisplay *display;
     DockImage icon, background, scratch, frame;
+    unsigned long stamp;
 };
 
 static const char label[] = "Remove";
@@ -120,6 +121,7 @@ AmigaDragPreview *amiga_drag_preview_open(struct Screen *screen, const DockImage
     if (!alloc_image(&p->icon,icon->width,icon->height) || !alloc_image(&p->frame,p->width,p->height))
         goto fail;
     memcpy(p->icon.pixels,icon->pixels,(size_t)icon->width*icon->height*4);
+    { static unsigned long stamps; p->stamp = ++stamps; }
     position(p,x,y,&p->left,&p->top);
     if (!(p->display = amiga_display_open(screen,p->width,p->height))) goto fail;
     if (!shaped && (!alloc_image(&p->background,p->width,p->height) ||
@@ -185,6 +187,11 @@ int amiga_drag_preview_settle(AmigaDragPreview *p)
     p->stale = 0;
     render(p);
     return 1;
+}
+
+unsigned long amiga_drag_preview_stamp(const AmigaDragPreview *p)
+{
+    return p ? p->stamp : 0;
 }
 
 const DockImage *amiga_drag_preview_icon(const AmigaDragPreview *p, int *x, int *y)

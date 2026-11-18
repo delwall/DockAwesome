@@ -46,6 +46,8 @@ typedef int (*DockUIFit)(void *context, const DockUIPrefs *draft);
    as its title. NULL restores the normal pointer and title. */
 void dock_ui_set_busy(DockUI *ui, const char *status);
 void dock_ui_set_fit_hook(DockUI *ui, DockUIFit hook, void *context);
+/* --profile: the display's field counter, for the Folder Stack's frame log. */
+void dock_ui_set_field_counter(DockUI *ui, const volatile ULONG *fields);
 void dock_ui_destroy(DockUI *ui);
 ULONG dock_ui_signal_mask(const DockUI *ui);
 int dock_ui_open_popup(DockUI *ui, DockEdge edge, int anchor_x, int anchor_y,
@@ -61,6 +63,9 @@ int dock_ui_folder_pending(const DockUI *ui);
 int dock_ui_folder_open(const DockUI *ui);
 /* The Folder Stack view is opening or closing. */
 int dock_ui_folder_moving(const DockUI *ui);
+/* Turn the still Folder Stack's tip toward the stack pin's center at
+   (x,y) on the screen; the box stays where it is. */
+void dock_ui_point_folder_tip(DockUI *ui, int x, int y);
 /* How far the Folder Stack box is out on screen: 0 (hidden) to 256 (open). */
 int dock_ui_folder_progress(const DockUI *ui);
 ULONG dock_ui_folder_frame_delay(const DockUI *ui);
@@ -73,14 +78,13 @@ int dock_ui_prefetch_folder(DockUI *ui, const char *path, int icon_size,
     DockUIReadIcon read_icon, const void *context);
 int dock_ui_folder_step(DockUI *ui);
 void dock_ui_finish_folder_motion(DockUI *ui);
-/* The label is nonactivating and lives outside the visible Dock artwork. */
-int dock_ui_show_label(DockUI *ui, DockEdge edge, const DockRect *anchor, const char *text);
-void dock_ui_move_label(DockUI *ui, DockEdge edge, const DockRect *anchor);
-void dock_ui_hide_label(DockUI *ui);
-/* Labels show in this PiP1 layer (no window shapes), or in windows when
-   NULL. The UI does not own it. */
-struct AmigaFloat;
-void dock_ui_set_float(DockUI *ui, struct AmigaFloat *float_layer);
+/* The label for the dock's own image: its height with the tip, its width
+   for a text, and the label as RGBA (with tip: pointing down at tip_x, -1
+   the middle). All 0 without antialiased text. */
+#define DOCK_UI_LABEL_GAP 8 /* between the label's tip and the zoomed icon */
+int dock_ui_label_height(DockUI *ui);
+int dock_ui_label_width(DockUI *ui, const char *text, int max_width);
+int dock_ui_label_image(DockUI *ui, const char *text, int max_width, int tip, int tip_x, DockImage *out);
 /* A flat label pill with hard edges as RGBA (alpha 0 outside); the caller
    frees out->pixels. */
 int dock_ui_pill_image(DockUI *ui, const char *text, DockImage *out);
@@ -93,5 +97,8 @@ int dock_ui_poll(DockUI *ui, DockUIAction *action);
 void dock_ui_close_dialog(DockUI *ui);
 int dock_ui_owns_window(const DockUI *ui, const struct Window *window);
 int dock_ui_busy(const DockUI *ui);
+/* A dialog, a menu or a moving Folder Stack is open: the dock holds its
+   row and passes presses through. A still Folder Stack does not. */
+int dock_ui_holds_dock(const DockUI *ui);
 
 #endif

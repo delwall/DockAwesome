@@ -317,6 +317,73 @@ static void measure(const char *name, DockMixHalf mix,
            name, ticks, frequency);
 }
 
+/* Screen rows to RGB565 against a byte-wise oracle: every count 0..31 and
+   source and destination alignment 0..7, with canaries around both. */
+typedef void (*RowKernel)(unsigned char *, const unsigned char *, unsigned long);
+static int validate_row565(const char *name, RowKernel kernel, int step, int r, int g, int b)
+{
+    unsigned char actual[160], expected[160], source[200], saved[200];
+    unsigned int dst_offset, src_offset, count, i, pixel;
+    for (src_offset = 0; src_offset < 8; ++src_offset) {
+        for (dst_offset = 0; dst_offset < 8; ++dst_offset) {
+            for (count = 0; count < 32; ++count) {
+                memset(actual, 0xa5, sizeof(actual));
+                memset(expected, 0xa5, sizeof(expected));
+                for (i = 0; i < sizeof(source); ++i)
+                    source[i] = (unsigned char)(i*47 + count*19 + src_offset*11 + (i*i>>3));
+                memcpy(saved, source, sizeof(source));
+                for (pixel = 0; pixel < count; ++pixel) {
+                    const unsigned char *in = source+8+src_offset+pixel*step;
+                    unsigned int v = ((unsigned int)(in[r]&0xf8)<<8)|((unsigned int)(in[g]&0xfc)<<3)|
+                        ((unsigned int)in[b]>>3);
+                    expected[8+dst_offset+pixel*2] = (unsigned char)(v>>8);
+                    expected[8+dst_offset+pixel*2+1] = (unsigned char)v;
+                }
+                kernel(actual+8+dst_offset, source+8+src_offset, count);
+                if (memcmp(actual, expected, sizeof(actual)) ||
+                    memcmp(source, saved, sizeof(source))) {
+                    printf("FAIL %s count=%u srcalign=%u dstalign=%u\n",
+                           name, count, src_offset, dst_offset);
+                    return 0;
+                }
+            }
+        }
+    }
+    kernel(NULL, NULL, 0);
+    printf("PASS %s to RGB565: all count 0..31/alignment cases, canaries, source preservation\n", name);
+    return 1;
+}
+
+static int validate_rows(void)
+{
+    return validate_row565("ARGB32",dock_argb_to_rgb565_ammx,4,1,2,3) &&
+        validate_row565("BGRA32",dock_bgra_to_rgb565_ammx,4,2,1,0) &&
+        validate_row565("RGBA32",dock_rgba_to_rgb565_ammx,4,0,1,2) &&
+        validate_row565("RGB24",dock_rgb24_to_rgb565_ammx,3,0,1,2) &&
+        validate_row565("BGR24",dock_bgr24_to_rgb565_ammx,3,2,1,0);
+}
+
+/* The dock's byte loop for a 24-bit row, to time against the kernel. */
+static void rgb24_row_c(unsigned char *out, const unsigned char *in, unsigned long n)
+{
+    for (; n > 0; --n, in += 3, out += 2) {
+        unsigned int v = ((unsigned int)(in[0]&0xf8)<<8)|((unsigned int)(in[1]&0xfc)<<3)|
+            ((unsigned int)in[2]>>3);
+        out[0] = (unsigned char)(v>>8); out[1] = (unsigned char)v;
+    }
+}
+
+static void measure_row(const char *name, RowKernel kernel, unsigned char *dst, const unsigned char *src)
+{
+    struct EClockVal start, end;
+    unsigned long frequency, ticks, repeat;
+    frequency = ReadEClock(&start);
+    for (repeat = 0; repeat < 1000; ++repeat) kernel(dst, src, 16384);
+    ReadEClock(&end);
+    ticks = end.ev_lo - start.ev_lo;
+    printf("%s: %lu EClock ticks at %lu Hz, 16384000 pixels\n", name, ticks, frequency);
+}
+
 int main(void)
 {
     struct MsgPort *port;
@@ -324,7 +391,8 @@ int main(void)
     unsigned char *dst, *source;
     unsigned int i;
     int result = 20;
-    if (!validate() || !validate_rgb24() || !validate_rgb565() || !validate_equal() || !validate_key565()) return result;
+    if (!validate() || !validate_rgb24() || !validate_rgb565() || !validate_equal() || !validate_key565() ||
+        !validate_rows()) return result;
     port = CreateMsgPort();
     if (!port) return result;
     request = (struct timerequest *)CreateIORequest(port, sizeof(*request));
@@ -335,8 +403,8 @@ int main(void)
         return result;
     }
     TimerBase = request->tr_node.io_Device;
-    dst = (unsigned char *)malloc(65536);
-    source = (unsigned char *)malloc(65536);
+    dst = (unsigned char *)malloc(65536+8);
+    source = (unsigned char *)malloc(65536+8);
     if (dst && source) {
         memset(dst, 17, 65536);
         memset(source, 93, 65536);
@@ -347,8 +415,16 @@ int main(void)
         measure("RGB24 AMMX", dock_rgba_to_rgb24_ammx, dst, source);
         measure_native("RGB565 decode C",dock_rgb565_to_rgba_c,dst,source);
         measure_native("RGB565 decode AMMX",dock_rgb565_to_rgba_ammx,dst,source);
+        /* The same kernel by destination alignment: malloc returns 4 mod 8. */
+        printf("dst is %lu mod 8\n",(unsigned long)dst&7);
+        measure_native("RGB565 decode AMMX dst+4",dock_rgb565_to_rgba_ammx,dst+4,source);
+        measure("Half blend AMMX dst+4, src+4",dock_mix_half_ammx,dst+4,source+4);
+        measure("Half blend AMMX dst+4, src",dock_mix_half_ammx,dst+4,source);
         measure_native("RGB565 encode C",dock_rgba_to_rgb565_c,dst,source);
         measure_native("RGB565 encode AMMX",dock_rgba_to_rgb565_ammx,dst,source);
+        measure_row("RGB24 row to RGB565 C",rgb24_row_c,dst,source);
+        measure_row("RGB24 row to RGB565 AMMX",dock_rgb24_to_rgb565_ammx,dst,source);
+        measure_row("ARGB32 row to RGB565 AMMX",dock_argb_to_rgb565_ammx,dst,source);
         memcpy(dst,source,65536);
         measure_equal("Equal C",dock_bytes_equal_c,dst,source);
         measure_equal("Equal AMMX",dock_bytes_equal_ammx,dst,source);

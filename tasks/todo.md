@@ -842,3 +842,488 @@ PiP1, shows beside the dock's PiP2 under Coffin (probe: both visible).
       check that no previous dock frame (or black box) shows at boot; offer
       `DockAwesome --pip-off` early in S:User-Startup for other reboots.
 
+
+## AmiKit and more AmigaOS versions (2026-11-10)
+- [x] AmiKit (DOpus 5 desktop): drops from desktop and listers, selection box,
+      Clock's dot, dragged icon without blinking, clean quit. Branch
+      amikit-dopus, build 367 (2a808c8), not pushed, no release.
+- [x] Build 367 installed in SYS:WBStartup on AmiKit XE, AmigaOS 3.9 and
+      AmigaOS 3.1.4.1; WBDock moved to SYS:WBStartup/Disabled there. Prefs
+      in ENVARC:DockAwesome.json (the WBDock pins on 3.9 and 3.1.4.1).
+- [ ] AmigaOS 3.1 (Kickstart 40): `DockAwesome --caps` hangs. Not installed,
+      WBDock left as is. Find the call that needs V44+ before installing.
+- [ ] Not retested with build 367: ApolloOS, Coffin, AmigaOS 3.2.3.
+- [ ] Illegal instruction (#80000004) reported on 3.2.3 (not a 68080?): safe
+      CPU check at start.
+- [ ] Reports from others on 1.0b2 (ApolloOS): window part kept behind the
+      dock, grey PiP rectangle. Likely no colour key on their core; ask for
+      --caps.
+- [ ] Same report on AmigaOS 3.2.3, core STANDALONE_12846_x14_16, 1.0b2
+      (photo 2026-11-15): a window is cut where it meets the dock's box,
+      the wallpaper shows instead. Live PiP keys those pixels to the
+      scanout, so the dock likely runs in snapshot mode: saved PiP prefs
+      fall back to snapshot without a word when PiP fails to open
+      (amiga_main.c, fall_back_to_snapshot), and the snapshot window covers
+      the zoom room above the dock. Ask for `DockAwesome --caps` and, with
+      the dock quit, `DockAwesome --pip` (prints the reason). Then: report
+      the fallback reason, and keep the snapshot window at rest height.
+- [ ] PiP survives ApolloBoot's BOOT:C/Reboot (direct RESET): message to the
+      ApolloBoot author and the Apollo team drafted.
+
+## CPU check before any 68080 code (2026-11-15)
+Illegal instruction (#80000004) was reported on 3.2.3. AttnFlags bit 10 is
+set on the Vampire under ApolloOS ($a47f) and AmigaOS 3.2.3 ($847f), core
+12856 (measured). The startup and libnix are 68000 code (multilib ".").
+- [x] src/amiga_cpu_guard.c, built with -m68020: an ADD2INIT at priority
+      -128 (the first libnix constructor) checks bit 10 and exits with 20
+      after a Shell line or an EasyRequest from Workbench.
+- [x] objdump: the check is plain 68020 code (btst #2,296(a6) on
+      AttnFlags); its init-list entry has priority 0, the lowest.
+- [x] 3.2.3, build 370: --caps and --version as before. A test build that
+      requires bit 11: from the Shell the line and return code 20; from
+      Workbench (WBRun) the requester, and the process ended after OK.
+      Test files removed from RAM:.
+
+## PiP only (2026-11-15)
+The CPU check admits only the 68080, and a dock without PiP (snapshot or
+opaque window) cut windows behind its zoom room (3.2.3 report). Decision
+(user): PiP is the only backend; when PiP cannot run, say why and quit.
+- [x] Profile: no backend choice. dock_choose_profile reports why PiP
+      cannot run (no AMMX, core, screen); the start shows that reason.
+- [x] Start: open failures show surface_error (pixel format, alignment,
+      PiP2 taken); no fall_back_to_snapshot. A Workbench reopen on a screen
+      PiP cannot use leaves the dock closed until the next change.
+- [x] Removed amiga_surface_window.c, app->snapshot, app->pip_mode,
+      requested_backend, the window-only IDCMP button and refresh paths,
+      the layer check in pointer_inside and the input handler, and the
+      fields only they used.
+- [x] Prefs: "snapshot" and "pip" still read (old files load) and ignored;
+      "pip": true is still written so an older build keeps PiP on rollback.
+- [x] CLI: --snapshot and --opaque go (ignored like unknown options); --pip
+      and --ammx are accepted. --caps prints "pip yes/no" instead of the
+      backend.
+- [x] Tests (test_profile, test_prefs), docs (README, PRODUCT,
+      architecture, pip-backend, hardware, release notes).
+- [x] 3.2.3, build 371 from RAM:: --caps (pip yes); started while the
+      installed dock ran: requester "PiP2 is already in use.", process
+      ended after OK, no crash. Installed dock quit through its menu, the
+      new build ran as the dock: zoom sweep, menu, RAM Disk dropped from
+      Workbench (saved), dragged out (removed), Quit. Config restored from
+      the backup, installed dock restarted with WBRun, RAM: files removed.
+- [x] ApolloOS R9.5 (shaped windows), final build: --caps all yes; installed
+      dock quit through its menu; new build with --profile: shaped label,
+      zoom, RAM Disk dropped from Workbench (messages=1 added=1) and dragged
+      out (downs=1 ups=1, screen clean), menu Quit. A second dock showed
+      "PiP2 is already in use." and ended after OK. Config restored,
+      installed dock restarted with WBRun, RAM: test files removed.
+- [x] Coffin (24-bit) and AmiKit (24-bit): start, --caps, zoom, refusal of a
+      second dock (Coffin), drop and drag out (Coffin). AmiKit desktop drops
+      fail with build 367 too, see below.
+- [ ] A screen PiP cannot use (8-bit): not run on hardware, only in
+      test_profile.
+
+## 24-bit PiP capture cost (2026-11-15)
+User on Coffin (24-bit): the part behind the dock lags a window dragged
+sideways. --bench-sweep: one forced capture of the 1056x100 box took 31.6
+ms (16-bit: 4.0 ms). Each changed row read video memory three or four
+times, the conversion byte by byte.
+- [x] Read each row once into a Fast RAM row (memcpy), compare and convert
+      from there; one conversion loop per pixel format.
+- [x] Convert and copy only the changed span; scan for it a long at a time.
+- [x] Matched run on Coffin, core 12856, 24-bit: dock with --profile from an
+      Execute script, Archives window moved 70 x 10 px under the dock by
+      ARexx CHANGEWINDOW (delay 2), Break. 58-60 polls, 37-38 changes each:
+      capture_compare_us_avg 27333 (before) -> 16663 (Fast RAM row) ->
+      14031 (long scan) -> 12072 (span copy). Forced capture 31561 -> 18087.
+- [x] User: "Bättre men laggar lite fortfarande".
+- [x] Poll spacing with a held button (new profile counter motion_polls,
+      motion_interval_us_avg; ARexx move plus a held desktop drag): 20 ms
+      requested gave 28.6 ms. Starting the timer before the capture: 28.1
+      ms, no gain, reverted. Asking for 10 ms: 17.1 ms (timer.device rounds
+      up), capture 6.2 ms average.
+- [x] User with the 10 ms build: "Microskopiskt mindre". Floor: the glass
+      shows a copy of the screen taken after Workbench drew the window, then
+      composed and shown at the next field (one to two fields). SAGA PiP has
+      a colour key, no alpha blend, so translucent glass needs the copy.
+      Stopped here; left open: VBlank-paced motion polls, AMMX row compare,
+      or a design change (less translucent glass while the source moves).
+- [x] Coffin cleaned: test docks quit, Archives window closed, ENVARC: and
+      ENV: DockAwesome.json restored from the backup, installed dock started
+      with WBRun, RAM: test files removed. A second C:ApolloExplorerSrv that
+      I started (one already ran) stays until the next reboot.
+
+## AmiKit: drops from the Directory Opus desktop fail (2026-11-15)
+User on AmiKit XE (24-bit, DOpus 5 desktop, core 12856): an icon dragged
+from the desktop "glitches" over the dock and is not added. Same with the
+installed build 367 (2a808c8), started from the Shell and from a lister,
+so not from today's changes. tasks/todo.md had desktop and lister drops
+working on 2026-11-10.
+- Profiles (new build / 367): drag image painted over the dock (110 / 31
+  frames), receiver armed late on the drag image (arms=2 / 1), presses
+  unarmed (2 / 1), and no AppMessage at all (messages=0): Directory Opus
+  did not deliver the drop to the receiver window.
+- [ ] Find what changed since 2026-11-10 (screen depth? DOpus settings?) and
+      whether lister drops still work. Agent input does not reach the dock
+      on AmiKit: each try needs the user's drag.
+- Cleaned: config restored, test files removed from RAM:, installed dock
+  running (started by the user from a lister). A C:ApolloExplorerSrv that I
+  started (none ran at boot) stays until the next reboot.
+
+
+## Code review fixes (2026-11-17)
+Whole-codebase review (five slices, checked against ApolloKnowledgeBase and
+amiga-refs). User: "Fixa rubbet!". Branch review-fixes, commits local, not
+pushed. Build 388.
+Bugs (built; host tests and sanitizer pass; hardware only where said):
+- [x] B1 launch: a document without .info runs as a script only with the
+      script bit; a dock pin also when it is text and not a program (the
+      ShapeShifter Launch case). Never from the Folder Stack, never binary.
+      Not run on hardware.
+- [x] B2 dock_rgb565_refresh: edge scans bounded (test with a lying equal).
+- [x] B3 Apollo bit (SR bit 11) set at the start of main. Ran on ApolloOS;
+      not run on 3.2.3 or Coffin, where it matters.
+- [x] B4 Delete key hit test uses screen coordinates. Not run.
+- [x] B5 native-menu branch defers its Workbench and status signals and
+      keeps the live tick. Not run (needs MagicMenu on Coffin).
+- [x] B6 unreplied close message gives its signal bit back. Not run.
+- [x] B7 status worker: Directory Opus gets two seconds per ARexx call,
+      then is not asked again. program_poll_close still waits for the
+      worker (its code must stay loaded). Not run (needs AmiKit).
+- [x] B8 reset signal served while Workbench is closed; PiP and the float
+      layer go off before RESETHANDLERDONE. Not run. Open: a reset while
+      an EasyRequest is up still waits for keyboard.device's timeout.
+- [x] B9 presses pass through while a requester is up. Not run.
+- [x] B10 prefs: unknown keys are skipped, a byte order mark is accepted
+      (tests/test_prefs.c).
+- [x] B11 new temporary item index with a Folder Stack.
+- [x] B12 About releases openurl.library and its pen when the window fails.
+- [x] B13 pip_coexist_probe matches "already in use".
+- [x] Minor: lister path with a quote refused, 1024-byte handle list,
+      Makefile (.DELETE_ON_ERROR, release rebuilds all objects, package
+      clears build/dist), fill_rounded, NULL guards in three UI getters.
+Performance, measured on ApolloOS R9.5, core 12856, 16-bit, 800x96, 12 pins:
+- [x] P1 AMMX row kernels for 24/32-bit capture (ARGB, BGRA, RGB24, BGR24;
+      RGBA uses the existing kernel). ammx_probe: all counts and alignments
+      pass; RGB24 row 1,220,421 -> 150,797 ticks per 16,384,000 pixels (105
+      -> 13 ns per pixel). The dock's capture on a 24-bit screen (Coffin)
+      is not measured yet: this machine runs 16-bit.
+- [x] P2+P3 blend_pixel inlined with two multiplies, opaque runs as longs
+      or memcpy. --bench-sweep 4, two matched runs each: compose_us_avg
+      5625/5655 -> 5329/5336 (5.5 %), render 7412/7415 -> 7085/7096.
+      --damage-check: 180 frames, 0 compose and 0 convert mismatches.
+      Smaller than the review's estimate: compose is not dominated by
+      antialiased edges. Next: find where the 5.3 ms goes before more work.
+- [x] P4 fast live rate only with the dock's screen in front. Not measured.
+Second round (user: "Kör vidare med alla punkter"), build 393:
+- [x] Overlay stamps: a rebuilt drag picture or preview icon at a reused
+      address is redrawn (DockOverlay.stamp, size compare).
+- [x] Status attribution keeps a hash of the task's name beside its
+      address.
+- [x] Folder Stack entrance shows the icons already in the cache. ApolloOS,
+      Personal:Downloads (22 entries): entrance 4-5 frames, second opening
+      "0 read, 22 cached", dismissal 6 frames; first paint 80-82 ms (the
+      layer stage is 13.5-16.9 ms with the icons blended in).
+- [x] Folder Stack dismissal under another window hides by strips instead
+      of shrinking a picture of that window. Not seen on hardware (needs a
+      window over the open stack); the plain dismissal still animates.
+- [x] Quit: PiP goes off and presses pass through before the status worker
+      is waited for. A reset while a requester is up is answered
+      (BuildEasyRequest + SysReqHandler). Not run.
+- [x] src/dock_text.c: title matching, alias extraction, Shell quoting and
+      text detection moved out of the Amiga files, with tests/test_text.c.
+      The tests found that "Editor - RAM:Copy/Notes.txt" never gave the
+      alias "RAM:Copy/Notes.txt" (the volume search ran across the label);
+      fixed.
+- [x] tests/bench_core.c times dock_renderer_draw (glass, coverage, damage)
+      beside whole frames.
+- [x] --profile prints "Idle passes" (woken, nothing drawn, no live tick).
+Measured and rejected:
+- Handler signal filter: 537 idle passes, 377 us each (ApolloOS). At 60
+  mouse events a second that is 2.3 % of the CPU, only while the pointer
+  moves on the dock's screen; the drop receiver and labels need those
+  events. Not worth the risk.
+- Aligned pixel buffers: ammx_probe, decode to a destination 4 mod 8 and
+  0 mod 8: 60,434 and 60,374 ticks; half blend 187,961 and 186,637. No
+  difference on core 12856.
+- Capture compare before copy: the Fast RAM row was a measured win on
+  Coffin (27.3 -> 16.7 ms).
+- Folder Stack listing kept by the drawer's date: FAT volumes (the SD card
+  here) do not change a drawer's date when its contents change.
+Open:
+- [ ] Menu glass over a just-closed label: not reproduced. On ApolloOS the
+      label is in PiP1, so closing it exposes nothing; needs a system
+      where the label is a window.
+- [ ] .bak recovery and save_config have no host test (they are DOS calls).
+- [ ] Run on Coffin/3.2.3/AmiKit: B3-B9 above and the 24-bit capture.
+- [ ] The Games drawer window on the test machine moved from 351,409 to
+      364,420 during my tests.
+Coffin (AmigaOS 3.9, 24-bit, no shaped windows, core 12856), 2026-11-17:
+- [x] ammx_probe: every kernel passes, also the new screen-row kernels.
+- [x] --bench-sweep 4, build 395 against the installed 352-era build:
+      compose 5028/4799 -> 5016/5482 us (no gain here, noisy);
+      --damage-check 262 frames, 0 compose and 0 convert mismatches. The
+      Apollo bit is set in these runs.
+- [x] 24-bit capture, matched (baseline 7a74a3d and the new build with the
+      same new counter, one script: Archives window moved in 38 steps of
+      10 px over the dock's box, 2 ticks apart): a poll that finds a change
+      10735 -> 7899 us (second pair 11052 -> 8146); a poll that finds none
+      about 3 ms in both (2751-3677). New profile line "PiP2 capture:
+      changed/unchanged".
+- [x] Compare in place before copying the row: changed polls 8146 against
+      7899 us, unchanged 2888 against 2751-3677. No gain; reverted, the
+      measurement is in the comment. Kept: a row redrawn back between
+      compare and copy is skipped instead of giving an inverted box.
+- [x] The 3 ms of an unchanged poll: LockBitMap. A diagnostic build timed
+      94 locks at 2.6 ms each (245 ms of 93 polls); the plate compare
+      passed in 75 of 76 unchanged polls. Now a poll with a check box looks
+      at the screen's memory without the lock, at the address the last lock
+      gave; a change, or every tenth poll, takes the lock. Dock at rest,
+      84-87 polls each, old/new/old in one script: 4340 -> 2202 us a poll.
+      What is left is the compare itself (memory-bound) and one lock a
+      second. The same path serves 16-bit screens; not run on ApolloOS.
+- [x] The band: the receiver without shapes, armed behind the other windows
+      while the pointer is on a drawer or icon, holds a copy of the screen.
+      A window over the dock's box that closed uncovered the receiver,
+      which Layers filled from the copy: the closed window, or garbage.
+      With the pointer then resting on the dock it never stepped back. Now
+      it remembers which layers lay on the box when the copy was taken
+      (box_windows) and steps back when they differ, arming again half a
+      second later. The first try, a time window after arming, failed: the
+      window closed within it. Same sequence as the report (right-click at
+      640,717, Esc), build 405: clean. Pointer parked on a desktop icon
+      for 12 s: arms=1 disarms=0. Window closed by ARexx while armed, build
+      406 installed: clean.
+- My diagnostic build crashed at exit (it read the EClock after
+  profile_close had cleared TimerBase) and kept the PiP2 lease: the user
+  rebooted Coffin. The installed builds never held that code.
+- Build 406: --damage-check 262 frames, 0 and 0; installed in
+  SYS:WBStartup (399 kept as Disabled/DockAwesome-build399.old).
+- [x] Independent review of the whole branch diff (one reviewer, with
+      host harnesses): no crash or data loss; seven defects in today's
+      changes, all fixed in build 407:
+      a reset answered inside a requester let the loop show PiP again
+      (app->resetting); the Folder Stack's first still frame lacked the
+      preloaded icons; the alias search no longer found a path whose
+      drawer name holds " - "; dock_shell_quote wrote one byte past size
+      with two bytes left (moved code, ASan); the menu branch ran the fast
+      tick; a busy layer list at arming stored 0 and stepped back at once;
+      popup_covered released with UnlockLayerInfo after AttemptSemaphore.
+      Also: PiP1 goes off at quit before the worker is waited for.
+      Confirmed by the reviewer: VPERM constants, exact kernel ranges,
+      blend bit-identical (200 million triples), peek bounds and
+      invalidation, prefs skip_value, loaded[] ownership.
+- [x] Build 407 on Coffin: --damage-check twice, 262 frames, 0 and 0; the
+      band sequence with the dock running: clean, arms=disarms; installed
+      in SYS:WBStartup. Disabled/DockAwesome-build406.old could not be
+      deleted (Workbench still holds a WBRun binary); delete after a
+      reboot. Disabled/DockAwesome-build399.old is the rollback.
+AmigaOS 3.2.3 (Kickstart 47.13, 24-bit, no shaped windows), build 407,
+2026-11-17:
+- [x] ammx_probe: every kernel passes. --damage-check 194 frames, 0 and 0
+      (Apollo bit set).
+- [x] --bench-sweep 4 against the installed build (272452 bytes): compose
+      5363/5355 -> 5229/4905 us.
+- [x] Dock at rest, 95-100 polls: capture 4766 -> 1513 us a poll.
+- [x] Band: receiver armed (pointer on the RAM Disk icon, window at
+      224,624 832x96), Archives window over the box closed by ARexx, dock
+      running: clean; arms=disarms=5.
+- [ ] Not run: the dock's menu (a right-click at 640,717 opened none with
+      the installed build either), Delete, drops, B5-B9.
+- Left: RexxMast started by me (was not running); RAM:DockAwesome (407)
+  for the user; installed dock restarted with WBRun, other files removed.
+
+ApolloOS R9.5 (16-bit, shaped windows), build 407, 2026-11-17:
+- [x] The reviewer's doubt about the peek: a probe (LockBitMapTags, unlock,
+      WriteRGBPixel with no lock, read at the remembered address): the
+      memory changed with the pixel, was restored with it, and a second
+      lock gave the same address. Live screen memory between locks.
+- [x] --damage-check 180 frames, 0 and 0. Dock at rest, 94 polls each:
+      capture 787 (build 395) and 781 us a poll: the lock is cheap here,
+      no gain and no loss.
+- [x] Installed in SYS:WBStartup (395 kept as
+      Disabled/DockAwesome-build395.old); Folder Stack opened with its
+      icons from the installed dock.
+- The cross compiler at ~/ApolloCrossDevLocal was gone when I came to build
+  the probe (not removed by me); the probe was built with
+  ~/GitRepos/ApolloCrossDev/Compilers/GCC-6.50-Dev. `make amiga` fails
+  until the path is back or APOLLO_ROOT points elsewhere. Build 407 was
+  already built.
+
+- [ ] Reviewer's notes left open: a hover label
+      or popup of the dock's own over the box counts as a window change
+      (one step back, half a second without arming); rexx_call polls with
+      Delay(1), 20 ms a call; apply_attributions matches by address only.
+- [ ] Not run on Coffin: the dock's own menu (my right-click at 640,717
+      missed the plate), Delete key, Folder Stack, B5-B9.
+- Cleaned: test docks quit, installed dock restarted with WBRun, RAM: test
+  files removed. RAM:DockAwesome (build 399) left for the user to try.
+
+Smoke test, builds 388 and 393 from RAM: on ApolloOS: hover, plate menu,
+About, Quit through the menu, Folder Stack, profile printed. Installed dock (WBStartup) stopped with
+a FindTask/Signal Ctrl-C tool and restarted with WBRun; RAM: test files
+removed (BreakTask too). A C:ApolloExplorerSrv that I started stays until
+the next reboot.
+
+Folder Stack entrance hitch, build 408 (2026-11-17, ApolloOS):
+- [x] The icons that grew with the box blinked out for a few ms at the end
+      of the entrance: the first still frame was presented before they were
+      blended into the artwork. They are now blended in first
+      (load_folder_icon(ui,0)), then the still frame is painted once.
+- [x] From RAM: with --profile, Personal:Downloads (22 entries), four
+      openings: entrance 4-6 frames, 133-145 ms, all icons in place.
+- [x] Installed in SYS:WBStartup (407 kept as
+      Disabled/DockAwesome-build407.old). Disabled/DockAwesome-build395.old
+      is held by Workbench (WBRun binary); delete after a reboot. 352 deleted.
+
+The dock stays live while a Folder Stack is open, builds 410-412
+(2026-11-17, ApolloOS). Reference: the user's macOS screencast; the box
+stays put, its tip slides along the edge to point at the stack button's
+center every frame while the dock zooms.
+- [x] dock_ui_holds_dock: a dialog, a menu or a moving box holds the row;
+      a still box does not. Hover, zoom and presses on the dock follow it
+      (pointer_inside, update_target, input_publish, sync_input_ui,
+      message). The pointer over the box never counts as dock hover.
+- [x] A click on another pin closes the stack and goes on as a click
+      (at the launch, not the press: the press would clear the snapshot
+      and the release would miss the pin). CLI pin with the stack open:
+      stack closed, new Shell.
+- [x] dock_ui_point_folder_tip: draw() points the tip at the stack pin's
+      center; the band by the tip is retinted from the clean backdrop and
+      presented. A page change in the same window keeps the tip.
+- [x] Build 411 changed the window shape per tip move: Workbench redrew
+      the desktop behind each time, dock frames 10 -> 24 ms, settle
+      avg/max 184/312 -> 351/876 ms, 168 stalled frames. Build 412 shapes
+      the whole tip strip once and paints its backdrop: settle 174/319 ms,
+      23 stalled, entrance 5 frames.
+- [x] Measured tip on screen: pointer on the stack x=870, left of it
+      x=898, pointer off the dock x=871; old place repainted cleanly.
+- [ ] Not seen: the dock itself (PiP) beside the tip on the monitor;
+      side docks (left/right) not run.
+- [x] Installed build 412 in SYS:WBStartup (408 kept as
+      Disabled/DockAwesome-build408.old); the stack opened and its tip
+      moved to x=898 with the pointer left of the pin. RAM: test files
+      removed. Disabled/DockAwesome-build407.old and -build395.old are held
+      by Workbench (WBRun binaries); delete after a reboot.
+
+Smoother animations: Folder Stack box and dock zoom, builds 413-427
+(2026-11-17, ApolloOS). Plan: measure where frames drop, fix the box's
+frame rate, let the user pick the zoom curve.
+- [x] Profile: fields between box frames (fields=), each box frame's time
+      (frame_us), dock frames during the box's motion, and the first
+      stalled dock frames (only frames that continue a motion).
+- [x] Zoom alone drops no frames: 60 of 60 one field apart. The earlier
+      "stalled" count included a new motion starting after the last.
+- [x] Box entrance dropped one frame of 6 (fields=01121, 5 frames):
+      1. PiP converted the whole canvas while a popup was open (12 ms dock
+         frames). Now the popup's rectangle and the one in that buffer's
+         last frame; --damage-check 418 frames, 0 and 0.
+      2. The pin's morph blend: bytes and three divides per pixel, 5 ms.
+         Now words, one divide per alpha pair (max 1 level from the old
+         result), quarter steps kept in three slots with runs, made when
+         the stack opens: morph frames 8.5 -> 1.7-3.4 ms.
+      3. The box's own large frames (21 ms at near full size): runs of
+         consecutive source columns copied whole when they average 4 px
+         or more. Largest frame 21 -> 16 ms.
+      Entrance now 6 frames, fields=011111, in all five runs.
+- [ ] Dismissal: 6 frames as before, but fields=021111: a 7.4 ms dock
+      frame (27426 px, the backdrop under the moved tip) lands with the
+      first box frame. Not fixed.
+- [x] Zoom curve: DOCK_ZOOM_TICKS (default 8). RAM:Dock8 (build 426),
+      Dock10 (424), Dock12 (425) for the user to compare on the monitor.
+
+Regression report: the zoomed row slid left and lost the pointer
+(all three zoom variants, 2026-11-18).
+- [x] Cause: the toolchain, not the zoom change. ~/ApolloCrossDevLocal
+      (GCC-6.50-Stable) is gone; builds since 408 use GCC-6.50-Dev
+      (6.5.0b). Clean builds of the committed 412 source show the same
+      shift; the installed 412 still held old-compiler objects. With
+      dock_core.c (or only dock_layout) at -O1 the frame matches 412.
+- [x] logical_positions: focus*span/rest_pitch in 32 bits. A layout
+      harness on the Vampire (12 icons, 36 px, 190%, end gap 12, every x
+      0-799) now matches the host exactly; at -O2 before, 463 of 800 x
+      differed (row pinned to the left padding).
+- [x] Host tests cross-compiled at -O2 on the Vampire: geometry, prefs,
+      profile, bob, text pass.
+- [ ] test_core ran over 17 minutes without finishing (1.6 s on the Mac);
+      test_interaction hung earlier (possibly the 4 KB stack). The Amiga
+      stopped answering after ChangeTaskPri on the stuck test: needs a
+      reset. Unknown whether more Dev miscompiles remain.
+- [ ] The fixed dock itself not yet checked with --pip-dump. Built:
+      Dock8 (430), Dock10 (428), Dock12 (429) in the scratchpad.
+
+Compiler fixed, 2026-11-18. The zoomed row slid left in every build made
+with GCC-6.50-Dev: bbb's opt_elim_dead_assign deleted a reload because
+track_var::invalidate_mem kept a register's cached MEM over a DImode store
+to the same slot (inverted offset test, store attributes required).
+- [x] Patch bbb-invalidate-mem-fix.patch in ApolloCrossDev (Dev scripts),
+      PR WDrijver/ApolloCrossDev#30. Toolchain rebuilt with the script:
+      ~/GitRepos/ApolloCrossDev/Compilers/GCC-6.50-Dev is the only one.
+- [x] dock_core.c back to the original int64_t expression; Makefile and
+      README default to the ApolloCrossDev toolchain.
+- [x] Layout harness on the Vampire with the installed compiler and the
+      original code: 800 of 800 pointer positions equal to the host.
+- [x] 720 compilations (373 C files, -O2/-O3/-Os): 703 identical, 17 keep
+      loads the old pass had replaced with register copies.
+- [x] All seven test suites cross-compiled with the fixed compiler at -O2
+      -m68080 pass on the Vampire, test_core in full (20400 fuzz frames,
+      about 27 minutes there; test_interaction about 10).
+- [x] Build 434 (fixed compiler, original layout code) installed in
+      SYS:WBStartup; build 412 is the one rollback
+      (Disabled/DockAwesome-build412.old). Zoom curve variants for the user:
+      Disabled/DockAwesome-zoom10-build432 and -zoom12-build433 (build 434
+      is the 8-tick curve). 408/407/395/1731 backups deleted.
+- [x] The night's "freezes" were starvation: tests at -5 starved SDIO0/1
+      (-21). Build 431 had been waiting on a hidden "PiP2 is already in
+      use" requester the whole time.
+- [x] Only compiler left: ~/GitRepos/ApolloCrossDev/Compilers/GCC-6.50-Dev
+      (rollback copy and scratch cc1 builds removed). The toolchain build
+      needs a PATH without spaces (VMware Fusion's entry broke the port
+      libraries' configure).
+- [x] Stable scripts: same bbb-opts.c code, fix applies unchanged. A Stable
+      cc1 before/after over the same 720 compilations: 709 identical, 11
+      only add reloads of stack slots; no wrong code found, so the defect is
+      latent there. PR WDrijver/ApolloCrossDev#31 (patch file identical to
+      #30, plus the step in GCC-6.50-Stable-MacOS.sh/-Linux.sh).
+- [x] Zoom curve: 8, 10 and 12 ticks looked the same to the user (the
+      cubic ease-out differs by about 40 ms). Following divisors 1/4 and
+      1/5 (40 -> 60/80 ms lag) gave no visible gain either. Kept 8 ticks
+      and 1/3: build 434 stays installed; all variants deleted from
+      SYS:WBStartup/Disabled (412 rollback kept).
+- [x] Filmed hitch (IMG_2570.MOV): every ~15th camera frame unchanged, then
+      a double step, at each icon crossing. A smooth input.device sweep
+      (scratch Sweep tool) with per-section loop timing found the name
+      label window: open 26 ms (glass 9, OpenWindow 13), close 13 ms, in
+      the main loop. Build 457: label in its own task; capture and window
+      check skip a poll while it works; redraws between fields wait for
+      the next field. Label stage 0.1 ms, 13 ms poll waits 10 -> 2 per
+      sweep, longest frame 45 -> 18 ms. Menu, quit with a label: fine.
+      Installed; rollback Disabled/DockAwesome-build446.old.
+- [x] Label without delay as a window still came late (user: worse than
+      457). Build 465: on the bottom edge the label is an overlay in the
+      dock canvas (+12 px), shown at once, following the zoom; labels made
+      while idle (~11 ms each). Sweep: stalled=0, longest frame 16.5 ms,
+      no backdrop recaptures; damage-check 472 frames clean. Installed;
+      rollback Disabled/DockAwesome-build457.old.
+- [x] Side docks: overlay label beside the icon (canvas +96 px inward for
+      the widest label, capped 240 px). Right/left tested with RAM test
+      configs: label placement, sweep 1 late frame, damage-check clean.
+      Build 473 installed; rollback Disabled/DockAwesome-build465.old.
+- [x] /simplify of today's work: label task removed (only the fallback
+      used it), label outline 3x faster (caps sampled once, identical
+      bytes), slots by pin, one placement and one build function. Build
+      479 installed; rollback Disabled/DockAwesome-build473.old.
+- [x] Coffin: all 7 suites pass (build 479). Build 482: the label in the
+      dock's image on every system (AA font made in software always); the
+      window label code removed. Coffin label shown ("RiVA"), sweep 24
+      late frames of 635, damage-check 223 clean. Installed in place.
+      Coffin Disabled/DockAwesome-locked-delete(-479): delete after reboot.
+- [ ] Not verified on Coffin: the dock's right-click menu (my agent click
+      showed none, as before 2026-11-17); ApolloOS run of build 482.
+- [x] AmigaOS 3.2.3 (24-bit), build 482 installed in place (old 407 and
+      Disabled copies deleted): all 7 suites pass incl. full test_core;
+      label in the dock's image; sweep 25 late frames of 457;
+      damage-check 273 clean. RAM: cleaned.
+- [x] ApolloOS: build 482 installed (old copies in Disabled deleted after
+      the reboot; 479 locked, Disabled/DockAwesome-locked-delete until the
+      next reboot). Label in the dock's image, sweep 0 late frames,
+      damage-check 399 clean. RAM: cleaned.

@@ -27,8 +27,8 @@ static void shift_held_drops(App *app, int closing)
 void close_surface(App *app)
 {
     if (app->window) shift_held_drops(app,1);
-    dock_ui_hide_label(app->ui);
-    app->label_pin_id = 0; app->label_at = 0; app->label_visible = 0;
+    app->label_pin_id = 0;
+    label_slots_free(app);
     amiga_drag_preview_close(app->drag_preview); app->drag_preview = NULL;
     drag_bob_close(app);
     interaction_cancel(app);
@@ -36,8 +36,8 @@ void close_surface(App *app)
     input_invalidate(app);
     animation_cancel(app);
     live_cancel(app);
-    /* The backend releases its hardware, native window and buffers. No
-       backend is chosen before the first select_backend. */
+    /* PiP releases its hardware, native window and buffers. No surface is
+       set before the first select_backend. */
     if (app->surface) app->surface->close(app);
     free(app->check_canvas.pixels); memset(&app->check_canvas,0,sizeof(app->check_canvas));
     dock_renderer_release(&app->check_renderer);
@@ -54,21 +54,20 @@ int open_surface(App *app)
     int cross = app->settings.max_size+2*app->settings.padding+12;
     int available_height = app->screen->Height-app->screen->BarHeight-2;
     /* Keep the right PiP raster's keyed tail even where it crosses the screen edge. */
-    int right_padding = app->edge == DOCK_EDGE_RIGHT && app->pip_mode ?
-        RIGHT_PIP_TAIL-DOCK_DESKTOP_GAP : 0;
+    int right_padding = app->edge == DOCK_EDGE_RIGHT ? RIGHT_PIP_TAIL-DOCK_DESKTOP_GAP : 0;
     int panel_cross = dock_panel_thickness(&app->settings)+DOCK_DESKTOP_GAP+right_padding;
     /* SAGA shows the last columns of each PiP row at the start of the next
        one: a right dock keeps them past the screen edge, a left dock keyed
        on its far side. Without them a pin dragged out of a left dock (on
        AmigaOS 3.2.3) left icon pixels at the screen's left edge and lost
        its own last columns: an invisible edge. */
-    app->pip_tail = app->edge == DOCK_EDGE_LEFT && app->pip_mode ? RIGHT_PIP_TAIL : 0;
+    app->pip_tail = app->edge == DOCK_EDGE_LEFT ? RIGHT_PIP_TAIL : 0;
     /* Each attempt reports its own error. Keep the text of an earlier failure. */
     if (!app->failed) app->surface_error[0] = 0;
     app->settings.edge_padding = right_padding;
     if (cross < panel_cross) cross = panel_cross;
     /* Pinning can use this spare room without closing and opening the surface. */
-    if (app->pip_mode && reserve && app->settings.max_size > app->settings.base_size) {
+    if (reserve && app->settings.max_size > app->settings.base_size) {
         reserve += 2;
         if (reserve > DOCK_MAX_ITEMS) reserve = DOCK_MAX_ITEMS;
     }
@@ -76,12 +75,45 @@ int open_surface(App *app)
     if (wanted > limit) wanted = limit;
     if (wanted < 1) return 0;
     app->width = app->edge == DOCK_EDGE_BOTTOM ? wanted : cross+app->pip_tail;
-    if (app->width > app->screen->Width) app->width = app->screen->Width;
-    if (app->pip_mode) {
-        app->width = (app->width+31)&~31;
-        if (app->width > app->screen->Width) app->width = app->screen->Width&~31;
-    }
+    app->width = (app->width+31)&~31;
+    if (app->width > app->screen->Width) app->width = app->screen->Width&~31;
     app->height = app->edge == DOCK_EDGE_BOTTOM ? cross : wanted;
+    /* The hover label beside a zoomed icon is drawn in the dock's own
+       image: room for it past the zoom headroom, above the row on the
+       bottom edge, inside a side dock for its widest label (capped; a
+       longer one is shortened). The rows and columns grow on the side
+       away from the screen edge, where the layout is not anchored. */
+    app->label_max_width = 0;
+    {
+        /* Measured on a row of at least one icon: a pin added to an
+           empty dock has its label too. */
+        int label = dock_ui_label_height(app->ui), icons = app->count ? app->count : 1;
+        DockPlacement rest[DOCK_MAX_ITEMS];
+        if (label > 0 && dock_edge_layout(&app->settings,app->edge,icons,app->width,app->height,0,0,0,rest)) {
+            int need;
+            if (app->edge == DOCK_EDGE_BOTTOM) {
+                int headroom = rest[0].y+rest[0].size-app->settings.max_size;
+                need = DOCK_UI_LABEL_GAP+label-headroom;
+                if (need > 0) app->height += need;
+                app->label_max_width = app->screen->Width/2 < pip_visible_width(app) ?
+                    app->screen->Width/2 : pip_visible_width(app);
+            } else {
+                int column = app->screen->Width/4 < 240 ? app->screen->Width/4 : 240, widest = 0, i;
+                int headroom = app->edge == DOCK_EDGE_RIGHT ?
+                    rest[0].x+rest[0].size-app->settings.max_size :
+                    pip_visible_width(app)-(rest[0].x+app->settings.max_size);
+                char text[PATH_CAP];
+                for (i = 0; i < app->count; ++i) {
+                    int w = pin_label_text(app,i,text) ? dock_ui_label_width(app->ui,text,column) : 0;
+                    if (w > widest) widest = w;
+                }
+                need = DOCK_UI_LABEL_GAP+widest-headroom;
+                if (need > 0) app->width += (need+31)&~31;
+                if (app->width > app->screen->Width) app->width = app->screen->Width&~31;
+                app->label_max_width = column;
+            }
+        }
+    }
     if (app->height > available_height) return 0;
     app->left = app->edge == DOCK_EDGE_LEFT ? 0 : app->edge == DOCK_EDGE_RIGHT ?
         app->screen->Width-app->width+right_padding : (app->screen->Width-app->width)/2;
@@ -94,7 +126,7 @@ int open_surface(App *app)
     app->screen_left = app->screen->LeftEdge; app->screen_top = app->screen->TopEdge;
     app->display = amiga_display_open(app->screen, app->width, app->height);
     if (!app->display || !image_alloc(&app->canvas, app->width, app->height) ||
-        ((app->snapshot || app->pip_mode) && !image_alloc(&app->backdrop, app->width, app->height))) return 0;
+        !image_alloc(&app->backdrop, app->width, app->height)) return 0;
     amiga_display_set_converters(app->display,app->renderer.pixels->rgba_to_rgb24,
         app->renderer.pixels->decode565,app->renderer.pixels->encode565);
     app->active = 0; app->hovered = -1;
@@ -115,23 +147,14 @@ int open_surface(App *app)
     return 1;
 }
 
-static void apply_profile(App *app, int backend, int explicit_pip)
-{
-    app->features = dock_choose_profile(&app->caps,backend,explicit_pip);
-    app->pip_mode = app->features.backend == DOCK_BACKEND_PIP;
-    app->snapshot = app->features.backend == DOCK_BACKEND_SNAPSHOT;
-    /* The 68080 build's AMMX kernels serve every backend, not only PiP. */
-    app->use_ammx = app->features.pixels == DOCK_PIXELS_AMMX;
-    /* Only while no surface is open: close uses the table that opened it. */
-    app->surface = app->pip_mode ? &amiga_surface_pip : &amiga_surface_window;
-}
-
-/* Follow the (new) Workbench screen; features.error reports an explicit
-   PiP request that cannot be met. */
-void select_backend(App *app, int explicit_pip)
+/* Follow the (new) Workbench screen. features.error says why PiP, which
+   the dock needs, cannot run there. */
+void select_backend(App *app)
 {
     amiga_caps_probe_screen(&app->caps,app->screen);
-    apply_profile(app,app->requested_backend,explicit_pip);
+    app->features = dock_choose_profile(&app->caps);
+    app->use_ammx = app->features.pixels == DOCK_PIXELS_AMMX;
+    app->surface = &amiga_surface_pip;
 }
 
 /* Pixel kernels for use_ammx, shared with the controls. */
@@ -143,13 +166,4 @@ void use_pixel_backend(App *app)
 #endif
     dock_ui_set_converters(app->ui,app->renderer.pixels->rgba_to_rgb24,app->renderer.pixels->decode565,
         app->renderer.pixels->encode565,app->renderer.pixels->mix_half);
-}
-
-/* After a closed PiP surface: open the snapshot backend instead. */
-int fall_back_to_snapshot(App *app)
-{
-    apply_profile(app,DOCK_BACKEND_SNAPSHOT,0);
-    use_pixel_backend(app);
-    app->surface_error[0] = 0;
-    return open_surface(app);
 }

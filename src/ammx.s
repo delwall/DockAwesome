@@ -9,7 +9,17 @@
 ; PAVGB performs eight independent (src + dst + 1) >> 1 operations.
 
     section .text,code
+    xdef _dock_apollo_bit
     xdef _dock_mix_half_ammx
+
+; void dock_apollo_bit(void);
+; Sets SR bit 11, which the 68080 allows in user mode. A ROM-patched
+; AmigaOS (3.2.3, Coffin) saves the 68080's extra register state across
+; task switches only for a program that has set it; ApolloOS always does.
+_dock_apollo_bit:
+    ori.w #$0800,sr
+    rts
+
     cnop 0,4
 _dock_mix_half_ammx:
     movem.l d2-d3,-(sp)
@@ -319,3 +329,107 @@ _dock_rgb565_key_ammx:
     add.l #32,sp
     movem.l (sp)+,d2-d3
     rts
+
+; Screen rows to the PiP overlay's big-endian RGB565, for live capture of
+; 24- and 32-bit screens:
+; void dock_<format>_to_rgb565_ammx(unsigned char *dst, const unsigned char *src,
+;                                   unsigned long pixel_count);
+; Channels are cut to 5, 6 and 5 bits (PACK3216), like the C rows. Exact
+; ranges: no read or write beyond pixel_count pixels. A zero count permits
+; null pointers. dst and src must not overlap.
+
+; One pixel by bytes: \1 bytes per pixel, \2 \3 \4 the R, G and B offsets.
+ROW565_TAIL macro
+    tst.l d3
+    beq.s .done
+.pixel:
+    moveq #0,d0
+    move.b \2(a1),d0
+    lsl.w #8,d0
+    and.w #$f800,d0
+    moveq #0,d1
+    move.b \3(a1),d1
+    lsl.w #3,d1
+    and.w #$07e0,d1
+    or.w d1,d0
+    moveq #0,d1
+    move.b \4(a1),d1
+    lsr.w #3,d1
+    or.w d1,d0
+    addq.l #\1,a1
+    move.w d0,(a0)+
+    subq.l #1,d3
+    bne.s .pixel
+.done:
+    movem.l (sp)+,d2-d3
+    rts
+    endm
+
+ROW565_ENTER macro
+    movem.l d2-d3,-(sp)
+    move.l 12(sp),a0
+    move.l 16(sp),a1
+    move.l 20(sp),d2
+    move.l d2,d3
+    and.l #3,d3
+    lsr.l #2,d2
+    beq.s .tail
+    endm
+
+; 32-bit pixels: \1 the byte order that makes each pixel xRGB.
+ROW565_32 macro
+    ROW565_ENTER
+.quads:
+    load (a1)+,d0
+    load (a1)+,d1
+    vperm #\1,d0,d0,d0
+    vperm #\1,d1,d1,d1
+    pack3216 d0,d1,(a0)+
+    subq.l #1,d2
+    bne.s .quads
+.tail:
+    endm
+
+; 24-bit pixels, four in twelve bytes: bytes 0-7 hold the first two, bytes
+; 4-11 the last two. \1 and \2 pick xRGB xRGB out of each.
+ROW565_24 macro
+    ROW565_ENTER
+.quads:
+    load (a1),d0
+    load 4(a1),d1
+    vperm #\1,d0,d0,d0
+    vperm #\2,d1,d1,d1
+    lea 12(a1),a1
+    pack3216 d0,d1,(a0)+
+    subq.l #1,d2
+    bne.s .quads
+.tail:
+    endm
+
+    xdef _dock_argb_to_rgb565_ammx
+    xdef _dock_bgra_to_rgb565_ammx
+    xdef _dock_rgb24_to_rgb565_ammx
+    xdef _dock_bgr24_to_rgb565_ammx
+
+_dock_argb_to_rgb565_ammx:
+    ROW565_ENTER
+.quads:
+    load (a1)+,d0
+    load (a1)+,d1
+    pack3216 d0,d1,(a0)+
+    subq.l #1,d2
+    bne.s .quads
+.tail:
+    ROW565_TAIL 4,1,2,3
+
+_dock_bgra_to_rgb565_ammx:
+    ROW565_32 $32107654
+    ROW565_TAIL 4,2,1,0
+
+_dock_rgb24_to_rgb565_ammx:
+    ROW565_24 $00120345,$02340567
+    ROW565_TAIL 3,0,1,2
+
+_dock_bgr24_to_rgb565_ammx:
+    ROW565_24 $02100543,$04320765
+    ROW565_TAIL 3,2,1,0

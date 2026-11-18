@@ -15,10 +15,10 @@ A macOS-style dock for the Vampire V4, with live transparency through SAGA PiP.
 
 ## Requirements
 
-- A Vampire V4 (68080 with AMMX).
+- A Vampire V4 (68080 with AMMX), Apollo core 11900 or newer.
 - ApolloOS R9.5, AmigaOS 3.2.3 or AmigaOS 3.9.
-- A 16-bit Workbench screen for live transparency. Other screens get a static
-  or solid background.
+- A 16-, 24- or 32-bit Workbench screen. The dock is a SAGA PiP overlay; when
+  it cannot run, it says why and quits.
 
 ## Install
 
@@ -52,7 +52,7 @@ make                           # build/DockAwesome for the 68080
 make release RELEASE="1.0 beta 2"
 ```
 
-The default toolchain is `~/ApolloCrossDevLocal/Compilers/GCC-6.50-Stable`;
+The default toolchain is `~/GitRepos/ApolloCrossDev/Compilers/GCC-6.50-Dev`;
 set `TOOLCHAIN` to change it. More in [Architecture](docs/architecture.md),
 [Hardware](docs/hardware.md), [PiP](docs/pip-backend.md) and
 [Verification](docs/verification.md).

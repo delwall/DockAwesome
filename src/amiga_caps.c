@@ -15,6 +15,7 @@
 #include <proto/cybergraphics.h>
 #include <cybergraphx/cybergraphics.h>
 #include <stdio.h>
+#include <string.h>
 
 #ifndef RPTAG_PenMode
 #define RPTAG_PenMode 0x80000080UL
@@ -80,13 +81,31 @@ struct MsgPort *amiga_caps_dopus_port(void)
     return FindPort((STRPTR)"DOPUS.1");
 }
 
+int amiga_caps_desktop_task(const struct Task *task)
+{
+    static const char *const ports[] = {"WORKBENCH", "WANDERER", "WANDERER.1"};
+    const char *name;
+    unsigned int i;
+    if (!task) return 0;
+    for (i = 0; i < sizeof(ports)/sizeof(ports[0]); ++i) {
+        const struct MsgPort *port = FindPort((STRPTR)ports[i]);
+        if (port && (port->mp_Flags & PF_ACTION) == PA_SIGNAL && port->mp_SigTask == task) return 1;
+    }
+    /* Directory Opus 5 runs as many processes, each named "dopus" or
+       "dopus_<job>" (dopus_lister for every lister, dopus_desktop_update,
+       ...: see the DOpus 5 source). */
+    name = task->tc_Node.ln_Name;
+    return name && amiga_caps_dopus_port() &&
+        (!strcmp(name,"dopus") || !strncmp(name,"dopus_",6)) ? 2 : 0;
+}
+
 int amiga_caps_probe(DockCaps *caps, struct Screen *screen)
 {
     *caps = (DockCaps){0};
     caps->cpu_080 = amiga_caps_cpu_080();
 #ifdef DOCK_AMMX
-    /* This build runs only on a 68080, whether or not exec reports one:
-       AmigaOS 3.2 need not set AttnFlags bit 10. */
+    /* This build runs only on a 68080: amiga_cpu_guard.c stops the start
+       when exec does not report one. */
     caps->ammx = 1;
 #endif
     /* A custom chip register: read it only on a 68080 (a Vampire). */
@@ -196,7 +215,7 @@ static void print_library(const char *name, const struct Library *library)
     else printf("  %-22s missing\n",name);
 }
 
-void amiga_caps_print(const DockCaps *caps, const DockProfile *profile, int requested_backend)
+void amiga_caps_print(const DockCaps *caps, const DockProfile *profile)
 {
     struct Library *cyber = OpenLibrary((STRPTR)"cybergraphics.library",0);
     const struct Library *input, *console;
@@ -249,8 +268,8 @@ void amiga_caps_print(const DockCaps *caps, const DockProfile *profile, int requ
     print_library("input.device",input);
     print_library("console.device",console);
     if (cyber) CloseLibrary(cyber);
-    printf("Profile (requested %s)\n",dock_backend_name(requested_backend));
-    printf("  %-22s %s\n","backend",dock_backend_name(profile->backend));
+    printf("Profile\n");
+    printf("  %-22s %s\n","pip",yes_no(!profile->error));
     printf("  %-22s %s\n","pixels",profile->pixels == DOCK_PIXELS_AMMX ? "ammx" : "portable");
     printf("  %-22s %s\n","ui_shapes",yes_no(profile->ui_shapes));
     printf("  %-22s %s\n","ui_glass",yes_no(profile->ui_glass));

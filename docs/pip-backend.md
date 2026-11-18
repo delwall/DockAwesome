@@ -8,8 +8,10 @@ its original bitmap and main scanout.
 The tested setup is a Vampire 68080 with core 12515, ApolloOS R9.5,
 Intuition 50.7, Layers 50.0, and a 1280 × 720 native RGB565 screen.
 
-PiP requires core 11900 or newer, a native RGB565 screen, and the Intuition
-V50 window shape API. Use snapshot or opaque mode on other window stacks.
+PiP requires core 11900 or newer and a 16-, 24- or 32-bit screen. The
+Intuition V50 window shape API gives shaped labels and menus; without it
+they are drawn over the captured screen. PiP is the dock's only backend:
+when it cannot run, the dock shows why and quits.
 
 The tested offsets are +17 on X and -1 on Y. Use `--pip-x-offset`,
 `--pip-y-offset`, `pip_x_offset`, or `pip_y_offset` to set them.
@@ -70,8 +72,9 @@ popup or dialog clip and the keyed tail are applied to a scratch copy of each
 row span. A frame with an active mask converts whole, and so does the next
 conversion into a buffer that holds a masked frame.
 
-Poll the background every 100 ms at rest and every 20 ms during motion or a
-held button. Animation captures reset the background deadline. Matching
+Poll the background every 100 ms at rest and ask for 10 ms during motion or a
+held button (timer.device rounds it up: about 17 ms between polls on
+Coffin). Animation captures reset the background deadline. Matching
 source bytes and geometry skip decode, draw, and upload; otherwise only the
 box of changed source pixels is decoded, composed and converted. Reuse all
 buffers.

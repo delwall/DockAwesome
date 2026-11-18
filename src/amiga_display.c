@@ -37,6 +37,18 @@ struct AmigaDisplay {
     unsigned char *raw;
     size_t raw_capacity;
     int raw_valid, raw_bytes;
+    /* One source row in Fast RAM: video memory is read once, in a burst,
+       and compared and converted from here. */
+    unsigned char *row;
+    size_t row_capacity;
+    /* The screen's memory as the last lock found it. LockBitMap took 2.6 ms
+       a call on Coffin's 24-bit screen, ten times a second at rest, to
+       compare a plate that had not changed. A poll with a check box first
+       looks there without the lock; only a change, or every tenth poll,
+       takes the lock and reads the address again. */
+    const unsigned char *peek_base, *peek_cache;
+    ULONG peek_stride, peek_bytes, peek_format;
+    int peek_x, peek_y, peek_width, peek_height, peek_left;
 };
 
 /* One palette lookup serves every display on the same palette. Building it
@@ -150,7 +162,7 @@ void amiga_display_close(AmigaDisplay *d)
     if (!d) return;
     if (d->temp_bitmap) { WaitBlit(); FreeBitMap(d->temp_bitmap); }
     if (d->frame_bitmap) { WaitBlit(); FreeBitMap(d->frame_bitmap); }
-    free_lookup(d); free(d->upload); free(d->raw);
+    free_lookup(d); free(d->upload); free(d->raw); free(d->row);
     if (d->cyber) CloseLibrary(d->cyber);
     free(d);
 }
@@ -171,7 +183,7 @@ int amiga_display_resize(AmigaDisplay *d, int width, int height)
     }
     if (d->frame_bitmap) { WaitBlit(); FreeBitMap(d->frame_bitmap); d->frame_bitmap = NULL; }
     d->width = width; d->height = height; d->stride = width*3;
-    d->raw_valid = 0;
+    d->raw_valid = 0; d->peek_left = 0;
     return 1;
 }
 
@@ -198,24 +210,52 @@ static int rgb565_source(ULONG format, ULONG bytes)
 }
 
 /* One row of n source pixels as big-endian RGB565, the PiP overlay's
-   format: the dock's own pixels are 16-bit whatever the screen. */
+   format: the dock's own pixels are 16-bit whatever the screen. One loop
+   per format, so no per-pixel format test. */
+#define RGB565_ROW(R,G,B,STEP) \
+    for (; n > 0; --n, in += (STEP), out += 2) { \
+        unsigned int v = ((unsigned int)(in[R]&0xf8)<<8)|((unsigned int)(in[G]&0xfc)<<3)| \
+            ((unsigned int)in[B]>>3); \
+        out[0] = (unsigned char)(v>>8); out[1] = (unsigned char)v; \
+    }
 static void row_to_rgb565(unsigned char *out, const unsigned char *in, int n, ULONG format)
 {
-    int r, g, b;
-    unsigned int v;
-    if (format == PIXFMT_RGB16) { memcpy(out,in,(size_t)n*2); return; }
-    for (; n > 0; --n, out += 2) {
-        switch (format) {
-        case PIXFMT_RGB16PC: out[0] = in[1]; out[1] = in[0]; in += 2; continue;
-        case PIXFMT_RGB24: r = in[0]; g = in[1]; b = in[2]; in += 3; break;
-        case PIXFMT_BGR24: b = in[0]; g = in[1]; r = in[2]; in += 3; break;
-        case PIXFMT_ARGB32: r = in[1]; g = in[2]; b = in[3]; in += 4; break;
-        case PIXFMT_BGRA32: b = in[0]; g = in[1]; r = in[2]; in += 4; break;
-        default: /* PIXFMT_RGBA32 */ r = in[0]; g = in[1]; b = in[2]; in += 4; break;
-        }
-        v = ((unsigned int)(r&0xf8)<<8)|((unsigned int)(g&0xfc)<<3)|((unsigned int)b>>3);
-        out[0] = (unsigned char)(v>>8); out[1] = (unsigned char)v;
+#ifdef DOCK_AMMX
+    /* Four pixels per PACK3216; the byte loops below cost about thirteen
+       times as much per pixel on a 24-bit screen. */
+    if (n <= 0) return;
+    switch (format) {
+    case PIXFMT_RGB24: dock_rgb24_to_rgb565_ammx(out,in,(unsigned long)n); return;
+    case PIXFMT_BGR24: dock_bgr24_to_rgb565_ammx(out,in,(unsigned long)n); return;
+    case PIXFMT_ARGB32: dock_argb_to_rgb565_ammx(out,in,(unsigned long)n); return;
+    case PIXFMT_BGRA32: dock_bgra_to_rgb565_ammx(out,in,(unsigned long)n); return;
+    case PIXFMT_RGBA32: dock_rgba_to_rgb565_ammx(out,in,(unsigned long)n); return;
+    default: break;
     }
+#endif
+    switch (format) {
+    case PIXFMT_RGB16: memcpy(out,in,(size_t)n*2); return;
+    case PIXFMT_RGB16PC:
+        for (; n > 0; --n, in += 2, out += 2) { out[0] = in[1]; out[1] = in[0]; }
+        return;
+    case PIXFMT_RGB24: RGB565_ROW(0,1,2,3) return;
+    case PIXFMT_BGR24: RGB565_ROW(2,1,0,3) return;
+    case PIXFMT_ARGB32: RGB565_ROW(1,2,3,4) return;
+    case PIXFMT_BGRA32: RGB565_ROW(2,1,0,4) return;
+    default: /* PIXFMT_RGBA32 */ RGB565_ROW(0,1,2,4) return;
+    }
+}
+#undef RGB565_ROW
+
+/* The Fast RAM row buffer, at least bytes long; NULL without memory. */
+static unsigned char *fast_row(AmigaDisplay *d, size_t bytes)
+{
+    if (bytes > d->row_capacity) {
+        unsigned char *row = malloc(bytes);
+        if (!row) return NULL;
+        free(d->row); d->row = row; d->row_capacity = bytes;
+    }
+    return d->row;
 }
 
 /* A rectangle of a 24- or 32-bit bitmap as RGB565 rows of out_stride
@@ -226,6 +266,7 @@ static int read_rect565(AmigaDisplay *d, struct BitMap *bitmap, int x, int y, in
     APTR lock, base = NULL;
     ULONG stride = 0, format = ~0UL, bytes = 0, width = 0, height = 0;
     int row;
+    unsigned char *line;
     lock = LockBitMapTags(bitmap, LBMI_BASEADDRESS, (ULONG)&base,
         LBMI_BYTESPERROW, (ULONG)&stride, LBMI_BYTESPERPIX, (ULONG)&bytes,
         LBMI_PIXFMT, (ULONG)&format, LBMI_WIDTH, (ULONG)&width,
@@ -233,9 +274,11 @@ static int read_rect565(AmigaDisplay *d, struct BitMap *bitmap, int x, int y, in
     if (!lock) return 0;
     if (!base || !rgb565_source(format,bytes) || x < 0 || y < 0 ||
         width < (ULONG)(x+w) || height < (ULONG)(y+h)) { UnLockBitMap(lock); return 0; }
-    for (row = 0; row < h; ++row)
-        row_to_rgb565(out+(size_t)row*out_stride,
-            (const unsigned char *)base+(size_t)(y+row)*stride+(size_t)x*bytes,w,format);
+    if (!(line = fast_row(d,(size_t)w*bytes))) { UnLockBitMap(lock); return 0; }
+    for (row = 0; row < h; ++row) {
+        memcpy(line,(const unsigned char *)base+(size_t)(y+row)*stride+(size_t)x*bytes,(size_t)w*bytes);
+        row_to_rgb565(out+(size_t)row*out_stride,line,w,format);
+    }
     UnLockBitMap(lock);
     return 1;
 }
@@ -250,6 +293,8 @@ static int capture_raw(AmigaDisplay *d, unsigned char *cache, const unsigned cha
     size_t raw_row = (size_t)d->width*bytes, visible_raw = (size_t)visible_width*bytes;
     size_t row565 = (size_t)d->width*2, needed = raw_row*d->height;
     int row, top = -1, bottom = 0, left = visible_width, right = 0;
+    unsigned char *fresh = fast_row(d,raw_row);
+    if (!fresh) return -1;
     if (needed > d->raw_capacity) {
         unsigned char *raw = malloc(needed);
         if (!raw) return -1;
@@ -269,17 +314,27 @@ static int capture_raw(AmigaDisplay *d, unsigned char *cache, const unsigned cha
     }
     for (row = 0; row < d->height; ++row) {
         unsigned char *copy = d->raw+(size_t)row*raw_row;
-        const unsigned char *line = source+(size_t)row*stride;
-        int l = 0, r = visible_width;
+        size_t a = 0, b = visible_raw;
+        int l, r;
+        /* One burst read of video memory; the rest works in Fast RAM.
+           Comparing in place first and copying only changed rows measured
+           no faster on Coffin (changed polls 7.9 against 8.1 ms). */
+        memcpy(fresh,source+(size_t)row*stride,visible_raw);
         if (!force) {
-            size_t a = 0, b = visible_raw;
-            if (equal(copy,line,(unsigned long)visible_raw)) continue;
-            while (a < b && copy[a] == line[a]) ++a;
-            while (b > a && copy[b-1] == line[b-1]) --b;
-            l = (int)(a/bytes); r = (int)((b+bytes-1)/bytes);
+            if (equal(copy,fresh,(unsigned long)visible_raw)) continue;
+            /* Skip equal longs, then finish byte by byte (the 68080
+               reads unaligned longs; rows start long-aligned here). */
+            while (a+4 <= b && *(const ULONG *)(copy+a) == *(const ULONG *)(fresh+a)) a += 4;
+            while (a < b && copy[a] == fresh[a]) ++a;
+            while (b >= a+4 && *(const ULONG *)(copy+b-4) == *(const ULONG *)(fresh+b-4)) b -= 4;
+            while (b > a && copy[b-1] == fresh[b-1]) --b;
+            if (a >= b) continue;
         }
-        memcpy(copy,line,visible_raw);
-        row_to_rgb565(cache+row*row565,line,visible_width,format);
+        /* Only the changed span, widened to whole pixels: a window moved
+           sideways changes a few. */
+        l = (int)(a/bytes); r = (int)((b+bytes-1)/bytes);
+        memcpy(copy+(size_t)l*bytes,fresh+(size_t)l*bytes,(size_t)(r-l)*bytes);
+        row_to_rgb565(cache+row*row565+(size_t)l*2,copy+(size_t)l*bytes,r-l,format);
         if (visible_width < d->width) memset(cache+row*row565+(size_t)visible_width*2,0,row565-(size_t)visible_width*2);
         if (top < 0) top = row;
         bottom = row+1;
@@ -307,6 +362,30 @@ int amiga_display_capture565(AmigaDisplay *d, unsigned char *cache,
         x >= d->screen->Width || y+d->height > d->screen->Height) return -1;
     visible_width = d->screen->Width-x;
     if (visible_width > d->width) visible_width = d->width;
+    if (!equal) equal = dock_bytes_equal_c;
+    if (!force && check && d->peek_left > 0 && d->peek_cache == cache &&
+        d->peek_x == x && d->peek_y == y && d->peek_width == d->width && d->peek_height == d->height &&
+        (d->peek_format == PIXFMT_RGB16 || (d->raw_valid && d->raw_bytes == (int)d->peek_bytes)) &&
+        check->left >= 0 && check->right <= visible_width && check->top >= 0 &&
+        check->bottom <= d->height && check->left < check->right && check->top < check->bottom) {
+        /* Reading without the lock cannot harm: at worst the pixels are
+           mid-draw or the address is old, and then they differ (the lock
+           follows) or the next lock, at most a second away, finds out. */
+        int raw = d->peek_format != PIXFMT_RGB16;
+        const unsigned char *held = raw ? d->raw : cache;
+        size_t held_row = (size_t)d->width*d->peek_bytes;
+        const unsigned char *seen = d->peek_base+(size_t)y*d->peek_stride+(size_t)x*d->peek_bytes;
+        size_t offset = (size_t)check->left*d->peek_bytes;
+        unsigned long span = (unsigned long)(check->right-check->left)*d->peek_bytes;
+        for (row = check->top; row < check->bottom; ++row)
+            if (!equal(held+(size_t)row*held_row+offset,seen+(size_t)row*d->peek_stride+offset,span)) break;
+        if (row == check->bottom) {
+            --d->peek_left;
+            if (box) *box = (DockRect){0,0,0,0};
+            return 0;
+        }
+    }
+    d->peek_left = 0;
     lock = LockBitMapTags(d->source_bitmap, LBMI_BASEADDRESS, (ULONG)&base,
         LBMI_BYTESPERROW, (ULONG)&stride, LBMI_BYTESPERPIX, (ULONG)&bytes,
         LBMI_PIXFMT, (ULONG)&format, LBMI_WIDTH, (ULONG)&width,
@@ -317,7 +396,10 @@ int amiga_display_capture565(AmigaDisplay *d, unsigned char *cache,
         stride < width*bytes) {
         UnLockBitMap(lock); return -1;
     }
-    if (!equal) equal = dock_bytes_equal_c;
+    d->peek_base = base; d->peek_cache = cache;
+    d->peek_stride = stride; d->peek_bytes = bytes; d->peek_format = format;
+    d->peek_x = x; d->peek_y = y; d->peek_width = d->width; d->peek_height = d->height;
+    d->peek_left = 9;
     row_bytes = (size_t)d->width*2;
     visible_bytes = (size_t)visible_width*2;
     if (format != PIXFMT_RGB16) {
@@ -363,7 +445,7 @@ int amiga_display_drag_reference565(AmigaDisplay *d, struct BitMap *backing,
     if (!d || !d->cyber || d->depth < 15 ||
         !backing || visible_width < 1 || visible_width > d->width) return 0;
     /* reference is the capture's RGB565 cache: the raw copy no longer matches. */
-    d->raw_valid = 0;
+    d->raw_valid = 0; d->peek_left = 0;
     if (GetCyberMapAttr(backing,CYBRMATTR_PIXFMT) != PIXFMT_RGB16) {
         if (!read_rect565(d,backing,0,0,visible_width,d->height,reference,(size_t)d->width*2)) return 0;
     } else {
@@ -379,7 +461,7 @@ int amiga_display_drag_reference565(AmigaDisplay *d, struct BitMap *backing,
 
 int amiga_display_drag_mask565(AmigaDisplay *d, const unsigned char *reference,
     unsigned char *mask, DockRect *marked, int x, int y, int left, int top, int right, int bottom,
-    DockBytesEqual equal, unsigned char *colors)
+    DockBytesEqual equal, unsigned char *colors, int keep_empty)
 {
     struct RastPort rp;
     int row, col, changed = 0, width, scan_left = left, scan_top = top, scan_right = right, scan_bottom = bottom;
@@ -411,6 +493,12 @@ int amiga_display_drag_mask565(AmigaDisplay *d, const unsigned char *reference,
     rp.BitMap = d->source_bitmap;
     if (ReadPixelArray(d->upload,left,top,width*2,&rp,x+left,y+top,
             right-left,bottom-top,RECTFMT_RAW) != (ULONG)(right-left)*(bottom-top)) return -1;
+    }
+    if (keep_empty) {
+        for (row = top; row < bottom; ++row)
+            if (!equal(reference+((size_t)row*width+left)*2,d->upload+((size_t)row*width+left)*2,
+                    (right-left)*2)) break;
+        if (row == bottom) return -2;
     }
     for (row = scan_top; row < scan_bottom; ++row) {
         unsigned char *line = mask+(size_t)row*width;

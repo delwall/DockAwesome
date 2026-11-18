@@ -5,6 +5,7 @@
    process with the icon's stack, and a WBStartup message whose reply says
    the program has ended. The program's code stays loaded until then. */
 #include "amiga_app.h"
+#include "dock_text.h"
 #include <rexx/storage.h>
 #include <proto/rexxsyslib.h>
 #include "amiga_folder.h"
@@ -109,17 +110,33 @@ static int rexx_send(struct MsgPort *reply, const char *command)
     return msg != NULL;
 }
 
-/* Sends and waits. The result string, if any, goes to `result`. Returns
-   the ARexx return code, or -1 when Directory Opus is not there. */
+/* Sends and waits, from the status worker. The result string, if any, goes
+   to `result`. Returns the ARexx return code, or -1 when Directory Opus is
+   not there. Directory Opus answers at once; one that did not kept the
+   worker waiting for good (no status, and a dock that could not quit), so
+   the reply gets two seconds. After that the message and its port are left
+   behind, ignored, and Directory Opus is not asked again. */
 static LONG rexx_call(const char *command, char *result, size_t size)
 {
-    struct MsgPort *reply = CreateMsgPort();
+    enum { REPLY_TICKS = 2*TICKS_PER_SECOND };
+    static int silent;
+    struct MsgPort *reply = silent ? NULL : CreateMsgPort();
     struct RexxMsg *msg = reply ? rexx_message(reply,command,RXCOMM|RXFF_RESULT) : NULL;
     LONG rc = -1;
     if (size) result[0] = 0;
     if (msg && rexx_put(msg)) {
-        WaitPort(reply);
-        GetMsg(reply);
+        int ticks;
+        struct Message *answer = NULL;
+        for (ticks = 0; !(answer = GetMsg(reply)) && ticks < REPLY_TICKS; ++ticks) Delay(1);
+        if (!answer) {
+            Forbid();
+            if (!(answer = GetMsg(reply))) {
+                reply->mp_Flags = PA_IGNORE; FreeSignal(reply->mp_SigBit);
+                silent = 1;
+            }
+            Permit();
+            if (!answer) return -1;
+        }
         rc = msg->rm_Result1;
         if (!rc && msg->rm_Result2 && size) {
             strncpy(result,(const char *)msg->rm_Result2,size-1);
@@ -189,23 +206,6 @@ static LONG embedded_stack(BPTR seglist)
 /* Icons set to "Start from Shell" (tool type CLI) or "Start from ARexx"
    (REXX) run as Shell commands in the object's drawer, with an output
    window that opens only when the command writes. */
-/* Appends `text` in Shell double quotes, where * escapes " and itself.
-   Returns 0 when it does not fit. */
-static int shell_quote(char *out, size_t size, const char *text)
-{
-    size_t n = strlen(out);
-    if (n+1 >= size) return 0;
-    out[n++] = '"';
-    for (; *text; ++text) {
-        if (n+3 >= size) return 0;
-        if (*text == '"' || *text == '*') out[n++] = '*';
-        out[n++] = *text;
-    }
-    out[n++] = '"';
-    out[n] = 0;
-    return 1;
-}
-
 static int shell_launch(const char *path, const struct DiskObject *icon, LONG *error)
 {
     char command[PATH_CAP*4+32], window[PATH_CAP+48];
@@ -216,7 +216,7 @@ static int shell_launch(const char *path, const struct DiskObject *icon, LONG *e
     if (!icon) {
         /* A script without its own icon, as Coffin's WBDock runs them. */
         strcpy(command,"Execute ");
-        fits = shell_quote(command,sizeof(command),path);
+        fits = dock_shell_quote(command,sizeof(command),path);
     } else if (has_tool_type(icon,"REXX")) {
         /* RX runs a quoted argument as ARexx source, not as a file, so a
            one-line program calls the script by its full name. */
@@ -229,12 +229,12 @@ static int shell_launch(const char *path, const struct DiskObject *icon, LONG *e
         }
         call[n++] = '\''; call[n] = 0;
         strcpy(command,"RX ");
-        fits = !*c && shell_quote(command,sizeof(command),call);
+        fits = !*c && dock_shell_quote(command,sizeof(command),call);
     } else if (icon->do_Type == WBPROJECT && icon->do_DefaultTool && icon->do_DefaultTool[0]) {
-        fits = shell_quote(command,sizeof(command),(const char *)icon->do_DefaultTool);
+        fits = dock_shell_quote(command,sizeof(command),(const char *)icon->do_DefaultTool);
         if (fits) strcat(command," ");
-        fits = fits && shell_quote(command,sizeof(command),path);
-    } else fits = shell_quote(command,sizeof(command),path);
+        fits = fits && dock_shell_quote(command,sizeof(command),path);
+    } else fits = dock_shell_quote(command,sizeof(command),path);
     if (!fits) { *error = ERROR_LINE_TOO_LONG; return 0; }
     file = Lock((STRPTR)path,ACCESS_READ);
     dir = file ? ParentDir(file) : 0;
@@ -257,15 +257,16 @@ static int shell_launch(const char *path, const struct DiskObject *icon, LONG *e
 }
 
 /* A plain file without its own icon that is a script: it has the script
-   bit, or it is not a loadable program (no hunk header). Workbench would
-   give it a default text icon and open it in an editor; a dock entry such
-   as ShapeShifter's Launch or C:WOMyFiles means to run it. */
-static int script_without_icon(const char *path)
+   bit, or (`pinned`) it is text and not a loadable program. Workbench would
+   give the latter a default text icon and open it in an editor; a dock pin
+   such as ShapeShifter's Launch or C:WOMyFiles means to run it. A file
+   picked in the Folder Stack is a document unless it has the script bit. */
+static int script_without_icon(const char *path, int pinned)
 {
     char info[PATH_CAP+8];
     struct FileInfoBlock *fib;
     BPTR lock;
-    ULONG magic = 0;
+    UBYTE head[64];
     int script = 0;
     if (strlen(path)+6 > sizeof(info)) return 0;
     sprintf(info,"%s.info",path);
@@ -274,11 +275,12 @@ static int script_without_icon(const char *path)
     fib = AllocDosObject(DOS_FIB,NULL);
     if (fib && Examine(lock,fib) && fib->fib_DirEntryType < 0) {
         if (fib->fib_Protection & FIBF_SCRIPT) script = 1;
-        else if (fib->fib_Size > 0) {
+        else if (pinned && fib->fib_Size > 0) {
             BPTR file = OpenFromLock(lock);
             if (file) {
+                LONG got = Read(file,head,sizeof(head));
                 lock = 0;
-                script = Read(file,&magic,4) == 4 ? magic != 0x000003f3UL : 1;
+                script = dock_text_bytes(head,(size_t)(got > 0 ? got : 0));
                 Close(file);
             }
         }
@@ -288,10 +290,10 @@ static int script_without_icon(const char *path)
     return script;
 }
 
-int launch_script(const char *path, LONG *error)
+int launch_script(const char *path, int pinned, LONG *error)
 {
     *error = 0;
-    return script_without_icon(path) ? shell_launch(path,NULL,error) : -1;
+    return script_without_icon(path,pinned) ? shell_launch(path,NULL,error) : -1;
 }
 
 int launch_object(App *app, const char *path, LONG *error)
@@ -304,7 +306,6 @@ int launch_object(App *app, const char *path, LONG *error)
     const char *pri;
     *error = 0;
     if (!app->launch_port) { *error = ERROR_NO_FREE_STORE; return 0; }
-    if (script_without_icon(path)) return shell_launch(path,NULL,error);
     if (!(launch = AllocVec(sizeof(*launch),MEMF_PUBLIC|MEMF_CLEAR))) { *error = ERROR_NO_FREE_STORE; return 0; }
     strncpy(launch->path,path,PATH_CAP-1);
     {
@@ -314,8 +315,10 @@ int launch_object(App *app, const char *path, LONG *error)
     if (icon && icon->do_Type != WBTOOL && icon->do_Type != WBPROJECT) {
         /* Drawers and disks open in the desktop's own windows. */
         char command[PATH_CAP+16];
+        /* A quote would end the ARexx argument: no such drawer opens. */
         snprintf(command,sizeof(command),"lister new \"%s\"",path);
-        if (rexx_send(app->launch_port,command)) ++app->rexx_pending;
+        if (strchr(path,'"')) *error = ERROR_OBJECT_WRONG_TYPE;
+        else if (rexx_send(app->launch_port,command)) ++app->rexx_pending;
         else *error = ERROR_OBJECT_WRONG_TYPE;
         FreeDiskObject(icon);
         launch_free(launch);
@@ -443,13 +446,30 @@ int launch_open(App *app)
 }
 
 /* The programs' code is in the dock's memory until they reply: wait for
-   every one. The dock's windows are already closed. */
+   every one. The dock's windows are already closed. Directory Opus answers
+   ARexx at once; one that never came kept the dock from quitting, so its
+   replies get two seconds, then the port is left behind, ignored. */
 void launch_close(App *app)
 {
+    enum { REXX_TICKS = 2*TICKS_PER_SECOND, POLL_TICKS = 5 };
+    const struct DockLaunched *launch;
+    int ticks = 0, told = 0;
     if (!app->launch_port) return;
-    while (app->launched || app->rexx_pending) {
-        WaitPort(app->launch_port);
-        launch_reap(app);
+    for (launch_reap(app); app->launched || app->rexx_pending; launch_reap(app)) {
+        if (!told) {
+            for (launch = app->launched; launch; launch = launch->next)
+                printf("Waiting for %s, started from the dock, to quit.\n",launch->path);
+            told = 1;
+        }
+        if (app->launched) { WaitPort(app->launch_port); continue; }
+        if (ticks >= REXX_TICKS) {
+            printf("Directory Opus did not answer %d command(s).\n",app->rexx_pending);
+            app->launch_port->mp_Flags = PA_IGNORE;
+            app->launch_port = NULL;
+            return;
+        }
+        Delay(POLL_TICKS);
+        ticks += POLL_TICKS;
     }
     DeleteMsgPort(app->launch_port);
     app->launch_port = NULL;
@@ -491,7 +511,7 @@ void dopus_close_lister(App *app, ULONG lister)
 /* Status worker: open Directory Opus listers count as open drawers. */
 void dopus_drawers(ProgramPoll *poll)
 {
-    char handles[256], *cursor, *end;
+    char handles[1024], *cursor, *end;
     void *requesters;
     int i;
     if (rexx_call("lister query all",handles,sizeof(handles)) < 0) return;
@@ -503,6 +523,8 @@ void dopus_drawers(ProgramPoll *poll)
         ULONG lister = strtoul(cursor,&end,10);
         BPTR place;
         if (end == cursor) break;
+        /* A list cut at the buffer's end: its last number is partial. */
+        if (!*end && strlen(handles) == sizeof(handles)-1) break;
         snprintf(command,sizeof(command),"lister query %lu path",(unsigned long)lister);
         if (rexx_call(command,path,sizeof(path)) || !(place = Lock((STRPTR)path,ACCESS_READ))) continue;
         for (i = 0; i < poll->count; ++i) {

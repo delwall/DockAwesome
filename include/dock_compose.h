@@ -33,7 +33,10 @@ void dock_render_oriented_mask(DockImage *canvas, const DockImage *backdrop,
 
 /* An image blended over the frame after the icons, with coverage: running
    dots and the dragged icon. */
-typedef struct { const DockImage *image; int x, y; } DockOverlay;
+/* stamp: changes when the image's pixels do while its address may not
+   (a rebuilt picture can land where the freed one was); 0 for images that
+   never change in place. */
+typedef struct { const DockImage *image; int x, y; unsigned long stamp; } DockOverlay;
 
 /* The plate as drawn: dock_edge_panel_rect with the center_panel mirror,
    and its corner radius. An empty plate is {0,0,0,0} with radius 0.

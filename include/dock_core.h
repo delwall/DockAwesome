@@ -36,8 +36,9 @@ typedef struct {
 typedef struct { int x, y, size, level; } DockPlacement;
 /* Track the zoom transition and each icon's subpixel center. */
 typedef struct {
-    int origin_level[DOCK_MAX_ITEMS];
-    int64_t center[DOCK_MAX_ITEMS], origin_center[DOCK_MAX_ITEMS]; /* Q8 pixels. */
+    int origin_level[DOCK_MAX_ITEMS], follow_level[DOCK_MAX_ITEMS];
+    /* Q8 pixels. follow_* trails the target as the row does after the zoom. */
+    int64_t center[DOCK_MAX_ITEMS], origin_center[DOCK_MAX_ITEMS], follow_center[DOCK_MAX_ITEMS];
     int tick, active, count;
 } DockAnimation;
 typedef void (*DockConvertRGB565)(unsigned char *, const unsigned char *, unsigned long);
@@ -74,6 +75,9 @@ int dock_cache_build_scaled(DockCache *out, const DockImage *source, const DockS
 /* One normalized image of size x size, as level 0 of a cache would be. */
 int dock_icon_build(DockImage *out, const DockImage *source, int size);
 void dock_cache_free(DockCache *cache);
+/* The runs a cache keeps per level, for an image built outside one (the
+   caller frees them); NULL without memory, which the compositor allows. */
+uint16_t *dock_image_runs(const DockImage *im);
 /* Gives the cache a new stamp from the counter builds use. Call it after
    changing a cache's pixels in place so the renderer redraws its slot. */
 void dock_cache_restamp(DockCache *cache);
@@ -112,9 +116,17 @@ void dock_rgb565_to_rgba_ammx(unsigned char *dst, const unsigned char *src, unsi
 void dock_rgba_to_rgb565_ammx(unsigned char *dst, const unsigned char *src, unsigned long pixels);
 int dock_bytes_equal_ammx(const unsigned char *a, const unsigned char *b, unsigned long bytes);
 void dock_rgb565_key_ammx(unsigned char *dst, const unsigned char *source, unsigned long pixels);
+/* Screen rows of 24- and 32-bit pixels to big-endian RGB565, channels cut
+   to 5, 6 and 5 bits. Exact ranges; dst and src must not overlap. */
+void dock_argb_to_rgb565_ammx(unsigned char *dst, const unsigned char *src, unsigned long pixels);
+void dock_bgra_to_rgb565_ammx(unsigned char *dst, const unsigned char *src, unsigned long pixels);
+void dock_rgb24_to_rgb565_ammx(unsigned char *dst, const unsigned char *src, unsigned long pixels);
+void dock_bgr24_to_rgb565_ammx(unsigned char *dst, const unsigned char *src, unsigned long pixels);
 #endif
 void dock_mix_half_c(unsigned char *dst, const unsigned char *src, unsigned long pixels);
 #ifdef DOCK_AMMX
 void dock_mix_half_ammx(unsigned char *dst, const unsigned char *src, unsigned long pixels);
+/* Call once per task before any AMMX kernel (68080 only). */
+void dock_apollo_bit(void);
 #endif
 #endif

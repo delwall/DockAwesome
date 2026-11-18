@@ -11,6 +11,23 @@
 ## Build and test
 
 - Build successfully before uploading. An old binary can survive a failed build.
+- A different compiler is a different program. After a toolchain change,
+  build clean and compare the dock's frame with --pip-dump against the
+  installed build before judging any other change. GCC 6.5.0b
+  (GCC-6.50-Dev) at -O2 -m68080 got an int64_t expression in the layout
+  wrong; objects left from the old compiler hid it until a header change
+  rebuilt them.
+- Cross-compile the host tests for the Amiga to find such miscompiles,
+  and run them from an Execute script that sets Stack and FailAt first:
+  extra lines in one amiga_shell call do not run.
+- Run CPU-bound work on ApolloOS below priority -21 (ChangeTaskPri -30 in
+  the script). The SD card tasks SDIO0/SDIO1 run at -21: at -5 the tests
+  starved them, so Workbench, WBRun and the dock hung on disk access and
+  the machine looked frozen. It was never a crash.
+- Find a compiler bug by halving: optimization flags (-fbbb=-, one bbb
+  letter at a time), then a counter on the suspect pass in a self-built
+  cc1, run on the Vampire. Fix it in ApolloCrossDev as a patch; build the
+  toolchain with its script and a PATH without spaces.
 - Wait for the native window or gadget before sending input or reading saved
   preferences. A visible window alone does not prove the dock responds.
 - Redirect the profiled command's output from an AmigaDOS script.
@@ -63,6 +80,9 @@
 - Compare original PNG alpha with the decoded icon before changing scaling.
 - Use a Vampire screenshot as the baseline for Workbench icon comparisons.
 - Keep running dots small and sharp, near the screen-side icon baseline.
+- A reference video from the user is the specification. Extract frames,
+  crop the detail at full resolution and measure it (for example, where
+  the stack tip points in each frame) before planning or building.
 
 ## PiP and Intuition
 
@@ -83,6 +103,9 @@
 - Pass a full `ULONG` count to ApolloOS text calls. A classic `UWORD` inline
   can leave stale upper bits. Check generated register writes.
 - If a task stays in a library call after Ctrl-C, use a user-approved restart.
+- Do not change a window shape per frame: Workbench redraws the desktop
+  behind each change (dock frames 10 -> 24 ms). Shape the whole area a
+  part moves in once and repaint it from the saved backdrop.
 
 ## Workbench input and drops
 
@@ -305,3 +328,92 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
 - Before writing a release-notes line, find its verification in tasks/todo.md
   (or the commit body). "Built, not yet run on hardware" stays out.
 - Commit titles describe intent; the verification notes describe what is true.
+
+## AmiKit: Directory Opus is the desktop (2026-11-10)
+- Synthetic input from amiagent does not reach the dock or Intuition windows on
+  AmiKit (`Input: downs=0`). Ask the user for clicks and drags there.
+- `a || b` on bit flags collapses them to 1, which is RUNNING_WORKBENCH: a
+  window's dot became Workbench evidence that is kept while the Workbench list
+  cannot be read (no Workbench). Combine flags with `|`.
+- The drop receiver over the DOpus desktop clipped DOpus's selection box. DOpus
+  sets the same window flags for an icon drag and a selection box; tell them
+  apart by the drag image around the pointer.
+- Measure before the next guess: a per-frame count of painted drag pixels
+  (all 1561 or 0, never partial) showed whole reads between Directory Opus's
+  erase and redraw, where the "keep half-torn reads" guess had made it worse.
+
+- A dock started from WBStartup has no CLI number for Break. Stop it with a
+  small tool that does FindTask("DockAwesome") and Signal(SIGBREAKF_CTRL_C)
+  under Forbid; restart it with WBRun SYS:WBStartup/DockAwesome and check
+  for its 800x96 window (2026-11-17).
+- Matched --bench-sweep runs before believing a review's cycle estimate:
+  "45-50 cycles per translucent pixel" for blend_pixel became 5.5 % of
+  compose on hardware (2026-11-17).
+- Test a review's hardware claim with the probe before building on it:
+  "misaligned AMMX stores cost 1.7x" measured as no difference on core
+  12856 (decode and half blend, destination 4 mod 8 against 0 mod 8)
+  (2026-11-17).
+- Wait a few seconds after starting a test dock before the first click:
+  a click during its icon loading is not a press on a pin (2026-11-17).
+- Hover labels on ApolloOS are in PiP1: no screenshot shows them. Find an
+  icon by the row arithmetic (size, gap 5, divider 12) instead (2026-11-17).
+- Temporary timing code must not use TimerBase outside the dock's own
+  profile window: profile_close clears it before the surface closes, and a
+  capture during cleanup then jumped through NULL (Software Failure, PiP2
+  lease kept, reboot). Guard diagnostics, and run a start-and-quit of any
+  diagnostic build before a measured run (2026-11-17).
+- After BreakTask on the installed dock, wait a few seconds before starting
+  a test dock: the old one still holds the PiP2 lease while it quits.
+- Time each OS call before blaming our own loops: the "3 ms compare" on a
+  24-bit screen was LockBitMap (2.6 ms a call under P96 on Coffin).
+- A fix that depends on a time window (first band fix: "exposures within
+  half a second of arming are the initial fill") failed on the first test.
+  Compare state instead (which layers lie on the box).
+- One run of a profile average is noise here (unchanged polls 1.8-4.5 ms
+  across runs with motion). Measure old/new/old in one script with the
+  scenario reduced to the one thing compared (2026-11-17).
+- A screenshot taken after the test dock has quit proves nothing about a
+  screen artefact the dock causes: quitting clears it. Capture first,
+  then Break (2026-11-17).
+- The independent review of a day's fixes found seven defects in them,
+  two in code that had passed on hardware. Run it before installing, not
+  after (2026-11-17).
+- "It stutters" with on-time frames: look at motion, not timing. A frame
+  trace showed every zoom frame inside its field and --damage-check found
+  no wrong pixel; the hitch was a velocity change where the zoom envelope
+  handed over to pointer following (2026-11-18). Simulate a moving pointer
+  on the host before tuning curves the user cannot tell apart.
+- Several amiga_move_mouse calls in one message run back to back: each
+  entry was cut off by the next exit after 40 ms. One move per message,
+  with the test dock started and settled first (Wait 6).
+- A copy over SYS:WBStartup/DockAwesome can fail "object is in use" while
+  no dock runs; copy to .new and Rename instead. The 64-entry TaskList hid
+  the dock (now 256 entries).
+- A film of the screen is the measurement for "it stutters": count camera
+  frames that do not change during motion (30 fps over 50 Hz). Then
+  reproduce with a smooth input.device sweep, not with pointer warps,
+  and time each section of the loop pass (2026-11-18).
+- Work moved to a lower-priority task still stalls the main task when the
+  main task takes a lock that work holds (LockBitMap, LockIBase, layers):
+  skip or defer those calls while the task works.
+- Files started with WBRun stay "in use" after the program quits on
+  ApolloOS; replace them by Rename, delete old ones after a reboot.
+- A pointer warp can land in the 5 px gap between icons: "no label" then
+  means "no hover", not a bug. Aim at an icon's centre from a pip-dump,
+  and log the gating state while the pointer is in, not at exit (the
+  exit path has already hidden PiP).
+- A later change can make an earlier one dead weight: after moving the
+  label into the canvas, the label task only served the no-AA fallback.
+  Review the whole day's diff, not each step, before installing.
+- "Draw unless this field already has a present" lets a redraw start
+  late in a field and run into the next one; drawing at the field's start
+  measured better (2 vs 4 stalls per sweep).
+- No rollback copies or test variants left behind (user, 2026-11-18:
+  "Sluta spara allt gamalt skit"): install by replacing the build in
+  place, delete variants once chosen and RAM: test files after each batch.
+- One path for every system (user, 2026-11-18: "Jag gillar inte att du har
+  massa special för olika versioner"): before adding a per-system branch,
+  check what the feature really needs (the AA label font needed no
+  library at all) and make it work everywhere instead.
+- On AmigaOS 3.9 (Coffin) a Run'd command's task is not named after the
+  command: stop it with Break <process number> from Status.

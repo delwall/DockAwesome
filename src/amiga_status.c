@@ -2,7 +2,9 @@
    Workbench's program and drawer lists, window titles and Shells, so the main
    task never waits on a handler; the main task schedules polls and applies
    the results. Also window actions (focus, close) and Shell menu targets. */
+#include "amiga_caps.h"
 #include "amiga_app.h"
+#include "dock_text.h"
 
 static int shell_target_live(const ShellTarget *target)
 {
@@ -117,70 +119,6 @@ static void poll_workbench_list(ProgramPoll *poll, int kind, ULONG get_tag, ULON
     poll->valid |= kind;
 }
 
-/* Window chrome may add a label on either side. Single spaces are legal
-   path characters and do not separate a path from that label. */
-static int title_separator(const char *text)
-{
-    if (text[0] == ':' && text[1] == ' ') return 2;
-    if (*text == '\t') return 1;
-    if (*text != ' ') return 0;
-    if (text[1] == ' ' || text[1] == '\t') return 1;
-    return (text[1] == '-' || text[1] == '|') && text[2] == ' ' ? 3 : 0;
-}
-
-static const char *next_title_part(const char *part)
-{
-    int separator;
-    while (*part && !title_separator(part)) ++part;
-    while ((separator = title_separator(part))) part += separator;
-    while (*part == ' ' || *part == '\t') ++part;
-    return part;
-}
-
-static int title_names_document(const char *title, const char *path, size_t length)
-{
-    const char *part = title;
-    while (*part) {
-        if (*part == '"' && !Strnicmp((STRPTR)(part+1),(STRPTR)path,length) &&
-            part[1+length] == '"') return 1;
-        if (!Strnicmp((STRPTR)part,(STRPTR)path,length) &&
-            (!part[length] || title_separator(part+length))) return 1;
-        part = next_title_part(part);
-    }
-    return 0;
-}
-
-/* Extract only qualified title paths with the same file name as a pin.
-   The caller validates the complete path through DOS after releasing IBase. */
-static size_t title_document_alias(const char *title, const char *path, char *candidate)
-{
-    const char *name = strrchr(path,'/');
-    const char *part;
-    size_t length;
-    if (!name) name = strrchr(path,':');
-    if (!name || !*++name) return 0;
-    length = strlen(name);
-    for (part = title; *part; part = next_title_part(part)) {
-        int quoted = *part == '"';
-        const char *start = part+quoted, *volume = strchr(start,':'), *file;
-        if (!volume || volume == start || volume[1] == ' ' ||
-            memchr(start,'/',(size_t)(volume-start))) continue;
-        for (file = volume+1; *file; ++file) {
-            size_t n;
-            const char *end;
-            if (file[-1] != ':' && file[-1] != '/') continue;
-            if (Strnicmp((STRPTR)file,(STRPTR)name,length)) continue;
-            end = file+length;
-            if (quoted ? *end != '"' : (*end && !title_separator(end))) continue;
-            n = end-start;
-            if (n >= PATH_CAP) continue;
-            memcpy(candidate,start,n); candidate[n] = 0;
-            return n;
-        }
-    }
-    return 0;
-}
-
 static void poll_document_windows(ProgramPoll *poll)
 {
     struct Screen *screen;
@@ -218,7 +156,7 @@ static void poll_document_windows(ProgramPoll *poll)
                     break;
                 }
                 if ((best < 0 || lengths[i] > lengths[best]) &&
-                    title_names_document(title,poll->pins[i].path,lengths[i])) best = i;
+                    dock_title_names_document(title,poll->pins[i].path,lengths[i])) best = i;
             }
             if (exact >= 0) poll->pins[exact].running = 1;
             else if (best >= 0) poll->pins[best].running = 1;
@@ -226,7 +164,7 @@ static void poll_document_windows(ProgramPoll *poll)
                 char candidate[PATH_CAP];
                 size_t longest = 0;
                 for (i = 0; i < poll->count; ++i) if (lengths[i]) {
-                    size_t length = title_document_alias(title,poll->pins[i].path,candidate);
+                    size_t length = dock_title_document_alias(title,poll->pins[i].path,candidate,PATH_CAP);
                     if (length > longest) {
                         strcpy(aliases[alias_count],candidate);
                         longest = length;
@@ -386,6 +324,32 @@ static void discover_unnamed(ProgramPoll *poll, const WindowProgram *owner)
     free(source.pixels);
 }
 
+/* The newest launch still waiting for its app, or NULL. */
+/* A task's name as a number, to tell a task from a later one at its address. */
+static uint32_t name_stamp(const char *name)
+{
+    uint32_t stamp = UINT32_C(2166136261);
+    while (*name) stamp = (stamp ^ (unsigned char)*name++) * UINT32_C(16777619);
+    return stamp;
+}
+
+static const DockLaunch *open_launch(const ProgramPoll *poll)
+{
+    int k, c;
+    for (k = poll->launch_count-1; k >= 0; --k) {
+        if (poll->now-poll->launches[k].at > poll->launch_ticks) continue;
+        for (c = 0; c < LAUNCH_SLOTS; ++c) if (poll->claimed[c] == poll->launches[k].at) break;
+        if (c == LAUNCH_SLOTS) return &poll->launches[k];
+    }
+    return NULL;
+}
+
+static void claim_launch(ProgramPoll *poll, const DockLaunch *launch)
+{
+    poll->claimed[poll->claimed_next] = launch->at;
+    poll->claimed_next = (poll->claimed_next+1)%LAUNCH_SLOTS;
+}
+
 /* Every process that shows a visible window is an app; background tasks
    are not. In order, an app belongs to: the pin it was attributed to, a
    pinned program with its path, the pin launched just before it appeared,
@@ -394,14 +358,10 @@ static void poll_window_programs(ProgramPoll *poll, const struct List *programs)
 {
     WindowProgram *owners = poll->owners;
     struct Screen *screen;
-    const struct MsgPort *desktop;
-    const struct Task *desktop_task;
     const DockLaunch *launch = NULL;
     int count = 0, i, k;
     ULONG lock = LockIBase(0);
     Forbid();
-    desktop = FindPort((STRPTR)"WORKBENCH");
-    desktop_task = desktop ? desktop->mp_SigTask : NULL;
     for (screen = IntuitionBase->FirstScreen; screen && count < DOCK_MAX_ITEMS; screen = screen->NextScreen) {
         const struct Window *window;
         for (window = screen->FirstWindow; window && count < DOCK_MAX_ITEMS; window = window->NextWindow) {
@@ -410,7 +370,7 @@ static void poll_window_programs(ProgramPoll *poll, const struct List *programs)
             const char *task_name;
             int existing;
             if (!owner || &owner->pr_Task == poll->dock_task ||
-                &owner->pr_Task == desktop_task || !window->WLayer) continue;
+                amiga_caps_desktop_task(&owner->pr_Task) || !window->WLayer) continue;
             for (existing = 0; existing < count; ++existing)
                 if (owners[existing].process == owner) break;
             if (existing < count) {
@@ -432,12 +392,12 @@ static void poll_window_programs(ProgramPoll *poll, const struct List *programs)
     /* Attributions end when the task no longer shows a visible window. */
     for (k = 0; k < poll->attribution_count; ) {
         for (i = 0; i < count; ++i)
-            if (&owners[i].process->pr_Task == poll->attributions[k].task && owners[i].visible) break;
+            if (&owners[i].process->pr_Task == poll->attributions[k].task && owners[i].visible &&
+                name_stamp(owners[i].task_name) == poll->attributions[k].name) break;
         if (i < count && pin_by_id(poll,poll->attributions[k].pin_id) >= 0) ++k;
         else poll->attributions[k] = poll->attributions[--poll->attribution_count];
     }
-    for (k = poll->launch_count-1; k >= 0 && !launch; --k)
-        if (poll->now-poll->launches[k].at <= poll->launch_ticks) launch = &poll->launches[k];
+    launch = open_launch(poll);
     for (i = 0; i < count; ++i) {
         const WindowProgram *owner = &owners[i];
         const struct Task *task = &owner->process->pr_Task;
@@ -457,15 +417,25 @@ static void poll_window_programs(ProgramPoll *poll, const struct List *programs)
                 program_path_matches(owner,poll->pins[pin].path)) {
                 mark_owner(poll,pin,owner);
                 pinned = 1;
+                /* The launched program found by its path: its launch is done. */
+                if (launch && !seen && poll->pins[pin].pin_id == launch->pin_id) {
+                    claim_launch(poll,launch);
+                    launch = open_launch(poll);
+                }
             }
         if (!pinned && launch && !seen && owner->visible &&
             (pin = pin_by_id(poll,launch->pin_id)) >= 0 &&
             poll->attribution_count < DOCK_MAX_ITEMS) {
             poll->attributions[poll->attribution_count].task = task;
+            poll->attributions[poll->attribution_count].name = name_stamp(owner->task_name);
             poll->attributions[poll->attribution_count++].pin_id = launch->pin_id;
             mark_owner(poll,pin,owner);
             poll->pins[pin].attributed = 1;
             pinned = 1;
+            /* Only the first new app: a window opened elsewhere a moment
+               later (a Directory Opus lister) is not this pin's. */
+            claim_launch(poll,launch);
+            launch = open_launch(poll);
         }
         for (pin = 0; pin < poll->count && !pinned; ++pin)
             if (poll->pins[pin].temporary && !strchr(poll->pins[pin].path,':') &&
@@ -593,6 +563,14 @@ static int send_close_message(struct Window *window)
         if (GetMsg(reply)) replied = 1;
         else Delay(1);
     }
+    if (!replied) {
+        /* Keep the message and the port's memory for a late reply, but
+           not the signal bit: a task has sixteen, and the dock needs most. */
+        Forbid();
+        if (GetMsg(reply)) replied = 1;
+        else { reply->mp_Flags = PA_IGNORE; FreeSignal(reply->mp_SigBit); }
+        Permit();
+    }
     if (replied) { FreeVec(message); DeleteMsgPort(reply); }
     return 1;
 }
@@ -713,15 +691,15 @@ static int document_window_matches(const App *app, const Item *item,
     const char *title, const char *alias)
 {
     int i;
-    if (!title || (!title_names_document(title,item->path,strlen(item->path)) &&
-        (!alias || !title_names_document(title,alias,strlen(alias))))) return 0;
+    if (!title || (!dock_title_names_document(title,item->path,strlen(item->path)) &&
+        (!alias || !dock_title_names_document(title,alias,strlen(alias))))) return 0;
     /* A title that could refer to two pins is not a safe close target. */
     for (i = 0; i < app->count; ++i) {
         const Item *other = &app->items[i];
         if (other != item && other->kind == PIN_DOCUMENT &&
-            (title_names_document(title,other->path,strlen(other->path)) ||
+            (dock_title_names_document(title,other->path,strlen(other->path)) ||
              (other->title_path[0] &&
-              title_names_document(title,other->title_path,strlen(other->title_path))))) return 0;
+              dock_title_names_document(title,other->title_path,strlen(other->title_path))))) return 0;
     }
     return 1;
 }
@@ -949,7 +927,10 @@ int program_poll_result(App *app, int *recreate)
         if (!(poll->valid & poll->pins[i].kind) && !poll->pins[i].attributed) continue;
         pin = pin_index(app,poll->pins[i].pin_id);
         if (pin < 0) continue;
-        running = poll->pins[i].running || poll->pins[i].attributed;
+        /* Keep the sources apart: the next poll carries RUNNING_WORKBENCH
+           over while the Workbench list cannot be read (no Workbench, as
+           under Directory Opus), so a window's dot must not turn into it. */
+        running = poll->pins[i].running | (poll->pins[i].attributed ? RUNNING_WINDOW : 0);
         if (launch_active(app,app->items[pin].path)) running |= RUNNING_SELF;
         app->items[pin].owner = running ? poll->pins[i].owner : NULL;
         if (poll->pins[i].kind == PIN_DRAWER) app->items[pin].lister = running ? poll->pins[i].lister : 0;
@@ -975,7 +956,7 @@ int program_poll_result(App *app, int *recreate)
             item = append_item(app,poll->new_path,PIN_PROGRAM,&poll->new_cache);
             item->running = RUNNING_WINDOW;
             item->temporary = 1;
-            added = app->count-1;
+            added = (int)(item-app->items);
             layout_changed = 1;
         }
         /* Like drops and unpins: a new icon appears in its slot and the rest

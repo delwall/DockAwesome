@@ -61,7 +61,7 @@ extern void dock_call_console_input(InputHandlerCode code, struct InputEvent *ev
 #define CONFIG_CAP 768
 #define DEFAULT_CONFIG "ENVARC:DockAwesome.json"
 #define INPUT_BUTTONS 64
-#define IDCMP_FLAGS (IDCMP_MOUSEMOVE|IDCMP_MOUSEBUTTONS|IDCMP_REFRESHWINDOW|IDCMP_RAWKEY|IDCMP_INACTIVEWINDOW)
+#define IDCMP_FLAGS (IDCMP_MOUSEMOVE|IDCMP_MOUSEBUTTONS|IDCMP_RAWKEY|IDCMP_INACTIVEWINDOW)
 
 #ifndef WA_ShapeRegion
 #define WA_ShapeRegion (WA_Dummy + 65)
@@ -84,9 +84,6 @@ typedef struct {
     uint32_t pin_id[DOCK_MAX_ITEMS];
     DockRect panel;
     int panel_radius;
-    /* The window modes' dock layer, which other windows can cover; NULL
-       for PiP, which is always in front. */
-    struct Layer *layer;
 } InputSnapshot;
 typedef struct {
     UWORD code;
@@ -127,7 +124,6 @@ typedef struct {
     volatile ULONG external_serial;
     volatile int external_held;
     volatile int external_dragged, external_cancelled;
-    ULONG external_seconds, external_micros;
     volatile int right_held, menu_cancelled, ui_busy, popup_open, popup_dismiss;
     /* The Folder Stack's close button in screen coordinates, while it is
        shown: a press there closes the stack and the pair is consumed. */
@@ -188,8 +184,12 @@ typedef struct {
        attributed to the pin whose launch started them. */
     const struct Task *seen[DOCK_MAX_ITEMS];
     int seen_count;
-    struct { const struct Task *task; uint32_t pin_id; } attributions[DOCK_MAX_ITEMS];
+    /* name: a hash of the task's name; exec reuses a quit task's address. */
+    struct { const struct Task *task; uint32_t pin_id, name; } attributions[DOCK_MAX_ITEMS];
     int attribution_count;
+    /* Launches that already got their app (by `at`): one app per launch. */
+    uint64_t claimed[LAUNCH_SLOTS];
+    int claimed_next;
     char aliases[DOCK_MAX_ITEMS][PATH_CAP];
     size_t lengths[DOCK_MAX_ITEMS];
 } ProgramPoll;
@@ -214,22 +214,32 @@ typedef struct {
 /* flip_register/flip_buffer: a PiP2 buffer flip for the server to do
    (amiga_pip_flip_at_vblank). */
 typedef struct { struct Task *task; ULONG mask; volatile ULONG armed, fields, flip_register, flip_buffer; } VBlankState;
+
+/* One of the stack pin's blends between its icon and the close button. */
+typedef struct { DockCache cache; unsigned char *pixels; int level; unsigned long icon, button; } MorphSlot;
 void dock_vblank_entry(void);
 /* --profile counters. Only the profile report reads them. */
 typedef struct {
     ULONG wakes;
+    /* Loop passes that drew nothing and were not a live tick, and their time. */
+    ULONG idle_passes; uint64_t idle_ticks;
     uint64_t render_ticks, min_ticks, max_ticks;
     uint64_t present_ticks, conversion_ticks, upload_ticks;
     uint64_t program_poll_ticks, program_poll_peak;
     ULONG program_polls, program_changes, menu_suspends;
     ULONG program_checks, drawer_checks, document_checks, status_events;
     ULONG source_polls, layer_busy, source_changes, front_requests, shape_updates, shape_rects, shape_rects_peak;
+    /* Live polls at the motion rate: their count and summed spacing. */
+    ULONG motion_polls;
+    uint64_t motion_ticks, motion_last;
     ULONG bob_opens, bob_places, bob_failures, bob_waits; /* the drawn drag pin */
     LONG bob_last[4]; /* its last place and size */
     ULONG drop_messages, drop_arguments, drop_added, drop_reordered, drop_bad_paths;
     ULONG desktop_scans;
     ULONG drag_reveal_frames, drag_reveal_peak, popup_reveal_frames, dialog_reveal_frames;
     uint64_t capture_ticks, decode_ticks, source_pixels;
+    /* Polls that found a change, and their share of capture_ticks. */
+    uint64_t capture_changed_ticks; ULONG capture_changed;
     uint64_t settle_ticks, settle_peak;
     ULONG settles, settle_ms[16];
     int settle_samples;
@@ -243,16 +253,45 @@ typedef struct {
     /* Display fields between consecutive animation frames: one is even
        motion, zero a frame never shown, two or more a stall. */
     ULONG pace_one, pace_same, pace_stall, pace_field;
+    /* The first stalled frames: fields since the last, this frame's draw
+       and present, and the time from the last frame's end to this draw. */
+    struct { UWORD fields, render_us, present_us, gap_us; } stall_log[24];
+    ULONG stall_logged;
+    /* The first frames, one row each: fields since the last frame, zoom
+       tick and top level, wake (field seen) to draw, compose, PiP block
+       check, conversion and upload in us, converted kilopixels, and the
+       time from the field being seen to the end of the present. */
+    struct { UWORD fields, tick, level, wake_us, compose_us, block_us, convert_us,
+        upload_us, kpixels, done_us, pass_us, peak_us; } trace[512];
+    ULONG traced;
+    /* pass_started: this loop pass woke; pass_peak: the longest pass
+       since the last frame. */
+    uint64_t field_seen, last_block, last_convert, last_upload, pass_started, pass_peak;
+    /* Loop passes over 18 ms, split at mark[1..6]: before input, input and
+       gestures, target and animation, polls and capture, label and
+       scheduling, draw; the rest after the draw. */
+    uint64_t mark[8];
+    struct { UWORD total_us, seg_us[7]; } long_pass[64];
+    ULONG long_passes;
+    /* Overlay labels made: count, and the sum and peak time in us. */
+    ULONG label_builds;
+    uint64_t label_build_ticks, label_build_peak;
+    ULONG last_pixels;
+    uint64_t frame_end;
+    int frame_continues; /* the last frame left motion to draw */
+    /* Dock frames drawn while the Folder Stack box moved. */
+    ULONG folder_dock_draws;
+    uint64_t folder_dock_ticks;
 } ProfileStats;
-/* A surface backend: how the dock reaches the screen. One table per backend,
-   chosen with the profile (apply_profile) while no surface is open, so open,
-   close and every frame use the same one. Each entry runs at most once per
-   frame or poll; pixel loops stay inside the backend. See docs/architecture.md. */
+/* The surface backend: how the dock reaches the screen. PiP is the only
+   one; select_backend sets it while no surface is open. Each entry runs at
+   most once per frame or poll; pixel loops stay inside the backend. See
+   docs/architecture.md. */
 typedef struct SurfaceOps {
     const char *name;
     /* The backend's part of open_surface, after the common steps have placed
-       the surface, opened the display layer, allocated the canvas (and the
-       backdrop for a backend that composes over the desktop) and laid out the
+       the surface, opened the display layer, allocated the canvas and the
+       backdrop and laid out the
        row: fill the backdrop, open the native window and its AppWindow, and
        whatever present needs. 0 on failure, leaving close_surface to release
        a partial open (surface_error may say why). */
@@ -270,7 +309,11 @@ typedef struct SurfaceOps {
     /* Show the composed frame; called once per draw. */
     void (*present)(struct App *app, const DockImage *frame);
 } SurfaceOps;
-extern const SurfaceOps amiga_surface_pip, amiga_surface_window;
+extern const SurfaceOps amiga_surface_pip;
+
+/* An overlay label's picture: its pin, tip column, stamp for the renderer,
+   and whether making it was tried (a failure is not retried). */
+typedef struct { uint32_t pin_id; int tip, tried; DockImage image; unsigned long stamp; } LabelSlot;
 
 typedef struct App {
     DockSettings settings;
@@ -278,15 +321,13 @@ typedef struct App {
     DockEdge edge;
     DockUI *ui;
     Item items[DOCK_MAX_ITEMS];
-    int requested_backend;
-    int count, snapshot, use_ammx, profile, timer_open, timer_pending, timer_failed;
+    int count, use_ammx, profile, timer_open, timer_pending, timer_failed;
     int incomplete_pins;
-    int timer_label_only;
     struct MsgPort *timer_port;
     struct timerequest *timer_io;
     ULONG clock_hz, frames;
     uint64_t started;
-    int pip_mode, live_open, live_pending, live_fast, live_failed, pip_visible, source_valid, failed;
+    int live_open, live_pending, live_fast, pip_visible, source_valid, failed;
     int screen_left, screen_top;
     DockRect dialog_clip;
     int pip_x_offset, pip_y_offset;
@@ -314,6 +355,9 @@ typedef struct App {
     struct Region *shape, *shape_pending;
     unsigned char *source565, *coverage, *drag_mask, *drag_color; /* drag_color: the native drag image (RGB565) where drag_mask is set */
     int drag_reference, drag_mask_live;
+    /* The pointer (PiP coordinates) when the drag mask was last read: the
+       mask is painted moved with the pointer since. */
+    int drag_pointer_x, drag_pointer_y;
     DockRect drag_box; /* bounds every nonzero drag_mask pixel */
     uint64_t front_requested;
     uint64_t settle_started;
@@ -375,6 +419,7 @@ typedef struct App {
        window preview instead. */
     AmigaDragBob *drag_bob;
     DockImage drag_bob_picture;
+    unsigned long drag_bob_stamp; /* bumped when the picture is rebuilt */
     const DockImage *drag_bob_icon;
     int drag_bob_remove, drag_bob_x, drag_bob_y, drag_bob_due, drag_bob_new, window_drag;
     int use_pip1; /* --pip1: labels and drags may use PiP1 beside a narrow dock */
@@ -384,16 +429,15 @@ typedef struct App {
     int drag_overlay_x, drag_overlay_y;
     int pip_tail; /* keyed columns at the far side of a left PiP dock */
     int drag_bob_gx, drag_bob_gy; /* the pointer at the drawn pin's last frame */
+    /* Ctrl-Amiga-Amiga was answered: PiP stays off and the loop ends. */
+    int resetting;
     int menu_decided, menu_hides; /* the native menu held now: whether PiP steps aside */
     ResetWatch reset; /* amiga_reset.c */
     int drop_preview_slot, displayed_drop_slot, snap_wait_motion, snap_x, snap_y;
     uint32_t next_pin_id, flash_pin_id;
     uint64_t flash_deadline;
-    uint32_t label_pin_id;
-    uint64_t label_at;
-    int label_visible;
+    uint32_t label_pin_id; /* the pin whose hover label is drawn, or 0 */
     int gesture_redraw;
-    ULONG native_external_serial;
     int saved_priority, priority_changed;
     ULONG menu_seen;
     int left, top, width, height, active, hovered;
@@ -405,6 +449,9 @@ typedef struct App {
        renderer's output). */
     DockDamage pip_pending[2];
     int pip_masked[2];
+    /* Per PiP buffer: the canvas rectangle a popup or dialog masked in the
+       frame it holds, to convert again when the mask moves or goes. */
+    DockRect pip_mask_clip[2];
     unsigned char *scratch;
     /* --damage-check: a full reference frame and conversion per draw. */
     int damage_check;
@@ -418,6 +465,17 @@ typedef struct App {
     ULONG vblank_field, vblank_check_field;
     uint64_t vblank_check_at, vblank_armed_at;
     int vblank_open, vblank_rate_ok, no_vsync;
+    /* This loop pass took a display field's step; a redraw asked for
+       outside one waits for the next field (redraw_due). */
+    int field_pass, redraw_due;
+    /* The hover label is drawn in the dock's own image, at once and with
+       the zooming icon (a label window took 26 ms to open):
+       label_max_width is its widest, 0 when the screen font cannot be
+       drawn that way (a colour font, or taller than 32 px): no labels.
+       label_slot: the pictures, one per pin, made while the dock is idle. */
+    int label_max_width;
+    LabelSlot label_slot[DOCK_MAX_ITEMS];
+    unsigned long label_stamp;
     /* The close button that replaces the Folder Stack pin while it is
        open, built with the surface for its settings and edge, and kept
        while those stay as it was built for (button_settings, button_edge). */
@@ -426,12 +484,11 @@ typedef struct App {
     DockEdge button_edge;
     int stack_button_shown;
     /* The pin morphs between the stack's icon (0) and the close button
-       (256) over eight animation ticks, in one buffer. The blend is redone
-       and the cache restamped only when its inputs (morph_key) change. */
+       (256) in quarter steps. The three blends between are kept, each with
+       its runs, and rebuilt only when their inputs change: the stack's
+       level or either image. */
     int morph;
-    DockCache morph_cache;
-    unsigned char *morph_pixels;
-    struct { int morph, level; unsigned long icon, button; } morph_key;
+    MorphSlot morph_slot[3];
     int stack_close_press;
     /* Added last so every other field keeps its offset. */
     const SurfaceOps *surface; /* The backend; set with the profile. */
@@ -522,11 +579,9 @@ static inline int viewport_limit(const App *app, DockEdge edge)
 {
     int length = edge == DOCK_EDGE_BOTTOM ? app->screen->Width :
         app->screen->Height-app->screen->BarHeight-2;
-    if (app->pip_mode) {
-        int maximum = edge == DOCK_EDGE_BOTTOM ? AMIGA_PIP_MAX_WIDTH : AMIGA_PIP_MAX_HEIGHT;
-        if (length > maximum) length = maximum;
-        if (edge == DOCK_EDGE_BOTTOM) length &= ~31;
-    }
+    int maximum = edge == DOCK_EDGE_BOTTOM ? AMIGA_PIP_MAX_WIDTH : AMIGA_PIP_MAX_HEIGHT;
+    if (length > maximum) length = maximum;
+    if (edge == DOCK_EDGE_BOTTOM) length &= ~31;
     return length;
 }
 
@@ -534,7 +589,6 @@ static inline DockUI *create_ui(const App *app)
 {
     DockUI *ui = dock_ui_create(app->screen,app->features.ui_shapes,app->features.ui_glass,
         app->features.ui_rgb_pens,app->features.aa_text);
-    dock_ui_set_float(ui,app->float_layer);
     return ui;
 }
 
@@ -577,12 +631,15 @@ int ui_fit(void *context, const DockUIPrefs *draft);
 DockUIPrefs current_ui_prefs(const App *app);
 int apply_preferences(App *app, const DockUIPrefs *prefs);
 
-/* amiga_surface.c: the common surface steps and backend selection. */
+/* amiga_surface.c: the common surface steps and the profile. */
 int open_surface(App *app);
 void close_surface(App *app);
-void select_backend(App *app, int explicit_pip);
+/* Frees the overlay labels (see label_slot). */
+void label_slots_free(App *app);
+/* The label text of item index, the last part of its path; 0 if none. */
+int pin_label_text(const App *app, int index, char *label);
+void select_backend(App *app);
 void use_pixel_backend(App *app);
-int fall_back_to_snapshot(App *app);
 
 /* amiga_input_handler.c: the input.device handler and its snapshots.
    dock_input_observe (amiga_platform.h) runs on input.device's task. */
@@ -612,7 +669,7 @@ int launch_object(App *app, const char *path, LONG *error);
 /* A file without its own icon that is a script (script bit, or not a
    loadable program) runs with Execute: 1 started, 0 failed (error set),
    -1 when path is no such script. */
-int launch_script(const char *path, LONG *error);
+int launch_script(const char *path, int pinned, LONG *error);
 int launch_active(const App *app, const char *path);
 int launch_reap(App *app);
 void launch_close(App *app);

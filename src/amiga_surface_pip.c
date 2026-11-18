@@ -53,12 +53,20 @@ static int update_drag_mask(App *app, int sample)
             } else app->drag_reference = -1;
         }
         if (app->drag_reference > 0) {
+            /* The drag image moves with the pointer, so a read that finds
+               none mid-drag caught the drag between Directory Opus erasing
+               and redrawing it (half of the reads): the image blinked over
+               the dock. Keep the last image and paint it at the pointer. */
+            int moved = app->drag_mask_live &&
+                (x != app->drag_pointer_x || y != app->drag_pointer_y);
             changed = amiga_display_drag_mask565(app->display,app->source565,app->drag_mask,
                 &app->drag_box,app->left,app->top,left,top,right,bottom,app->renderer.pixels->bytes_equal,
-                app->drag_color);
+                app->drag_color,app->drag_mask_live);
+            if (changed == -2) return moved || reference_changed;
             if (changed >= 0) {
                 app->drag_mask_live = 1;
-                return changed || reference_changed;
+                app->drag_pointer_x = x; app->drag_pointer_y = y;
+                return changed || moved || reference_changed;
             }
         }
     }
@@ -100,7 +108,7 @@ static int pip_blocked_by_screen(App *app)
         app->menu_hides = menu_near_dock(app);
         if (app->menu_hides) ++app->stats.menu_suspends;
     }
-    if (IntuitionBase->FirstScreen == app->screen && !(menu && app->menu_hides)) return 0;
+    if (!app->resetting && IntuitionBase->FirstScreen == app->screen && !(menu && app->menu_hides)) return 0;
     interaction_cancel(app);
     amiga_pip_suspend(app->pip); app->pip_visible = 0; input_publish(app);
     return 1;
@@ -130,6 +138,14 @@ static int frame_check(const App *app, DockRect *out)
         if (extent < p->size) extent = p->size;
         if (start < low) low = start;
         if (start+extent > high) high = start+extent;
+    }
+    /* Overlays (the hover label) may reach past the icons. */
+    for (i = 0; i < app->renderer.previous.overlay_count && i < DOCK_MAX_OVERLAYS; ++i) {
+        const DockRect *r = &app->renderer.previous.overlay_rect[i];
+        int start = bottom ? r->left : r->top, end = bottom ? r->right : r->bottom;
+        if (end <= start) continue;
+        if (start < low) low = start;
+        if (end > high) high = end;
     }
     limit = bottom ? visible : app->height;
     low -= MARGIN; high += MARGIN;
@@ -197,7 +213,11 @@ static int live_capture(App *app, int full_compare)
     result = amiga_display_capture565(app->display, app->source565,
         app->left, app->top, force, check, app->renderer.pixels->bytes_equal, &box);
     ++app->stats.source_polls;
-    if (app->profile) app->stats.capture_ticks += profile_clock()-started;
+    if (app->profile) {
+        uint64_t spent = profile_clock()-started;
+        app->stats.capture_ticks += spent;
+        if (result > 0 && !force) { app->stats.capture_changed_ticks += spent; ++app->stats.capture_changed; }
+    }
     if (result < 0) {
         amiga_pip_suspend(app->pip); app->pip_visible = 0; input_publish(app); app->failed = 1;
         strcpy(app->surface_error, "PiP lost the screen. Restart the dock on a supported screen.");
@@ -266,19 +286,24 @@ static void pip_mask(void *context, int y, int left, int right, unsigned char *s
    (Workbench draws it after the pointer moves), cutting it at the plate.
    It is painted on the clear parts of the surface too, so the image on the
    surface is one picture: half Workbench's and half ours lagged apart. */
+/* The mask as read, moved by the pointer's travel since. */
 static ULONG paint_drag_image(App *app, unsigned char *buffer, int stride)
 {
     ULONG painted = 0;
-    int y, x;
+    int dx = app->screen->MouseX-app->left-app->drag_pointer_x;
+    int dy = app->screen->MouseY-app->top-app->drag_pointer_y;
+    int visible = pip_visible_width(app), y, x;
     for (y = app->drag_box.top; y < app->drag_box.bottom; ++y) {
         const unsigned char *mask = app->drag_mask+(size_t)y*app->width;
         const unsigned char *color = app->drag_color+(size_t)y*app->width*2;
-        unsigned char *out = buffer+(size_t)y*stride;
+        unsigned char *out;
+        if (y+dy < 0 || y+dy >= app->height) continue;
+        out = buffer+(size_t)(y+dy)*stride;
         for (x = app->drag_box.left; x < app->drag_box.right; ++x)
-            if (mask[x]) {
+            if (mask[x] && x+dx >= 0 && x+dx < visible) {
                 unsigned int v = ((unsigned int)color[x*2]<<8)|color[x*2+1];
                 if (v == 0xf81f) v ^= 0x20; /* never the colour key */
-                out[x*2] = (unsigned char)(v>>8); out[x*2+1] = (unsigned char)v;
+                out[(x+dx)*2] = (unsigned char)(v>>8); out[(x+dx)*2+1] = (unsigned char)v;
                 ++painted;
             }
     }
@@ -314,12 +339,18 @@ static void pip_show(App *app, const DockImage *frame)
         mask.clip.left -= app->left; mask.clip.right -= app->left;
         mask.clip.top -= app->top; mask.clip.bottom -= app->top;
     } else mask.clip = app->dialog_clip;
-    /* A mask can change any covered pixel, so a masked frame converts
-       whole, and so does the next conversion into a buffer that holds
-       a masked frame. */
+    /* The drag image can change any pixel, so its frames convert whole, and
+       so does the next conversion into a buffer that holds one. A popup or
+       dialog masks only inside its rectangle: convert that, and the one
+       masked in the frame this buffer holds (a whole conversion per frame
+       took dock frames to 12 ms while the Folder Stack was open). */
     masked = app->drag_mask_live || mask.popup ||
         (mask.clip.right > mask.clip.left && mask.clip.bottom > mask.clip.top);
-    if (masked || app->pip_masked[back]) dock_damage_set_full(pending);
+    if (app->drag_mask_live || app->pip_masked[back]) dock_damage_set_full(pending);
+    else {
+        dock_damage_add(pending,app->pip_mask_clip[back],app->width,app->height);
+        if (masked) dock_damage_add(pending,mask.clip,app->width,app->height);
+    }
     /* Unmasked, pip_mask changes nothing unless the window is narrower
        than the canvas (the right-edge transport padding). */
     pixels = dock_convert565_damage(buffer,stride,frame,app->coverage,pending,app->scratch,
@@ -333,7 +364,8 @@ static void pip_show(App *app, const DockImage *frame)
        present below succeeds. */
     if (app->drag_mask_live) painted = paint_drag_image(app,buffer,stride);
     dock_damage_clear(pending);
-    app->pip_masked[back] = masked;
+    app->pip_masked[back] = app->drag_mask_live;
+    app->pip_mask_clip[back] = masked && !app->drag_mask_live ? mask.clip : (DockRect){0,0,0,0};
     if (app->check565) {
         PipMask reference = mask;
         DockDamage whole;
@@ -365,6 +397,10 @@ static void pip_show(App *app, const DockImage *frame)
         app->stats.present_ticks += finished-started;
         app->stats.conversion_ticks += converted-encoded;
         app->stats.upload_ticks += finished-converted;
+        app->stats.last_block = encoded-started;
+        app->stats.last_convert = converted-encoded;
+        app->stats.last_upload = finished-converted;
+        app->stats.last_pixels = pixels;
     }
 }
 
@@ -405,6 +441,7 @@ static int pip_open(App *app)
     int right_padding = app->settings.edge_padding;
     dock_damage_set_full(&app->pip_pending[0]); dock_damage_set_full(&app->pip_pending[1]);
     app->pip_masked[0] = app->pip_masked[1] = 0;
+    app->pip_mask_clip[0] = app->pip_mask_clip[1] = (DockRect){0,0,0,0};
     if (app->damage_check) {
         app->check_coverage = malloc((size_t)app->width*app->height);
         app->check565 = malloc((size_t)app->width*app->height*2);
@@ -446,19 +483,17 @@ static int pip_open(App *app)
             WA_Borderless, TRUE, WA_Activate, FALSE, WA_RMBTrap, TRUE,
             WA_SimpleRefresh, TRUE, WA_NoCareRefresh, TRUE,
             WA_BackFill, (ULONG)LAYERS_NOBACKFILL,
-            WA_IDCMP, IDCMP_FLAGS & ~IDCMP_REFRESHWINDOW, TAG_DONE);
+            WA_IDCMP, IDCMP_FLAGS, TAG_DONE);
         if (!app->window) return 0;
-        /* With --pip1, labels and dragged pins float in PiP1 when it is
-           free; reserve the largest icon with the Remove pill under it.
-           Only beside a narrow dock: with the 992 px bottom dock on
-           Coffin every PiP1 label or drag scrambled the dock, and beside
-           the 707-row left dock on AmigaOS 3.2.3 every label glitched it,
-           while Coffin's side dock had shown fine. So by default labels
-           use windows and dragged pins are drawn on the screen. */
+        /* With --pip1, dragged pins float in PiP1 when it is free;
+           reserve the largest icon with the Remove pill under it. Only
+           beside a narrow dock: with the 992 px bottom dock on Coffin a
+           PiP1 overlay scrambled the dock, and beside the 707-row left
+           dock on AmigaOS 3.2.3 it glitched it. So by default dragged
+           pins are drawn on the screen. */
         if (app->use_pip1 && app->width+((app->settings.max_size+64+31)&~31) <= PIP_SHARE_WIDTH)
             app->float_layer = amiga_float_create(app->screen, app->pip_x_offset, app->pip_y_offset,
                 app->settings.max_size+64, app->settings.max_size+32);
-        dock_ui_set_float(app->ui, app->float_layer);
         app->appwindow = AddAppWindowA(0, 0, app->window, app->drop_port, NULL);
         if (!app->appwindow) return 0;
         app->drop_catcher = amiga_drop_catcher_init(app->screen, app->window, NULL,
@@ -469,7 +504,7 @@ static int pip_open(App *app)
         WA_Left, app->left, WA_Top, app->top, WA_Width, app->width-right_padding, WA_Height, app->height,
         WA_Borderless, TRUE, WA_Activate, FALSE, WA_ReportMouse, TRUE, WA_RMBTrap, TRUE,
         WA_SimpleRefresh, TRUE, WA_NoCareRefresh, TRUE,
-        WA_IDCMP, IDCMP_FLAGS & ~IDCMP_REFRESHWINDOW, WA_MouseQueue, 1,
+        WA_IDCMP, IDCMP_FLAGS, WA_MouseQueue, 1,
         WA_ShapeRegion, (ULONG)app->shape,
         TAG_DONE);
     if (!app->window) return 0;
@@ -487,7 +522,6 @@ static int pip_open(App *app)
    their windows. */
 static void pip_close(App *app)
 {
-    dock_ui_set_float(app->ui, NULL);
     amiga_float_destroy(app->float_layer); app->float_layer = NULL;
     amiga_pip_close(app->pip); app->pip = NULL;
     if (app->appwindow) { RemoveAppWindow(app->appwindow); app->appwindow = NULL; }

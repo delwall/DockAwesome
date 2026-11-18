@@ -23,6 +23,8 @@ int amiga_drag_preview_settle(AmigaDragPreview *preview);
 int amiga_drag_preview_move(AmigaDragPreview *preview, int pointer_x, int pointer_y);
 /* The window's private copy of the icon and its top left on the screen
    once the last move lands, for the dock to draw the same picture in step. */
+/* A number no other preview had: its icon can reuse a freed one's address. */
+unsigned long amiga_drag_preview_stamp(const AmigaDragPreview *preview);
 const DockImage *amiga_drag_preview_icon(const AmigaDragPreview *preview, int *x, int *y);
 int amiga_drag_preview_owns(const AmigaDragPreview *preview, const struct Window *window);
 void amiga_drag_preview_close(AmigaDragPreview *preview);

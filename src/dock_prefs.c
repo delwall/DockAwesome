@@ -21,7 +21,6 @@ void dock_prefs_defaults(DockPrefs *prefs)
     prefs->zoom = defaults.max_size;
     prefs->levels = defaults.levels;
     prefs->edge = DOCK_EDGE_BOTTOM;
-    prefs->snapshot = 1;
     prefs->pip_x_offset = 17;
     prefs->pip_y_offset = -1;
 }
@@ -36,8 +35,6 @@ static int valid_prefs(const DockPrefs *prefs)
     if (!dock_settings_valid(&settings) ||
         (prefs->scale_percent && dock_scaled_size(prefs->size,prefs->scale_percent) != prefs->zoom) ||
         (unsigned)prefs->edge >= sizeof(edge_names)/sizeof(*edge_names) ||
-        (unsigned)prefs->snapshot > 1 || (unsigned)prefs->pip_mode > 1 ||
-        (prefs->snapshot && prefs->pip_mode) ||
         prefs->pip_x_offset < -128 || prefs->pip_x_offset > 128 ||
         prefs->pip_y_offset < -128 || prefs->pip_y_offset > 128 ||
         (unsigned)prefs->count > DOCK_MAX_ITEMS ||
@@ -149,6 +146,38 @@ static int read_edge(FILE *file, DockEdge *edge)
     return 0;
 }
 
+/* A value of a key this build does not know: a newer build wrote it. */
+static int skip_value(FILE *file, int depth)
+{
+    int c = next_token(file), close;
+    if (c == '"') {
+        while ((c = fgetc(file)) != '"') {
+            if (c == '\\') c = fgetc(file);
+            if (c == EOF) return 0;
+        }
+        return 1;
+    }
+    if (c == '[' || c == '{') {
+        close = c == '[' ? ']' : '}';
+        if (depth >= 8) return 0;
+        c = next_token(file);
+        if (c == close) return 1;
+        if (c == EOF || ungetc(c,file) == EOF) return 0;
+        do {
+            if (close == '}' && (!skip_value(file,depth+1) || next_token(file) != ':')) return 0;
+            if (!skip_value(file,depth+1)) return 0;
+            c = next_token(file);
+        } while (c == ',');
+        return c == close;
+    }
+    /* A number, true, false or null. */
+    if (c != '-' && !(c >= '0' && c <= '9') && !(c >= 'a' && c <= 'z')) return 0;
+    do c = fgetc(file);
+    while (c == '-' || c == '+' || c == '.' || (c >= '0' && c <= '9') ||
+        (c >= 'a' && c <= 'z') || c == 'E');
+    return c == EOF || ungetc(c,file) != EOF;
+}
+
 static int read_paths(FILE *file, DockPrefs *prefs)
 {
     int c;
@@ -169,14 +198,23 @@ static int read_object(FILE *file, DockPrefs *prefs)
 {
     unsigned int seen = 0;
     int c;
-    if (next_token(file) != '{') return 0;
+    c = next_token(file);
+    /* A UTF-8 byte order mark from an editor on another system. */
+    if (c == 0xef) c = fgetc(file) == 0xbb && fgetc(file) == 0xbf ? next_token(file) : EOF;
+    if (c != '{') return 0;
     do {
-        char key[24];
-        int field, ok = 0, version;
+        char key[64];
+        int field, ok = 0, version, ignored;
         if (!read_string(file,key,sizeof(key)) || next_token(file) != ':') return 0;
         for (field = 0; field < FIELD_COUNT; ++field)
             if (!strcmp(key,keys[field])) break;
-        if (field == FIELD_COUNT || (seen & (1U<<field))) return 0;
+        if (field == FIELD_COUNT) {
+            /* Going back from a newer build must not cost the user's dock. */
+            if (!skip_value(file,0)) return 0;
+            c = next_token(file);
+            continue;
+        }
+        if (seen & (1U<<field)) return 0;
         seen |= 1U<<field;
         switch (field) {
         case VERSION: ok = read_integer(file,&version) && version == 1; break;
@@ -187,8 +225,9 @@ static int read_object(FILE *file, DockPrefs *prefs)
             break;
         case LEVELS: ok = read_integer(file,&prefs->levels); break;
         case EDGE: ok = read_edge(file,&prefs->edge); break;
-        case SNAPSHOT: ok = read_boolean(file,&prefs->snapshot); break;
-        case PIP: ok = read_boolean(file,&prefs->pip_mode); break;
+        /* Backends from before PiP only: read so older files load. "pip":
+           true is still written, so an older build reading it keeps PiP. */
+        case SNAPSHOT: case PIP: ok = read_boolean(file,&ignored); break;
         case PIP_X_OFFSET: ok = read_integer(file,&prefs->pip_x_offset); break;
         case PIP_Y_OFFSET: ok = read_integer(file,&prefs->pip_y_offset); break;
         case PATHS: ok = read_paths(file,prefs); break;
@@ -197,7 +236,6 @@ static int read_object(FILE *file, DockPrefs *prefs)
         if (!ok) return 0;
         c = next_token(file);
     } while (c == ',');
-    if (prefs->pip_mode && !(seen & (1U<<SNAPSHOT))) prefs->snapshot = 0;
     if (seen & (1U<<SCALE_PERCENT)) {
         if (seen & (1U<<ZOOM)) return 0;
         prefs->zoom = dock_scaled_size(prefs->size,prefs->scale_percent);
@@ -241,11 +279,10 @@ int dock_prefs_write(FILE *file, const DockPrefs *prefs)
     if (!file || !prefs || !valid_prefs(prefs)) return 0;
     if (fprintf(file,
             "{\n  \"version\": 1,\n  \"size\": %d,\n  \"%s\": %d,\n  \"levels\": %d,\n"
-            "  \"edge\": \"%s\",\n  \"snapshot\": %s,\n  \"pip\": %s,\n"
+            "  \"edge\": \"%s\",\n  \"pip\": true,\n"
             "  \"pip_x_offset\": %d,\n  \"pip_y_offset\": %d,\n",
             prefs->size,prefs->scale_percent ? "scale_percent" : "zoom",
             prefs->scale_percent ? prefs->scale_percent : prefs->zoom,prefs->levels,edge_names[prefs->edge],
-            prefs->snapshot ? "true" : "false",prefs->pip_mode ? "true" : "false",
             prefs->pip_x_offset,prefs->pip_y_offset) < 0) return 0;
     if (prefs->folder[0] && (fputs("  \"folder\": ",file) == EOF ||
             !write_string(file,prefs->folder) || fputs(",\n",file) == EOF)) return 0;
