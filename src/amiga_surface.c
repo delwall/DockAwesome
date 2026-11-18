@@ -79,17 +79,36 @@ int open_surface(App *app)
     app->width = (app->width+31)&~31;
     if (app->width > app->screen->Width) app->width = app->screen->Width&~31;
     app->height = app->edge == DOCK_EDGE_BOTTOM ? cross : wanted;
-    /* The hover label above a zoomed icon is drawn in the dock's own image
-       on the bottom edge: room for it above the zoom headroom. */
+    /* The hover label beside a zoomed icon is drawn in the dock's own
+       image: room for it past the zoom headroom, above the row on the
+       bottom edge, inside a side dock for its widest label (capped; a
+       longer one is shortened). The rows and columns grow on the side
+       away from the screen edge, where the layout is not anchored. */
     app->label_overlay = 0;
-    if (app->edge == DOCK_EDGE_BOTTOM && app->count) {
-        int label = dock_ui_label_height(app->ui);
+    app->label_column = 0;
+    if (app->count && dock_ui_label_height(app->ui) > 0) {
         DockPlacement rest[DOCK_MAX_ITEMS];
-        if (label > 0 && dock_edge_layout(&app->settings,DOCK_EDGE_BOTTOM,app->count,app->width,
-                app->height,0,0,0,rest)) {
-            int headroom = rest[0].y+rest[0].size-app->settings.max_size;
-            int need = DOCK_UI_LABEL_GAP+label-headroom;
-            if (need > 0) app->height += need;
+        if (dock_edge_layout(&app->settings,app->edge,app->count,app->width,app->height,0,0,0,rest)) {
+            int need;
+            if (app->edge == DOCK_EDGE_BOTTOM) {
+                int headroom = rest[0].y+rest[0].size-app->settings.max_size;
+                need = DOCK_UI_LABEL_GAP+dock_ui_label_height(app->ui)-headroom;
+                if (need > 0) app->height += need;
+            } else {
+                int column = app->screen->Width/4 < 240 ? app->screen->Width/4 : 240, widest = 0, i;
+                int headroom = app->edge == DOCK_EDGE_RIGHT ?
+                    rest[0].x+rest[0].size-app->settings.max_size :
+                    pip_visible_width(app)-(rest[0].x+app->settings.max_size);
+                char text[PATH_CAP];
+                for (i = 0; i < app->count; ++i) {
+                    int w = pin_label_text(app,i,text) ? dock_ui_label_width(app->ui,text,column) : 0;
+                    if (w > widest) widest = w;
+                }
+                need = DOCK_UI_LABEL_GAP+widest-headroom;
+                if (need > 0) app->width += (need+31)&~31;
+                if (app->width > app->screen->Width) app->width = app->screen->Width&~31;
+                app->label_column = column;
+            }
             app->label_overlay = 1;
         }
     }

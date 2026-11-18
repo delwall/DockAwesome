@@ -274,7 +274,7 @@ typedef struct {
     struct { UWORD total_us, seg_us[7]; } long_pass[64];
     ULONG long_passes;
     /* Overlay labels made: count, and the sum and peak time in us. */
-    ULONG label_builds;
+    ULONG label_builds, label_switches, label_frames, label_missing;
     uint64_t label_build_sum, label_build_peak;
     ULONG last_pixels;
     uint64_t frame_end;
@@ -472,6 +472,7 @@ typedef struct App {
        took 26 ms to open). label_shown: its pin, or 0; label_rect: where
        it was drawn last; label_slot: per item, its picture and tip. */
     int label_overlay;
+    int label_column; /* side edges: the widest label the canvas has room for */
     uint32_t label_shown;
     DockRect label_rect;
     struct { uint32_t pin_id; int tip, tried; DockImage image; unsigned long stamp; } label_slot[DOCK_MAX_ITEMS];
@@ -637,6 +638,8 @@ int open_surface(App *app);
 void close_surface(App *app);
 /* Frees the overlay labels (see label_slot). */
 void label_slots_free(App *app);
+/* The label text of item index, the last part of its path; 0 if none. */
+int pin_label_text(const App *app, int index, char *label);
 void select_backend(App *app);
 void use_pixel_backend(App *app);
 

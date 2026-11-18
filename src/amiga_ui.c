@@ -2486,11 +2486,20 @@ int dock_ui_label_height(DockUI *ui)
     return label_geometry(ui,"H",ui->screen->Width,&g) ? g.body+LABEL_TIP : 0;
 }
 
+/* The label's width for text within max_width; 0 if it does not fit. */
+int dock_ui_label_width(DockUI *ui, const char *text, int max_width)
+{
+    LabelGeometry g;
+    if (!ui || max_width < 2*LABEL_PADDING+16 || !label_geometry(ui,text,max_width,&g)) return 0;
+    return g.width;
+}
+
 /* The label as straight-alpha RGBA for the dock's own image: the window
    label's glass, back*(255-o) + rim*(o-n) + (4*surface+back)/5*n, is this
-   colour over the backdrop at alpha o-n/5. The tip points at tip_x, or at
-   the middle when tip_x < 0. The caller frees out->pixels. */
-int dock_ui_label_image(DockUI *ui, const char *text, int max_width, int tip_x, DockImage *out)
+   colour over the backdrop at alpha o-n/5. With tip (the bottom edge) its
+   tip points down at tip_x, or at the middle when tip_x < 0. The caller
+   frees out->pixels. */
+int dock_ui_label_image(DockUI *ui, const char *text, int max_width, int tip, int tip_x, DockImage *out)
 {
     ULONG rim = menu_colors[MENU_RIM], surface = menu_colors[MENU_SURFACE];
     LabelGeometry g;
@@ -2500,10 +2509,11 @@ int dock_ui_label_image(DockUI *ui, const char *text, int max_width, int tip_x, 
     *out = (DockImage){0};
     if (!ui || !ui->chrome_aa || max_width < 2*LABEL_PADDING+16 ||
         !label_geometry(ui,text,max_width,&g)) return 0;
-    width = g.width; height = g.body+LABEL_TIP;
+    tip = tip ? LABEL_TIP : 0;
+    width = g.width; height = g.body+tip;
     if (tip_x < 0) tip_x = width/2;
     tip_x = dock_clamp(tip_x,g.body/2,width-g.body/2-1);
-    if (!(outer = label_outline(width,height,g.body,LABEL_TIP,tip_x))) return 0;
+    if (!(outer = label_outline(width,height,g.body,tip,tip_x))) return 0;
     count = (size_t)width*height;
     if (!(out->pixels = malloc(count*4))) { free(outer); return 0; }
     out->width = width; out->height = height;
