@@ -262,9 +262,17 @@ typedef struct {
        check, conversion and upload in us, converted kilopixels, and the
        time from the field being seen to the end of the present. */
     struct { UWORD fields, tick, level, wake_us, compose_us, block_us, convert_us,
-        upload_us, kpixels, done_us; } trace[96];
+        upload_us, kpixels, done_us, pass_us, peak_us; } trace[512];
     ULONG traced;
-    uint64_t field_seen, last_block, last_convert, last_upload;
+    /* pass_started: this loop pass woke; pass_peak: the longest pass
+       since the last frame. */
+    uint64_t field_seen, last_block, last_convert, last_upload, pass_started, pass_peak;
+    /* Loop passes over 18 ms, split at mark[1..6]: before input, input and
+       gestures, target and animation, polls and capture, label and
+       scheduling, draw; the rest after the draw. */
+    uint64_t mark[8];
+    struct { UWORD total_us, seg_us[7]; } long_pass[64];
+    ULONG long_passes;
     ULONG last_pixels;
     uint64_t frame_end;
     int frame_continues; /* the last frame left motion to draw */
@@ -453,6 +461,9 @@ typedef struct App {
     ULONG vblank_field, vblank_check_field;
     uint64_t vblank_check_at, vblank_armed_at;
     int vblank_open, vblank_rate_ok, no_vsync;
+    /* This loop pass took a display field's step; a redraw asked for
+       outside one waits for the next field (redraw_due). */
+    int field_pass, redraw_due;
     /* The close button that replaces the Folder Stack pin while it is
        open, built with the surface for its settings and edge, and kept
        while those stay as it was built for (button_settings, button_edge). */

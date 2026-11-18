@@ -855,7 +855,7 @@ void program_poll_schedule(App *app)
     now = profile_clock();
     /* Classic Intuition has no native notifications. A cheap window-list
        comparison replaces the per-second Workbench round trips there. */
-    if (!app->status_notify && now >= app->status_watch_at) {
+    if (!app->status_notify && now >= app->status_watch_at && !dock_ui_label_working(app->ui)) {
         app->status_watch_at = now+app->clock_hz/2;
         status_observe_windows(app);
     }

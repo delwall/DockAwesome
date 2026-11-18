@@ -565,7 +565,7 @@ int animation_needed(const App *app)
 
 static void reset_hover_label(App *app)
 {
-    dock_ui_hide_label(app->ui);
+    dock_ui_drop_label(app->ui);
     app->label_pin_id = 0; app->label_at = 0; app->label_visible = 0;
 }
 
@@ -588,6 +588,7 @@ static void update_hover_label(App *app)
     int hovered = app->hovered;
     uint32_t pin = 0;
     DockRect anchor;
+    dock_ui_label_pump(app->ui);
     if (hovered >= 0 && hovered < app->count && app->active &&
         IntuitionBase->FirstScreen == app->screen && app->pip_visible &&
         !app->gesture.active && !buttons_engaged(app,ANY_BUTTON) &&
@@ -620,6 +621,7 @@ static void update_hover_label(App *app)
         memcpy(label,first,length); label[length] = 0;
         anchor = hover_label_anchor(app,hovered);
         app->label_visible = dock_ui_show_label(app->ui,app->edge,&anchor,label);
+
     } else {
         anchor = hover_label_anchor(app,hovered);
         dock_ui_move_label(app->ui,app->edge,&anchor);
@@ -753,7 +755,8 @@ static void animation_profile_end(App *app)
 static void animation_schedule(App *app)
 {
     int flash_pending = app->flash_pin_id && profile_clock() < app->flash_deadline;
-    int fast = animation_needed(app) || flash_pending || dock_ui_folder_pending(app->ui);
+    int fast = animation_needed(app) || flash_pending || dock_ui_folder_pending(app->ui) ||
+        app->redraw_due;
     /* Only Folder Stack icons to load: the next batch at once, not at the
        next field (an icon takes 15-50 ms to read). */
     int loading = dock_ui_folder_loading(app->ui) && !animation_needed(app) && !flash_pending;
@@ -831,6 +834,7 @@ static int animation_step(App *app)
         return 1;
     }
     if (app->profile) app->stats.field_seen = profile_clock();
+    app->field_pass = 1;
     held = dock_ui_holds_dock(app->ui);
     closed = dock_ui_folder_step(app->ui);
     /* The entrance ended: presses on the dock count again. */
@@ -1093,12 +1097,23 @@ static void profile_report(App *app)
     }
     if (app->stats.traced) {
         ULONG n;
-        printf("Frame trace (fields tick level wake_us compose_us block_us convert_us upload_us kpx done_us):\n");
+        printf("Frame trace (fields tick level wake_us compose_us block_us convert_us upload_us kpx done_us pass_us peak_us):\n");
         for (n = 0; n < app->stats.traced; ++n)
-            printf(" %u %u %u %u %u %u %u %u %u %u\n",app->stats.trace[n].fields,app->stats.trace[n].tick,
+            printf(" %u %u %u %u %u %u %u %u %u %u %u %u\n",app->stats.trace[n].fields,app->stats.trace[n].tick,
                 app->stats.trace[n].level,app->stats.trace[n].wake_us,app->stats.trace[n].compose_us,
                 app->stats.trace[n].block_us,app->stats.trace[n].convert_us,app->stats.trace[n].upload_us,
-                app->stats.trace[n].kpixels,app->stats.trace[n].done_us);
+                app->stats.trace[n].kpixels,app->stats.trace[n].done_us,app->stats.trace[n].pass_us,
+                app->stats.trace[n].peak_us);
+    }
+    if (app->stats.long_passes) {
+        ULONG n;
+        int k;
+        printf("Long passes (total: before-input input target polls label draw after, us):\n");
+        for (n = 0; n < app->stats.long_passes; ++n) {
+            printf(" %u:",app->stats.long_pass[n].total_us);
+            for (k = 0; k < 7; ++k) printf(" %u",app->stats.long_pass[n].seg_us[k]);
+            printf("\n");
+        }
     }
     printf("Dock frames during Folder Stack motion: %lu, us_avg=%lu\n",
         (unsigned long)app->stats.folder_dock_draws,
@@ -1382,6 +1397,13 @@ static void publish_close_button(App *app, const DockPlacement *placement, int c
     Enable();
 }
 
+/* A trace time in us, capped to its 16 bits. */
+static UWORD trace_us(const App *app, uint64_t ticks, ULONG n)
+{
+    unsigned long us = ticks_us(app,ticks,n);
+    return (UWORD)(us > 65535 ? 65535 : us);
+}
+
 static void draw(App *app)
 {
     uint64_t started = app->profile ? profile_clock() : 0, presented;
@@ -1467,7 +1489,7 @@ static void draw(App *app)
     app->stats.last_block = app->stats.last_convert = app->stats.last_upload = 0;
     app->stats.last_pixels = 0;
     app->surface->present(app, &app->canvas);
-    if (app->profile && app->stats.traced < 96 && (animation_needed(app) || app->stats.frame_continues)) {
+    if (app->profile && app->stats.traced < 512 && (animation_needed(app) || app->stats.frame_continues)) {
         uint64_t now = profile_clock();
         int top = 0;
         ULONG n = app->stats.traced++;
@@ -1475,13 +1497,16 @@ static void draw(App *app)
         app->stats.trace[n].fields = (UWORD)(app->vblank.fields-app->stats.pace_field);
         app->stats.trace[n].tick = (UWORD)app->animation.tick;
         app->stats.trace[n].level = (UWORD)top;
-        app->stats.trace[n].wake_us = (UWORD)ticks_us(app,started-app->stats.field_seen,1);
+        app->stats.trace[n].wake_us = trace_us(app,started-app->stats.field_seen,1);
         app->stats.trace[n].compose_us = (UWORD)ticks_us(app,presented-started,1);
         app->stats.trace[n].block_us = (UWORD)ticks_us(app,app->stats.last_block,1);
         app->stats.trace[n].convert_us = (UWORD)ticks_us(app,app->stats.last_convert,1);
         app->stats.trace[n].upload_us = (UWORD)ticks_us(app,app->stats.last_upload,1);
         app->stats.trace[n].kpixels = (UWORD)(app->stats.last_pixels/1000);
-        app->stats.trace[n].done_us = (UWORD)ticks_us(app,now-app->stats.field_seen,1);
+        app->stats.trace[n].done_us = trace_us(app,now-app->stats.field_seen,1);
+        app->stats.trace[n].pass_us = trace_us(app,started-app->stats.pass_started,1);
+        app->stats.trace[n].peak_us = trace_us(app,app->stats.pass_peak,1);
+        app->stats.pass_peak = 0;
     }
     if (app->profile && app->vblank_open) {
         /* Consecutive frames of one motion: at most five fields apart. */
@@ -2268,6 +2293,20 @@ static __attribute__((noinline)) void event_loop(App *app)
     ULONG deferred = 0;
     while (running && !app->resetting) {
         ULONG workbench = app->workbench_port ? 1UL<<app->workbench_port->mp_SigBit : 0;
+        if (app->profile && app->stats.pass_started) {
+            uint64_t now = profile_clock(), pass = now-app->stats.pass_started;
+            if (pass > app->stats.pass_peak) app->stats.pass_peak = pass;
+            if (pass > app->clock_hz*18/1000 && app->stats.long_passes < 64) {
+                ULONG n = app->stats.long_passes++;
+                int k;
+                app->stats.mark[7] = now;
+                app->stats.long_pass[n].total_us = trace_us(app,pass,1);
+                for (k = 1; k < 8; ++k) {
+                    if (app->stats.mark[k] < app->stats.mark[k-1]) app->stats.mark[k] = app->stats.mark[k-1];
+                    app->stats.long_pass[n].seg_us[k-1] = trace_us(app,app->stats.mark[k]-app->stats.mark[k-1],1);
+                }
+            }
+        }
         if (app->workbench_closed) {
             /* Nothing is on screen: wait for Workbench to open again. */
             ULONG closed_signals = Wait(workbench|reset_watch_mask(app)|SIGBREAKF_CTRL_C);
@@ -2290,6 +2329,9 @@ static __attribute__((noinline)) void event_loop(App *app)
         int redraw = app->gesture_redraw, recreate = 0, save = 0, due;
         int dismiss_popup;
         uint64_t pass_started = app->profile ? profile_clock() : 0;
+        app->stats.pass_started = pass_started;
+        app->field_pass = 0;
+        if (app->profile) { int k; for (k = 0; k < 7; ++k) app->stats.mark[k] = pass_started; }
         ++app->stats.wakes; app->gesture_redraw = 0;
         if (signals & SIGBREAKF_CTRL_C) break;
         if (signals & reset_watch_mask(app)) {
@@ -2385,6 +2427,7 @@ static __attribute__((noinline)) void event_loop(App *app)
         }
         sync_input_ui(app);
         if (!running) break;
+        if (app->profile) app->stats.mark[1] = profile_clock();
         if (accept_drops(app,&recreate)) redraw = save = 1;
         while ((msg = (struct IntuiMessage *)GetMsg(app->window->UserPort))) {
             ULONG cls = msg->Class;
@@ -2445,6 +2488,7 @@ static __attribute__((noinline)) void event_loop(App *app)
         if (save) save_config(app);
         if (!running) break;
         if (program_poll_result(app,&recreate)) redraw = 1;
+        if (app->profile) app->stats.mark[2] = profile_clock();
         if (recreate) {
             close_surface(app);
             if (!open_surface(app)) {
@@ -2455,6 +2499,7 @@ static __attribute__((noinline)) void event_loop(App *app)
         }
         update_target(app); animation_profile_begin(app);
         if (animation_step(app)) redraw = 1;
+        if (app->profile) app->stats.mark[3] = profile_clock();
         if (app->timer_failed && animation_needed(app)) { animation_finish(app); redraw = 1; }
         if (app->flash_pin_id && profile_clock() >= app->flash_deadline) {
             app->flash_pin_id = 0; redraw = 1;
@@ -2469,14 +2514,24 @@ static __attribute__((noinline)) void event_loop(App *app)
            Only a backend sets failed here; every other failure has already
            left the loop. */
         if (app->surface->poll(app,due,redraw)) redraw = 1;
+        if (app->profile) app->stats.mark[4] = profile_clock();
         if (app->failed) { interaction_cancel(app); input_invalidate(app); break; }
         if (app->gesture_redraw) { redraw = 1; app->gesture_redraw = 0; }
         update_hover_label(app);
+        if (app->profile) app->stats.mark[5] = profile_clock();
+        /* One present per field: a second one in the same field waits for
+           the next inside the present, 13-41 ms of this loop while the
+           pointer moved. With the display pacing the dock, a redraw asked
+           for between fields is drawn at the next one. */
+        if (app->redraw_due && app->field_pass) { redraw = 1; app->redraw_due = 0; }
+        if (redraw && !app->field_pass && app->vblank_open && app->vblank_rate_ok &&
+            !app->no_vsync && !app->timer_failed) { app->redraw_due = 1; redraw = 0; }
         animation_schedule(app); live_schedule(app);
         if (redraw) draw(app);
         else if (app->profile && !due) {
             ++app->stats.idle_passes; app->stats.idle_ticks += profile_clock()-pass_started;
         }
+        if (app->profile) app->stats.mark[6] = profile_clock();
         drag_bob_present(app);
         /* --pip-dump: what PiP shows during a drag, frame by frame. */
         if (redraw && app->pip_dump[0] && app->pip && app->gesture.active && app->gesture.dragged)

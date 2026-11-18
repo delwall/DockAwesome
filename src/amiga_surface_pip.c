@@ -202,7 +202,10 @@ static int live_capture(App *app, int full_compare)
     }
     started = app->profile ? profile_clock() : 0;
     force = !app->source_valid || !app->pip_visible;
-    result = amiga_display_capture565(app->display, app->source565,
+    /* The bitmap lock would wait for the label task's window: the next
+       poll captures what changed. */
+    if (!force && dock_ui_label_working(app->ui)) result = 0, box = (DockRect){0,0,0,0};
+    else result = amiga_display_capture565(app->display, app->source565,
         app->left, app->top, force, check, app->renderer.pixels->bytes_equal, &box);
     ++app->stats.source_polls;
     if (app->profile) {
