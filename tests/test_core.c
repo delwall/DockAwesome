@@ -404,6 +404,32 @@ static void test_animation_stays_inside(void)
     }
 }
 
+/* A pointer that enters moving: the row's distance behind it settles once.
+   The zoom used to catch up with the pointer, then the row fell behind
+   again (11-17 px over the row) when the zoom ended: a visible brake. */
+static void test_zoom_end_keeps_pace(void)
+{
+    static const int speed[] = {-6, -5, 5, 6};
+    DockSettings s = dock_settings_default();
+    int start, v;
+    for (start = 360; start <= 440; start += 40) for (v = 0; v < 4; ++v) {
+        DockPlacement current[DOCK_MAX_ITEMS], target[DOCK_MAX_ITEMS];
+        DockAnimation animation;
+        int tick, i, low = INT_MAX, rise = 0;
+        assert(dock_layout(&s,13,800,96,0,0,0,current));
+        dock_animation_reset(&animation);
+        for (tick = 0; tick < 20; ++tick) {
+            int lag = 0;
+            assert(dock_layout(&s,13,800,96,start+speed[v]*tick,86,1,target));
+            dock_animate_step(&s,&animation,current,target,13);
+            for (i = 0; i < 13; ++i) lag += abs(current[i].x-target[i].x);
+            if (lag < low) low = lag;
+            if (lag-low > rise) rise = lag-low;
+        }
+        assert(rise <= 8);
+    }
+}
+
 /* A single icon equals level 0 of a cache with the same resting size. */
 static void test_icon_build(void)
 {
@@ -2115,7 +2141,7 @@ int main(void)
     DockSettings defaults = dock_settings_default();
     test_normalize(); test_clamp_helpers(); test_image_opaque_at(); test_reference_wave_and_hover(); test_zoom_gap_compaction(); test_inter_icon_anchor_continuity(); test_alpha_fringe(); test_distant_icon_motion(); test_animation_no_overlap(); test_layout(); test_blend();
     test_mix(); test_pressed_artwork(); test_side_panel_coverage(); test_reorder(); test_renderer();
-    test_faint_shadows(); test_scaled_shadows(); test_resampling(); test_enclosed_glass_and_centering(); test_animation_stays_inside(); test_icon_build(); test_scaled_fill(); test_icon_runs();
+    test_faint_shadows(); test_scaled_shadows(); test_resampling(); test_enclosed_glass_and_centering(); test_animation_stays_inside(); test_zoom_end_keeps_pace(); test_icon_build(); test_scaled_fill(); test_icon_runs();
     test_clipped_divider(); test_decode_rgb24(); test_items_fit();
     test_animation_and_pointer_anchor(); test_reference_timing_and_panel(); test_rounded_panel();
     test_convert(); test_native565(); test_key565(); test_overlay_coverage();

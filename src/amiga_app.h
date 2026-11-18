@@ -257,6 +257,15 @@ typedef struct {
        and present, and the time from the last frame's end to this draw. */
     struct { UWORD fields, render_us, present_us, gap_us; } stall_log[24];
     ULONG stall_logged;
+    /* The first frames, one row each: fields since the last frame, zoom
+       tick and top level, wake (field seen) to draw, compose, PiP block
+       check, conversion and upload in us, converted kilopixels, and the
+       time from the field being seen to the end of the present. */
+    struct { UWORD fields, tick, level, wake_us, compose_us, block_us, convert_us,
+        upload_us, kpixels, done_us; } trace[96];
+    ULONG traced;
+    uint64_t field_seen, last_block, last_convert, last_upload;
+    ULONG last_pixels;
     uint64_t frame_end;
     int frame_continues; /* the last frame left motion to draw */
     /* Dock frames drawn while the Folder Stack box moved. */

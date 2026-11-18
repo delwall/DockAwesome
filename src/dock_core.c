@@ -784,7 +784,11 @@ int dock_animate_step(const DockSettings *s, DockAnimation *animation, DockPlace
     if (animation->count != count || animation->active != active) {
         if (animation->count != count) for (i = 0; i < count; ++i)
             animation->center[i] = (int64_t)current[i].x*256+current[i].size*128;
-        for (i = 0; i < count; ++i) animation->origin_level[i] = current[i].level;
+        for (i = 0; i < count; ++i) {
+            animation->origin_level[i] = current[i].level;
+            animation->follow_level[i] = target[i].level;
+            animation->follow_center[i] = (int64_t)target[i].x*256+target[i].size*128;
+        }
         memcpy(animation->origin_center, animation->center, (size_t)count*sizeof(*animation->center));
         animation->tick = 0;
         animation->active = active;
@@ -797,9 +801,15 @@ int dock_animate_step(const DockSettings *s, DockAnimation *animation, DockPlace
            change on the first and most of it by the fourth, like the macOS
            Dock; a smoothstep start moved one pixel and felt sluggish. */
         weight = CUBE - rest * rest * rest;
+        /* Aim at where the row trails a moving pointer after the zoom, not at
+           the pointer: aiming at the pointer caught up with it, then the row
+           braked when the zoom ended. */
         for (i = 0; i < count; ++i) {
             int origin = animation->origin_level[i];
-            levels[i] = (origin * (CUBE - weight) + target[i].level * weight + CUBE/2) / CUBE;
+            animation->follow_level[i] = ease(animation->follow_level[i], target[i].level);
+            animation->follow_center[i] = ease_center(animation->follow_center[i],
+                (int64_t)target[i].x*256+target[i].size*128);
+            levels[i] = (origin * (CUBE - weight) + animation->follow_level[i] * weight + CUBE/2) / CUBE;
         }
     } else {
         /* Lateral retargeting stays responsive; it never restarts an ease-in. */
@@ -831,7 +841,7 @@ int dock_animate_step(const DockSettings *s, DockAnimation *animation, DockPlace
         DockPlacement next;
         int64_t target_center = (int64_t)target[i].x*256+target[i].size*128;
         int64_t center = envelope ?
-            (animation->origin_center[i]*(CUBE-weight)+target_center*weight+CUBE/2)/CUBE :
+            (animation->origin_center[i]*(CUBE-weight)+animation->follow_center[i]*weight+CUBE/2)/CUBE :
             ease_center(animation->center[i], target_center);
         animation->center[i] = center;
         next.level = levels[i];

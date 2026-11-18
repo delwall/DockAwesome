@@ -830,6 +830,7 @@ static int animation_step(App *app)
         animation_finish(app);
         return 1;
     }
+    if (app->profile) app->stats.field_seen = profile_clock();
     held = dock_ui_holds_dock(app->ui);
     closed = dock_ui_folder_step(app->ui);
     /* The entrance ended: presses on the dock count again. */
@@ -1089,6 +1090,15 @@ static void profile_report(App *app)
             printf(" %u/%u/%u/%u",app->stats.stall_log[n].fields,app->stats.stall_log[n].render_us,
                 app->stats.stall_log[n].present_us,app->stats.stall_log[n].gap_us);
         printf("\n");
+    }
+    if (app->stats.traced) {
+        ULONG n;
+        printf("Frame trace (fields tick level wake_us compose_us block_us convert_us upload_us kpx done_us):\n");
+        for (n = 0; n < app->stats.traced; ++n)
+            printf(" %u %u %u %u %u %u %u %u %u %u\n",app->stats.trace[n].fields,app->stats.trace[n].tick,
+                app->stats.trace[n].level,app->stats.trace[n].wake_us,app->stats.trace[n].compose_us,
+                app->stats.trace[n].block_us,app->stats.trace[n].convert_us,app->stats.trace[n].upload_us,
+                app->stats.trace[n].kpixels,app->stats.trace[n].done_us);
     }
     printf("Dock frames during Folder Stack motion: %lu, us_avg=%lu\n",
         (unsigned long)app->stats.folder_dock_draws,
@@ -1454,7 +1464,25 @@ static void draw(App *app)
     }
     /* The one indirect call per frame. */
     presented = app->profile ? profile_clock() : 0;
+    app->stats.last_block = app->stats.last_convert = app->stats.last_upload = 0;
+    app->stats.last_pixels = 0;
     app->surface->present(app, &app->canvas);
+    if (app->profile && app->stats.traced < 96 && (animation_needed(app) || app->stats.frame_continues)) {
+        uint64_t now = profile_clock();
+        int top = 0;
+        ULONG n = app->stats.traced++;
+        for (i = 0; i < count; ++i) if (placement[i].level > top) top = placement[i].level;
+        app->stats.trace[n].fields = (UWORD)(app->vblank.fields-app->stats.pace_field);
+        app->stats.trace[n].tick = (UWORD)app->animation.tick;
+        app->stats.trace[n].level = (UWORD)top;
+        app->stats.trace[n].wake_us = (UWORD)ticks_us(app,started-app->stats.field_seen,1);
+        app->stats.trace[n].compose_us = (UWORD)ticks_us(app,presented-started,1);
+        app->stats.trace[n].block_us = (UWORD)ticks_us(app,app->stats.last_block,1);
+        app->stats.trace[n].convert_us = (UWORD)ticks_us(app,app->stats.last_convert,1);
+        app->stats.trace[n].upload_us = (UWORD)ticks_us(app,app->stats.last_upload,1);
+        app->stats.trace[n].kpixels = (UWORD)(app->stats.last_pixels/1000);
+        app->stats.trace[n].done_us = (UWORD)ticks_us(app,now-app->stats.field_seen,1);
+    }
     if (app->profile && app->vblank_open) {
         /* Consecutive frames of one motion: at most five fields apart. */
         ULONG field = app->vblank.fields, fields = field-app->stats.pace_field;

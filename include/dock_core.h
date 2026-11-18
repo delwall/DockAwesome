@@ -36,8 +36,9 @@ typedef struct {
 typedef struct { int x, y, size, level; } DockPlacement;
 /* Track the zoom transition and each icon's subpixel center. */
 typedef struct {
-    int origin_level[DOCK_MAX_ITEMS];
-    int64_t center[DOCK_MAX_ITEMS], origin_center[DOCK_MAX_ITEMS]; /* Q8 pixels. */
+    int origin_level[DOCK_MAX_ITEMS], follow_level[DOCK_MAX_ITEMS];
+    /* Q8 pixels. follow_* trails the target as the row does after the zoom. */
+    int64_t center[DOCK_MAX_ITEMS], origin_center[DOCK_MAX_ITEMS], follow_center[DOCK_MAX_ITEMS];
     int tick, active, count;
 } DockAnimation;
 typedef void (*DockConvertRGB565)(unsigned char *, const unsigned char *, unsigned long);

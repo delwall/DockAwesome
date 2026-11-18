@@ -389,6 +389,10 @@ static void pip_show(App *app, const DockImage *frame)
         app->stats.present_ticks += finished-started;
         app->stats.conversion_ticks += converted-encoded;
         app->stats.upload_ticks += finished-converted;
+        app->stats.last_block = encoded-started;
+        app->stats.last_convert = converted-encoded;
+        app->stats.last_upload = finished-converted;
+        app->stats.last_pixels = pixels;
     }
 }
 
