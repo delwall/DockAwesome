@@ -1298,3 +1298,9 @@ to the same slot (inverted offset test, store attributes required).
       the next field. Label stage 0.1 ms, 13 ms poll waits 10 -> 2 per
       sweep, longest frame 45 -> 18 ms. Menu, quit with a label: fine.
       Installed; rollback Disabled/DockAwesome-build446.old.
+- [x] Label without delay as a window still came late (user: worse than
+      457). Build 465: on the bottom edge the label is an overlay in the
+      dock canvas (+12 px), shown at once, following the zoom; labels made
+      while idle (~11 ms each). Sweep: stalled=0, longest frame 16.5 ms,
+      no backdrop recaptures; damage-check 472 frames clean. Installed;
+      rollback Disabled/DockAwesome-build457.old.
