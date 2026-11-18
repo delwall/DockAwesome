@@ -408,3 +408,6 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
 - "Draw unless this field already has a present" lets a redraw start
   late in a field and run into the next one; drawing at the field's start
   measured better (2 vs 4 stalls per sweep).
+- No rollback copies or test variants left behind (user, 2026-11-18:
+  "Sluta spara allt gamalt skit"): install by replacing the build in
+  place, delete variants once chosen and RAM: test files after each batch.
