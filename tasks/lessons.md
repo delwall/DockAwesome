@@ -411,3 +411,9 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
 - No rollback copies or test variants left behind (user, 2026-11-18:
   "Sluta spara allt gamalt skit"): install by replacing the build in
   place, delete variants once chosen and RAM: test files after each batch.
+- One path for every system (user, 2026-11-18: "Jag gillar inte att du har
+  massa special för olika versioner"): before adding a per-system branch,
+  check what the feature really needs (the AA label font needed no
+  library at all) and make it work everywhere instead.
+- On AmigaOS 3.9 (Coffin) a Run'd command's task is not named after the
+  command: stop it with Break <process number> from Status.

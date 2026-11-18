@@ -1312,3 +1312,10 @@ to the same slot (inverted offset test, store attributes required).
       used it), label outline 3x faster (caps sampled once, identical
       bytes), slots by pin, one placement and one build function. Build
       479 installed; rollback Disabled/DockAwesome-build473.old.
+- [x] Coffin: all 7 suites pass (build 479). Build 482: the label in the
+      dock's image on every system (AA font made in software always); the
+      window label code removed. Coffin label shown ("RiVA"), sweep 24
+      late frames of 635, damage-check 223 clean. Installed in place.
+      Coffin Disabled/DockAwesome-locked-delete(-479): delete after reboot.
+- [ ] Not verified on Coffin: the dock's right-click menu (my agent click
+      showed none, as before 2026-11-17); ApolloOS run of build 482.
