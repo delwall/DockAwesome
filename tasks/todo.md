@@ -1304,3 +1304,7 @@ to the same slot (inverted offset test, store attributes required).
       while idle (~11 ms each). Sweep: stalled=0, longest frame 16.5 ms,
       no backdrop recaptures; damage-check 472 frames clean. Installed;
       rollback Disabled/DockAwesome-build457.old.
+- [x] Side docks: overlay label beside the icon (canvas +96 px inward for
+      the widest label, capped 240 px). Right/left tested with RAM test
+      configs: label placement, sweep 1 late frame, damage-check clean.
+      Build 473 installed; rollback Disabled/DockAwesome-build465.old.

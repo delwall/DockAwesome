@@ -398,3 +398,7 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
   skip or defer those calls while the task works.
 - Files started with WBRun stay "in use" after the program quits on
   ApolloOS; replace them by Rename, delete old ones after a reboot.
+- A pointer warp can land in the 5 px gap between icons: "no label" then
+  means "no hover", not a bug. Aim at an icon's centre from a pip-dump,
+  and log the gating state while the pointer is in, not at exit (the
+  exit path has already hidden PiP).
