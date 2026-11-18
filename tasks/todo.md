@@ -1319,3 +1319,7 @@ to the same slot (inverted offset test, store attributes required).
       Coffin Disabled/DockAwesome-locked-delete(-479): delete after reboot.
 - [ ] Not verified on Coffin: the dock's right-click menu (my agent click
       showed none, as before 2026-11-17); ApolloOS run of build 482.
+- [x] AmigaOS 3.2.3 (24-bit), build 482 installed in place (old 407 and
+      Disabled copies deleted): all 7 suites pass incl. full test_core;
+      label in the dock's image; sweep 25 late frames of 457;
+      damage-check 273 clean. RAM: cleaned.
