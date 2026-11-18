@@ -1264,3 +1264,18 @@ to the same slot (inverted offset test, store attributes required).
       original code: 800 of 800 pointer positions equal to the host.
 - [x] 720 compilations (373 C files, -O2/-O3/-Os): 703 identical, 17 keep
       loads the old pass had replaced with register copies.
+- [x] All seven test suites cross-compiled with the fixed compiler at -O2
+      -m68080 pass on the Vampire, test_core in full (20400 fuzz frames,
+      about 27 minutes there; test_interaction about 10).
+- [x] Build 434 (fixed compiler, original layout code) installed in
+      SYS:WBStartup; build 412 is the one rollback
+      (Disabled/DockAwesome-build412.old). Zoom curve variants for the user:
+      Disabled/DockAwesome-zoom10-build432 and -zoom12-build433 (build 434
+      is the 8-tick curve). 408/407/395/1731 backups deleted.
+- [x] The night's "freezes" were starvation: tests at -5 starved SDIO0/1
+      (-21). Build 431 had been waiting on a hidden "PiP2 is already in
+      use" requester the whole time.
+- [x] Only compiler left: ~/GitRepos/ApolloCrossDev/Compilers/GCC-6.50-Dev
+      (rollback copy and scratch cc1 builds removed). The toolchain build
+      needs a PATH without spaces (VMware Fusion's entry broke the port
+      libraries' configure).
