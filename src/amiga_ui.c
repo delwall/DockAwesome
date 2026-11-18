@@ -60,7 +60,7 @@ enum { SIZE_SLIDER_MAX = 72, SCALE_SLIDER_MAX = 5*DOCK_SCALE_ONE/2, ZOOM_CEILING
 /* Hover labels: a pill with semicircular ends; the text's ink sits
    LABEL_PADDING px from each end and its capitals LABEL_VPAD px from the
    top and bottom. */
-enum { POPUP_RADIUS = 6, LABEL_GAP = 8, LABEL_MARGIN = 4, LABEL_TIP = 4, LABEL_PADDING = 10,
+enum { POPUP_RADIUS = 6, LABEL_GAP = DOCK_UI_LABEL_GAP, LABEL_MARGIN = 4, LABEL_TIP = 4, LABEL_PADDING = 10,
     LABEL_VPAD = 5 };
 enum {
     MENU_SURFACE, MENU_RIM, MENU_HOVER, MENU_TEXT, MENU_HOVER_TEXT,
@@ -2475,6 +2475,50 @@ static unsigned char *label_outline(int width, int height, int body, int tip, in
         inner[y*width+x] = (unsigned char)(o ? label_coverage(x,y,width,body,tip,tip_x,1) : 0);
     }
     return outer;
+}
+
+/* The label's height with its tip, for an overlay label; 0 without
+   antialiased text (the label is then a window). */
+int dock_ui_label_height(DockUI *ui)
+{
+    LabelGeometry g;
+    if (!ui || !ui->chrome_aa || !ui->text_alpha) return 0;
+    return label_geometry(ui,"H",ui->screen->Width,&g) ? g.body+LABEL_TIP : 0;
+}
+
+/* The label as straight-alpha RGBA for the dock's own image: the window
+   label's glass, back*(255-o) + rim*(o-n) + (4*surface+back)/5*n, is this
+   colour over the backdrop at alpha o-n/5. The tip points at tip_x, or at
+   the middle when tip_x < 0. The caller frees out->pixels. */
+int dock_ui_label_image(DockUI *ui, const char *text, int max_width, int tip_x, DockImage *out)
+{
+    ULONG rim = menu_colors[MENU_RIM], surface = menu_colors[MENU_SURFACE];
+    LabelGeometry g;
+    unsigned char *outer;
+    int width, height;
+    size_t i, count;
+    *out = (DockImage){0};
+    if (!ui || !ui->chrome_aa || max_width < 2*LABEL_PADDING+16 ||
+        !label_geometry(ui,text,max_width,&g)) return 0;
+    width = g.width; height = g.body+LABEL_TIP;
+    if (tip_x < 0) tip_x = width/2;
+    tip_x = dock_clamp(tip_x,g.body/2,width-g.body/2-1);
+    if (!(outer = label_outline(width,height,g.body,LABEL_TIP,tip_x))) return 0;
+    count = (size_t)width*height;
+    if (!(out->pixels = malloc(count*4))) { free(outer); return 0; }
+    out->width = width; out->height = height;
+    for (i = 0; i < count; ++i) {
+        unsigned int o = outer[i], n = outer[count+i], a = o-n/5, c;
+        unsigned char *pixel = out->pixels+i*4;
+        pixel[3] = (unsigned char)a;
+        for (c = 0; c < 3; ++c) {
+            unsigned int shift = 16-8*c;
+            pixel[c] = a ? (unsigned char)((((rim>>shift)&255)*(o-n)+((surface>>shift)&255)*n*4/5+a/2)/a) : 0;
+        }
+    }
+    free(outer);
+    amiga_font_aa_draw(ui->chrome_aa,out,g.text,g.text_x,g.text_top,menu_colors[MENU_TEXT]);
+    return 1;
 }
 
 /* The pill as RGBA for an overlay: rim and surface as glass over the

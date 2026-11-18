@@ -139,6 +139,11 @@ static int frame_check(const App *app, DockRect *out)
         if (start < low) low = start;
         if (start+extent > high) high = start+extent;
     }
+    /* The hover label may reach past the icons near the row's ends. */
+    if (bottom && app->label_rect.right > app->label_rect.left) {
+        if (app->label_rect.left < low) low = app->label_rect.left;
+        if (app->label_rect.right > high) high = app->label_rect.right;
+    }
     limit = bottom ? visible : app->height;
     low -= MARGIN; high += MARGIN;
     if (low < 0) low = 0;

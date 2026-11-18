@@ -29,6 +29,7 @@ void close_surface(App *app)
     if (app->window) shift_held_drops(app,1);
     dock_ui_hide_label(app->ui);
     app->label_pin_id = 0; app->label_at = 0; app->label_visible = 0;
+    label_slots_free(app);
     amiga_drag_preview_close(app->drag_preview); app->drag_preview = NULL;
     drag_bob_close(app);
     interaction_cancel(app);
@@ -78,6 +79,20 @@ int open_surface(App *app)
     app->width = (app->width+31)&~31;
     if (app->width > app->screen->Width) app->width = app->screen->Width&~31;
     app->height = app->edge == DOCK_EDGE_BOTTOM ? cross : wanted;
+    /* The hover label above a zoomed icon is drawn in the dock's own image
+       on the bottom edge: room for it above the zoom headroom. */
+    app->label_overlay = 0;
+    if (app->edge == DOCK_EDGE_BOTTOM && app->count) {
+        int label = dock_ui_label_height(app->ui);
+        DockPlacement rest[DOCK_MAX_ITEMS];
+        if (label > 0 && dock_edge_layout(&app->settings,DOCK_EDGE_BOTTOM,app->count,app->width,
+                app->height,0,0,0,rest)) {
+            int headroom = rest[0].y+rest[0].size-app->settings.max_size;
+            int need = DOCK_UI_LABEL_GAP+label-headroom;
+            if (need > 0) app->height += need;
+            app->label_overlay = 1;
+        }
+    }
     if (app->height > available_height) return 0;
     app->left = app->edge == DOCK_EDGE_LEFT ? 0 : app->edge == DOCK_EDGE_RIGHT ?
         app->screen->Width-app->width+right_padding : (app->screen->Width-app->width)/2;

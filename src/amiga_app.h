@@ -273,6 +273,9 @@ typedef struct {
     uint64_t mark[8];
     struct { UWORD total_us, seg_us[7]; } long_pass[64];
     ULONG long_passes;
+    /* Overlay labels made: count, and the sum and peak time in us. */
+    ULONG label_builds;
+    uint64_t label_build_sum, label_build_peak;
     ULONG last_pixels;
     uint64_t frame_end;
     int frame_continues; /* the last frame left motion to draw */
@@ -464,6 +467,15 @@ typedef struct App {
     /* This loop pass took a display field's step; a redraw asked for
        outside one waits for the next field (redraw_due). */
     int field_pass, redraw_due;
+    /* Bottom edge with antialiased text: the hover label is drawn in the
+       dock's own image, at once and with the zooming icon (a label window
+       took 26 ms to open). label_shown: its pin, or 0; label_rect: where
+       it was drawn last; label_slot: per item, its picture and tip. */
+    int label_overlay;
+    uint32_t label_shown;
+    DockRect label_rect;
+    struct { uint32_t pin_id; int tip, tried; DockImage image; unsigned long stamp; } label_slot[DOCK_MAX_ITEMS];
+    unsigned long label_stamp;
     /* The close button that replaces the Folder Stack pin while it is
        open, built with the surface for its settings and edge, and kept
        while those stay as it was built for (button_settings, button_edge). */
@@ -623,6 +635,8 @@ int apply_preferences(App *app, const DockUIPrefs *prefs);
 /* amiga_surface.c: the common surface steps and the profile. */
 int open_surface(App *app);
 void close_surface(App *app);
+/* Frees the overlay labels (see label_slot). */
+void label_slots_free(App *app);
 void select_backend(App *app);
 void use_pixel_backend(App *app);
 

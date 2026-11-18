@@ -47,7 +47,7 @@ unsigned long dock_convert565_damage(unsigned char *buffer, int stride,
 DockRect dock_rgb565_refresh(unsigned char *cache, const unsigned char *source,
     size_t source_stride, int width, int visible, int height, DockBytesEqual equal);
 
-#define DOCK_MAX_OVERLAYS (DOCK_MAX_ITEMS+1)
+#define DOCK_MAX_OVERLAYS (DOCK_MAX_ITEMS+2)
 
 /* The inputs of the last draw, compared field by field to find damage. */
 typedef struct {

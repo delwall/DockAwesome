@@ -87,6 +87,12 @@ void dock_ui_hide_label(DockUI *ui);
 void dock_ui_drop_label(DockUI *ui);
 /* Sends the label task the latest label state once it is idle. */
 void dock_ui_label_pump(DockUI *ui);
+/* The label for the dock's own image (bottom edge): its height with the
+   tip, and the label as RGBA pointing at tip_x (-1: the middle). Both 0
+   without antialiased text. */
+#define DOCK_UI_LABEL_GAP 8 /* between the label's tip and the zoomed icon */
+int dock_ui_label_height(DockUI *ui);
+int dock_ui_label_image(DockUI *ui, const char *text, int max_width, int tip_x, DockImage *out);
 /* The label task is opening, moving or closing a window. Screen bitmap and
    Intuition locks taken meanwhile wait for it (13 ms of the dock's loop). */
 int dock_ui_label_working(const DockUI *ui);
