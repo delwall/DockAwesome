@@ -1323,3 +1323,7 @@ to the same slot (inverted offset test, store attributes required).
       Disabled copies deleted): all 7 suites pass incl. full test_core;
       label in the dock's image; sweep 25 late frames of 457;
       damage-check 273 clean. RAM: cleaned.
+- [x] ApolloOS: build 482 installed (old copies in Disabled deleted after
+      the reboot; 479 locked, Disabled/DockAwesome-locked-delete until the
+      next reboot). Label in the dock's image, sweep 0 late frames,
+      damage-check 399 clean. RAM: cleaned.
