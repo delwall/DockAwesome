@@ -389,3 +389,12 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
 - A copy over SYS:WBStartup/DockAwesome can fail "object is in use" while
   no dock runs; copy to .new and Rename instead. The 64-entry TaskList hid
   the dock (now 256 entries).
+- A film of the screen is the measurement for "it stutters": count camera
+  frames that do not change during motion (30 fps over 50 Hz). Then
+  reproduce with a smooth input.device sweep, not with pointer warps,
+  and time each section of the loop pass (2026-11-18).
+- Work moved to a lower-priority task still stalls the main task when the
+  main task takes a lock that work holds (LockBitMap, LockIBase, layers):
+  skip or defer those calls while the task works.
+- Files started with WBRun stay "in use" after the program quits on
+  ApolloOS; replace them by Rename, delete old ones after a reboot.

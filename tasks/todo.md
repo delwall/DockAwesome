@@ -1289,3 +1289,12 @@ to the same slot (inverted offset test, store attributes required).
       1/5 (40 -> 60/80 ms lag) gave no visible gain either. Kept 8 ticks
       and 1/3: build 434 stays installed; all variants deleted from
       SYS:WBStartup/Disabled (412 rollback kept).
+- [x] Filmed hitch (IMG_2570.MOV): every ~15th camera frame unchanged, then
+      a double step, at each icon crossing. A smooth input.device sweep
+      (scratch Sweep tool) with per-section loop timing found the name
+      label window: open 26 ms (glass 9, OpenWindow 13), close 13 ms, in
+      the main loop. Build 457: label in its own task; capture and window
+      check skip a poll while it works; redraws between fields wait for
+      the next field. Label stage 0.1 ms, 13 ms poll waits 10 -> 2 per
+      sweep, longest frame 45 -> 18 ms. Menu, quit with a label: fine.
+      Installed; rollback Disabled/DockAwesome-build446.old.
