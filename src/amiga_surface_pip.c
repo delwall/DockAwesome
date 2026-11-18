@@ -485,17 +485,15 @@ static int pip_open(App *app)
             WA_BackFill, (ULONG)LAYERS_NOBACKFILL,
             WA_IDCMP, IDCMP_FLAGS, TAG_DONE);
         if (!app->window) return 0;
-        /* With --pip1, labels and dragged pins float in PiP1 when it is
-           free; reserve the largest icon with the Remove pill under it.
-           Only beside a narrow dock: with the 992 px bottom dock on
-           Coffin every PiP1 label or drag scrambled the dock, and beside
-           the 707-row left dock on AmigaOS 3.2.3 every label glitched it,
-           while Coffin's side dock had shown fine. So by default labels
-           use windows and dragged pins are drawn on the screen. */
+        /* With --pip1, dragged pins float in PiP1 when it is free;
+           reserve the largest icon with the Remove pill under it. Only
+           beside a narrow dock: with the 992 px bottom dock on Coffin a
+           PiP1 overlay scrambled the dock, and beside the 707-row left
+           dock on AmigaOS 3.2.3 it glitched it. So by default dragged
+           pins are drawn on the screen. */
         if (app->use_pip1 && app->width+((app->settings.max_size+64+31)&~31) <= PIP_SHARE_WIDTH)
             app->float_layer = amiga_float_create(app->screen, app->pip_x_offset, app->pip_y_offset,
                 app->settings.max_size+64, app->settings.max_size+32);
-        dock_ui_set_float(app->ui, app->float_layer);
         app->appwindow = AddAppWindowA(0, 0, app->window, app->drop_port, NULL);
         if (!app->appwindow) return 0;
         app->drop_catcher = amiga_drop_catcher_init(app->screen, app->window, NULL,
@@ -524,7 +522,6 @@ static int pip_open(App *app)
    their windows. */
 static void pip_close(App *app)
 {
-    dock_ui_set_float(app->ui, NULL);
     amiga_float_destroy(app->float_layer); app->float_layer = NULL;
     amiga_pip_close(app->pip); app->pip = NULL;
     if (app->appwindow) { RemoveAppWindow(app->appwindow); app->appwindow = NULL; }

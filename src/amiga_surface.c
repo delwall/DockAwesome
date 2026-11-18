@@ -27,8 +27,7 @@ static void shift_held_drops(App *app, int closing)
 void close_surface(App *app)
 {
     if (app->window) shift_held_drops(app,1);
-    dock_ui_hide_label(app->ui);
-    app->label_pin_id = 0; app->label_at = 0; app->label_visible = 0;
+    app->label_pin_id = 0;
     label_slots_free(app);
     amiga_drag_preview_close(app->drag_preview); app->drag_preview = NULL;
     drag_bob_close(app);
@@ -85,10 +84,12 @@ int open_surface(App *app)
        longer one is shortened). The rows and columns grow on the side
        away from the screen edge, where the layout is not anchored. */
     app->label_max_width = 0;
-    if (app->count) {
-        int label = dock_ui_label_height(app->ui);
+    {
+        /* Measured on a row of at least one icon: a pin added to an
+           empty dock has its label too. */
+        int label = dock_ui_label_height(app->ui), icons = app->count ? app->count : 1;
         DockPlacement rest[DOCK_MAX_ITEMS];
-        if (label > 0 && dock_edge_layout(&app->settings,app->edge,app->count,app->width,app->height,0,0,0,rest)) {
+        if (label > 0 && dock_edge_layout(&app->settings,app->edge,icons,app->width,app->height,0,0,0,rest)) {
             int need;
             if (app->edge == DOCK_EDGE_BOTTOM) {
                 int headroom = rest[0].y+rest[0].size-app->settings.max_size;

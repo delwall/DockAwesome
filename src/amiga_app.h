@@ -323,7 +323,6 @@ typedef struct App {
     Item items[DOCK_MAX_ITEMS];
     int count, use_ammx, profile, timer_open, timer_pending, timer_failed;
     int incomplete_pins;
-    int timer_label_only;
     struct MsgPort *timer_port;
     struct timerequest *timer_io;
     ULONG clock_hz, frames;
@@ -437,9 +436,7 @@ typedef struct App {
     int drop_preview_slot, displayed_drop_slot, snap_wait_motion, snap_x, snap_y;
     uint32_t next_pin_id, flash_pin_id;
     uint64_t flash_deadline;
-    uint32_t label_pin_id;
-    uint64_t label_at;
-    int label_visible;
+    uint32_t label_pin_id; /* the pin whose hover label is drawn, or 0 */
     int gesture_redraw;
     int saved_priority, priority_changed;
     ULONG menu_seen;
@@ -471,9 +468,10 @@ typedef struct App {
     /* This loop pass took a display field's step; a redraw asked for
        outside one waits for the next field (redraw_due). */
     int field_pass, redraw_due;
-    /* With antialiased text the hover label is drawn in the dock's own
-       image, at once and with the zooming icon (a label window took 26 ms
-       to open): label_max_width is its widest, 0 when labels are windows.
+    /* The hover label is drawn in the dock's own image, at once and with
+       the zooming icon (a label window took 26 ms to open):
+       label_max_width is its widest, 0 when the screen font cannot be
+       drawn that way (a colour font, or taller than 32 px): no labels.
        label_slot: the pictures, one per pin, made while the dock is idle. */
     int label_max_width;
     LabelSlot label_slot[DOCK_MAX_ITEMS];
@@ -591,7 +589,6 @@ static inline DockUI *create_ui(const App *app)
 {
     DockUI *ui = dock_ui_create(app->screen,app->features.ui_shapes,app->features.ui_glass,
         app->features.ui_rgb_pens,app->features.aa_text);
-    dock_ui_set_float(ui,app->float_layer);
     return ui;
 }
 

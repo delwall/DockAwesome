@@ -565,8 +565,7 @@ int animation_needed(const App *app)
 
 static void reset_hover_label(App *app)
 {
-    dock_ui_hide_label(app->ui);
-    app->label_pin_id = 0; app->label_at = 0; app->label_visible = 0;
+    if (app->label_pin_id) { app->label_pin_id = 0; app->gesture_redraw = 1; }
 }
 
 static DockRect hover_label_anchor(const App *app, int hovered)
@@ -699,46 +698,20 @@ static LabelSlot *place_label(App *app, int index, const DockPlacement *p, int *
     return slot;
 }
 
+/* The pin whose label the next frame draws: the hovered one at once, none
+   during gestures, menus and the Folder Stack. 1 when it changed. */
 static int update_hover_label(App *app)
 {
-    enum { LABEL_DELAY_MS = 280 };
     int hovered = app->hovered;
     uint32_t pin = 0;
-    DockRect anchor;
-    if (hovered >= 0 && hovered < app->count && app->active &&
+    if (app->label_max_width && hovered >= 0 && hovered < app->count && app->active &&
         IntuitionBase->FirstScreen == app->screen && app->pip_visible &&
         !app->gesture.active && !buttons_engaged(app,ANY_BUTTON) &&
         !amiga_drop_catcher_active(app->drop_catcher) && !dock_ui_busy(app->ui))
         pin = app->items[hovered].pin_id;
-    if (app->label_max_width) {
-        /* Drawn with the next frame: no delay, no window. */
-        if (pin == app->label_pin_id) return 0;
-        app->label_pin_id = pin;
-        return 1;
-    }
-    if (!pin) {
-        if (app->label_pin_id) reset_hover_label(app);
-        return 0;
-    }
-    if (pin != app->label_pin_id) {
-        reset_hover_label(app);
-        app->label_pin_id = pin;
-        app->label_at = profile_clock()+(uint64_t)app->clock_hz*LABEL_DELAY_MS/1000;
-        return 0;
-    }
-    if ((!app->label_at && !app->label_visible) || animation_needed(app)) return 0;
-    if (app->label_at) {
-        char label[PATH_CAP];
-        if (profile_clock() < app->label_at) return 0;
-        app->label_at = 0;
-        if (!pin_label_text(app,hovered,label)) return 0;
-        anchor = hover_label_anchor(app,hovered);
-        app->label_visible = dock_ui_show_label(app->ui,app->edge,&anchor,label);
-    } else {
-        anchor = hover_label_anchor(app,hovered);
-        dock_ui_move_label(app->ui,app->edge,&anchor);
-    }
-    return 0;
+    if (pin == app->label_pin_id) return 0;
+    app->label_pin_id = pin;
+    return 1;
 }
 
 static int animate_row(App *app)
@@ -874,8 +847,7 @@ static void animation_schedule(App *app)
        next field (an icon takes 15-50 ms to read). */
     int loading = dock_ui_folder_loading(app->ui) && !animation_needed(app) && !flash_pending;
     ULONG delay = loading ? 1000 : dock_ui_folder_frame_delay(app->ui);
-    if (!fast && !app->label_at) { animation_cancel(app); return; }
-    if (fast && app->timer_pending && app->timer_label_only) animation_cancel(app);
+    if (!fast) { animation_cancel(app); return; }
     if (!app->timer_open || app->timer_pending || app->vblank.armed || app->timer_failed) return;
     if (app->vblank_open) {
         /* The curves count 20 ms ticks: follow the display only while its
@@ -899,18 +871,12 @@ static void animation_schedule(App *app)
         app->vblank_armed_at = profile_clock();
         return;
     }
-    if (!fast) {
-        uint64_t now = profile_clock();
-        delay = now < app->label_at ?
-            (ULONG)((app->label_at-now)*1000000/app->clock_hz)+1 : 1;
-    }
     app->timer_io->tr_node.io_Command = TR_ADDREQUEST;
     app->timer_io->tr_node.io_Flags = 0;
     app->timer_io->tr_time.tv_secs = 0;
     app->timer_io->tr_time.tv_micro = delay;
     SendIO((struct IORequest *)app->timer_io);
     app->timer_pending = 1;
-    app->timer_label_only = !fast;
 }
 
 void animation_cancel(App *app)
@@ -1993,7 +1959,6 @@ static int show_drag_float(App *app, const DockImage *icon, int remove, int x, i
     DockImage image;
     int ok;
     if (!drag_picture(app,icon,&remove,&image)) return 0;
-    dock_ui_hide_label(app->ui);
     ok = amiga_float_show(app->float_layer,&image,x-image.width/2,y-icon->height/2);
     free(image.pixels);
     if (ok) {
@@ -2030,7 +1995,6 @@ static int update_drag_bob(App *app, const DockImage *icon, int x, int y)
     }
     if (app->bob_failed == gesture->token) return -1;
     if (!app->drag_bob) {
-        dock_ui_hide_label(app->ui);
         app->drag_bob = amiga_drag_bob_open(app->screen);
         if (!app->drag_bob) { ++app->stats.bob_failures; app->bob_failed = gesture->token; return -1; }
         ++app->stats.bob_opens;
