@@ -697,10 +697,9 @@ int dock_layout(const DockSettings *s, int count, int width, int height,
     return 1;
 }
 
-/* Following the pointer closes 1/DOCK_FOLLOW_DIV of the gap per tick. */
-#ifndef DOCK_FOLLOW_DIV
-#define DOCK_FOLLOW_DIV 2
-#endif
+/* Following the pointer closes half the gap per tick (a third trailed
+   ~40 ms, a quarter or fifth more; the user chose a half). */
+enum { DOCK_FOLLOW_DIV = 2 };
 
 static int ease(int from, int to)
 {

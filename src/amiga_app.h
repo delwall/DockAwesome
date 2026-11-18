@@ -274,8 +274,8 @@ typedef struct {
     struct { UWORD total_us, seg_us[7]; } long_pass[64];
     ULONG long_passes;
     /* Overlay labels made: count, and the sum and peak time in us. */
-    ULONG label_builds, label_switches, label_frames, label_missing;
-    uint64_t label_build_sum, label_build_peak;
+    ULONG label_builds;
+    uint64_t label_build_ticks, label_build_peak;
     ULONG last_pixels;
     uint64_t frame_end;
     int frame_continues; /* the last frame left motion to draw */
@@ -310,6 +310,10 @@ typedef struct SurfaceOps {
     void (*present)(struct App *app, const DockImage *frame);
 } SurfaceOps;
 extern const SurfaceOps amiga_surface_pip;
+
+/* An overlay label's picture: its pin, tip column, stamp for the renderer,
+   and whether making it was tried (a failure is not retried). */
+typedef struct { uint32_t pin_id; int tip, tried; DockImage image; unsigned long stamp; } LabelSlot;
 
 typedef struct App {
     DockSettings settings;
@@ -467,15 +471,12 @@ typedef struct App {
     /* This loop pass took a display field's step; a redraw asked for
        outside one waits for the next field (redraw_due). */
     int field_pass, redraw_due;
-    /* Bottom edge with antialiased text: the hover label is drawn in the
-       dock's own image, at once and with the zooming icon (a label window
-       took 26 ms to open). label_shown: its pin, or 0; label_rect: where
-       it was drawn last; label_slot: per item, its picture and tip. */
-    int label_overlay;
-    int label_column; /* side edges: the widest label the canvas has room for */
-    uint32_t label_shown;
-    DockRect label_rect;
-    struct { uint32_t pin_id; int tip, tried; DockImage image; unsigned long stamp; } label_slot[DOCK_MAX_ITEMS];
+    /* With antialiased text the hover label is drawn in the dock's own
+       image, at once and with the zooming icon (a label window took 26 ms
+       to open): label_max_width is its widest, 0 when labels are windows.
+       label_slot: the pictures, one per pin, made while the dock is idle. */
+    int label_max_width;
+    LabelSlot label_slot[DOCK_MAX_ITEMS];
     unsigned long label_stamp;
     /* The close button that replaces the Folder Stack pin while it is
        open, built with the surface for its settings and edge, and kept

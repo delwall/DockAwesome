@@ -565,7 +565,7 @@ int animation_needed(const App *app)
 
 static void reset_hover_label(App *app)
 {
-    dock_ui_drop_label(app->ui);
+    dock_ui_hide_label(app->ui);
     app->label_pin_id = 0; app->label_at = 0; app->label_visible = 0;
 }
 
@@ -596,99 +596,107 @@ int pin_label_text(const App *app, int index, char *label)
     return 1;
 }
 
+static void label_slot_reset(LabelSlot *slot)
+{
+    free(slot->image.pixels);
+    memset(slot,0,sizeof(*slot));
+}
+
 void label_slots_free(App *app)
 {
     int i;
-    for (i = 0; i < DOCK_MAX_ITEMS; ++i) {
-        free(app->label_slot[i].image.pixels);
-        memset(&app->label_slot[i],0,sizeof(app->label_slot[i]));
-    }
-    app->label_shown = 0;
-    app->label_rect = (DockRect){0,0,0,0};
+    for (i = 0; i < DOCK_MAX_ITEMS; ++i) label_slot_reset(&app->label_slot[i]);
 }
 
 static unsigned long ticks_us(const App *app, uint64_t ticks, ULONG n);
 
-static void label_built(App *app, uint64_t started)
+/* The slot of a pin's label, by pin so a reorder keeps it: its own, a free
+   one, or one whose pin is gone. */
+static LabelSlot *label_slot_for(App *app, uint32_t pin_id)
 {
-    uint64_t us;
-    if (!app->profile) return;
-    us = ticks_us(app,profile_clock()-started,1);
-    ++app->stats.label_builds; app->stats.label_build_sum += us;
-    if (us > app->stats.label_build_peak) app->stats.label_build_peak = us;
-}
-
-/* Makes item index's label, tip in the middle, unless it has one (or its
-   making failed). ~10 ms: done while the dock is idle (prebuild_label). */
-static int label_max_width(const App *app)
-{
-    int visible = pip_visible_width(app), max_width = app->screen->Width/2;
-    if (app->edge != DOCK_EDGE_BOTTOM) return app->label_column;
-    return max_width < visible ? max_width : visible;
-}
-
-static int make_label(App *app, int index)
-{
-    int max_width = label_max_width(app);
-    char text[PATH_CAP];
-    uint64_t started;
-    __typeof__(app->label_slot[0]) *slot = &app->label_slot[index];
-    if (slot->pin_id != app->items[index].pin_id) {
-        free(slot->image.pixels);
-        memset(slot,0,sizeof(*slot));
-        slot->pin_id = app->items[index].pin_id;
+    LabelSlot *free_slot = NULL;
+    int i, j;
+    for (i = 0; i < DOCK_MAX_ITEMS; ++i) {
+        LabelSlot *slot = &app->label_slot[i];
+        if (slot->pin_id == pin_id) return slot;
+        if (!free_slot && !slot->pin_id) free_slot = slot;
     }
-    if (slot->image.pixels) return 1;
-    if (slot->tried || !pin_label_text(app,index,text)) return 0;
-    slot->tried = 1;
-    started = app->profile ? profile_clock() : 0;
-    if (!dock_ui_label_image(app->ui,text,max_width,app->edge == DOCK_EDGE_BOTTOM,-1,&slot->image)) return 0;
-    label_built(app,started);
-    slot->tip = slot->image.width/2; slot->stamp = ++app->label_stamp;
+    if (!free_slot) for (i = 0; i < DOCK_MAX_ITEMS && !free_slot; ++i) {
+        for (j = 0; j < app->count && app->items[j].pin_id != app->label_slot[i].pin_id; ++j) ;
+        if (j == app->count) free_slot = &app->label_slot[i];
+    }
+    if (!free_slot) free_slot = &app->label_slot[0];
+    label_slot_reset(free_slot);
+    free_slot->pin_id = pin_id;
+    return free_slot;
+}
+
+/* (Re)makes item index's label in slot, its tip at tip (-1: the middle). */
+static int build_label(App *app, LabelSlot *slot, int index, int tip)
+{
+    char text[PATH_CAP];
+    DockImage image;
+    uint64_t started = app->profile ? profile_clock() : 0;
+    if (!pin_label_text(app,index,text) ||
+        !dock_ui_label_image(app->ui,text,app->label_max_width,app->edge == DOCK_EDGE_BOTTOM,tip,&image))
+        return 0;
+    if (app->profile) {
+        uint64_t ticks = profile_clock()-started;
+        ++app->stats.label_builds; app->stats.label_build_ticks += ticks;
+        if (ticks > app->stats.label_build_peak) app->stats.label_build_peak = ticks;
+    }
+    free(slot->image.pixels);
+    slot->image = image;
+    slot->tip = tip < 0 ? image.width/2 : tip;
+    slot->stamp = ++app->label_stamp;
     return 1;
 }
 
-/* One missing label per idle tick, so a hover finds it made; 0 when all
-   are made. */
+/* Item index's label slot with its picture made (tip in the middle), or
+   NULL if it cannot be made. */
+static LabelSlot *made_label(App *app, int index)
+{
+    LabelSlot *slot = label_slot_for(app,app->items[index].pin_id);
+    if (!slot->image.pixels && !slot->tried) {
+        slot->tried = 1;
+        build_label(app,slot,index,-1);
+    }
+    return slot->image.pixels ? slot : NULL;
+}
+
+/* One label per idle tick, so a hover finds it made; 0 when all are. */
 static int prebuild_label(App *app)
 {
     int i;
-    for (i = 0; i < app->count; ++i)
-        if (app->label_slot[i].pin_id != app->items[i].pin_id ||
-            (!app->label_slot[i].image.pixels && !app->label_slot[i].tried)) {
-            make_label(app,i);
-            return 1;
-        }
+    for (i = 0; i < app->count; ++i) {
+        LabelSlot *slot = label_slot_for(app,app->items[i].pin_id);
+        if (!slot->image.pixels && !slot->tried) { made_label(app,i); return 1; }
+    }
     return 0;
 }
 
-/* Item index's label for the dock's image, its tip at the icon's centre
-   (center, canvas x): made once per pin, again only where the canvas edge
-   moves it off the middle. Its left edge goes to *x. */
-static const DockImage *overlay_label(App *app, int index, int center, int *x)
+/* Item index's label beside its icon p (canvas), at a fixed distance from
+   the dock's edge: above it on the bottom edge with the tip on the icon's
+   centre (moved only where the canvas edge pushes the label, 3 px steps),
+   centred beside it on a side edge. */
+static LabelSlot *place_label(App *app, int index, const DockPlacement *p, int *x, int *y)
 {
-    int visible = pip_visible_width(app), max_width = label_max_width(app), tip, slot_tip;
-    uint64_t started;
-    char text[PATH_CAP];
-    __typeof__(app->label_slot[0]) *slot = &app->label_slot[index];
-    if (!make_label(app,index)) return NULL;
-    *x = 0;
-    if (app->edge != DOCK_EDGE_BOTTOM) return &slot->image; /* no tip to aim */
-    *x = dock_clamp(center-slot->image.width/2,0,visible-slot->image.width);
-    tip = center-*x;
-    slot_tip = slot->tip;
-    /* Off the middle only where the canvas edge pushes the label; a new
-       picture takes ~10 ms, so only for a tip off by 3 px or more. */
-    if ((tip-slot_tip >= 3 || slot_tip-tip >= 3) && pin_label_text(app,index,text)) {
-        DockImage moved;
-        started = app->profile ? profile_clock() : 0;
-        if (dock_ui_label_image(app->ui,text,max_width,1,tip,&moved) && moved.width == slot->image.width) {
-            label_built(app,started);
-            free(slot->image.pixels);
-            slot->image = moved; slot->tip = tip; slot->stamp = ++app->label_stamp;
-        } else free(moved.pixels);
+    LabelSlot *slot = made_label(app,index);
+    int max = app->settings.max_size, gap = DOCK_UI_LABEL_GAP;
+    const DockImage *im;
+    if (!slot) return NULL;
+    im = &slot->image;
+    if (app->edge == DOCK_EDGE_BOTTOM) {
+        int center = p->x+p->size/2, tip;
+        *x = dock_clamp(center-im->width/2,0,pip_visible_width(app)-im->width);
+        *y = p->y+p->size-max-gap-im->height;
+        tip = center-*x;
+        if (tip-slot->tip >= 3 || slot->tip-tip >= 3) build_label(app,slot,index,tip);
+    } else {
+        *x = app->edge == DOCK_EDGE_RIGHT ? p->x+p->size-max-gap-im->width : p->x+max+gap;
+        *y = dock_clamp(p->y+p->size/2-im->height/2,0,app->height-im->height);
     }
-    return &slot->image;
+    return slot;
 }
 
 static int update_hover_label(App *app)
@@ -697,17 +705,15 @@ static int update_hover_label(App *app)
     int hovered = app->hovered;
     uint32_t pin = 0;
     DockRect anchor;
-    dock_ui_label_pump(app->ui);
     if (hovered >= 0 && hovered < app->count && app->active &&
         IntuitionBase->FirstScreen == app->screen && app->pip_visible &&
         !app->gesture.active && !buttons_engaged(app,ANY_BUTTON) &&
         !amiga_drop_catcher_active(app->drop_catcher) && !dock_ui_busy(app->ui))
         pin = app->items[hovered].pin_id;
-    if (app->label_overlay) {
+    if (app->label_max_width) {
         /* Drawn with the next frame: no delay, no window. */
-        if (pin == app->label_shown) return 0;
-        app->label_shown = pin;
-        ++app->stats.label_switches;
+        if (pin == app->label_pin_id) return 0;
+        app->label_pin_id = pin;
         return 1;
     }
     if (!pin) {
@@ -1213,11 +1219,9 @@ static void profile_report(App *app)
                 app->stats.trace[n].peak_us);
     }
     if (app->stats.label_builds)
-        printf("Overlay labels made: %lu (switches %lu, frames %lu, missing %lu), us avg=%lu peak=%lu\n",
-            (unsigned long)app->stats.label_builds,(unsigned long)app->stats.label_switches,
-            (unsigned long)app->stats.label_frames,(unsigned long)app->stats.label_missing,
-            (unsigned long)(app->stats.label_build_sum/app->stats.label_builds),
-            (unsigned long)app->stats.label_build_peak);
+        printf("Overlay labels made: %lu, us avg=%lu peak=%lu\n",(unsigned long)app->stats.label_builds,
+            ticks_us(app,app->stats.label_build_ticks,app->stats.label_builds),
+            ticks_us(app,app->stats.label_build_peak,1));
     if (app->stats.long_passes) {
         ULONG n;
         int k;
@@ -1567,28 +1571,13 @@ static void draw(App *app)
                 x-(app->drag_bob_picture.width-icon->width)/2, y, app->drag_bob_stamp};
         else overlays[overlay_count++] = (DockOverlay){icon, x, y, stamp};
     } else app->drag_overlay_icon = NULL;
-    /* The hover label, last: beside the zoomed icon at a fixed distance
-       from the dock's edge (above it on the bottom edge, its tip on the
-       icon's centre), moving along with the icon. */
-    app->label_rect = (DockRect){0,0,0,0};
-    if (app->label_shown) for (i = 0; i < count; ++i) {
-        int item = row_item(app,i), x;
-        const DockImage *label;
-        if (app->items[item].pin_id != app->label_shown) continue;
-        label = overlay_label(app,item,placement[i].x+placement[i].size/2,&x);
-        if (!label) ++app->stats.label_missing;
-        if (label) {
-            ++app->stats.label_frames;
-            int y = placement[i].y+placement[i].size-app->settings.max_size-DOCK_UI_LABEL_GAP-label->height;
-            if (app->edge != DOCK_EDGE_BOTTOM) {
-                x = app->edge == DOCK_EDGE_RIGHT ?
-                    placement[i].x+placement[i].size-app->settings.max_size-DOCK_UI_LABEL_GAP-label->width :
-                    placement[i].x+app->settings.max_size+DOCK_UI_LABEL_GAP;
-                y = dock_clamp(placement[i].y+placement[i].size/2-label->height/2,0,app->height-label->height);
-            }
-            overlays[overlay_count++] = (DockOverlay){label,x,y,app->label_slot[item].stamp};
-            app->label_rect = (DockRect){x,y,x+label->width,y+label->height};
-        }
+    /* The hover label, last. */
+    if (app->label_max_width && app->label_pin_id) for (i = 0; i < count; ++i) {
+        int item = row_item(app,i), x, y;
+        const LabelSlot *label;
+        if (app->items[item].pin_id != app->label_pin_id) continue;
+        if ((label = place_label(app,item,&placement[i],&x,&y)))
+            overlays[overlay_count++] = (DockOverlay){&label->image,x,y,label->stamp};
         break;
     }
     app->renderer.overlays = overlays; app->renderer.overlay_count = overlay_count;
@@ -1635,10 +1624,10 @@ static void draw(App *app)
         app->stats.trace[n].tick = (UWORD)app->animation.tick;
         app->stats.trace[n].level = (UWORD)top;
         app->stats.trace[n].wake_us = trace_us(app,started-app->stats.field_seen,1);
-        app->stats.trace[n].compose_us = (UWORD)ticks_us(app,presented-started,1);
-        app->stats.trace[n].block_us = (UWORD)ticks_us(app,app->stats.last_block,1);
-        app->stats.trace[n].convert_us = (UWORD)ticks_us(app,app->stats.last_convert,1);
-        app->stats.trace[n].upload_us = (UWORD)ticks_us(app,app->stats.last_upload,1);
+        app->stats.trace[n].compose_us = trace_us(app,presented-started,1);
+        app->stats.trace[n].block_us = trace_us(app,app->stats.last_block,1);
+        app->stats.trace[n].convert_us = trace_us(app,app->stats.last_convert,1);
+        app->stats.trace[n].upload_us = trace_us(app,app->stats.last_upload,1);
         app->stats.trace[n].kpixels = (UWORD)(app->stats.last_pixels/1000);
         app->stats.trace[n].done_us = trace_us(app,now-app->stats.field_seen,1);
         app->stats.trace[n].pass_us = trace_us(app,started-app->stats.pass_started,1);
@@ -1659,9 +1648,9 @@ static void draw(App *app)
                     uint64_t now = profile_clock();
                     ULONG n = app->stats.stall_logged++;
                     app->stats.stall_log[n].fields = (UWORD)fields;
-                    app->stats.stall_log[n].render_us = (UWORD)ticks_us(app,now-started,1);
-                    app->stats.stall_log[n].present_us = (UWORD)ticks_us(app,now-presented,1);
-                    app->stats.stall_log[n].gap_us = (UWORD)ticks_us(app,started-app->stats.frame_end,1);
+                    app->stats.stall_log[n].render_us = trace_us(app,now-started,1);
+                    app->stats.stall_log[n].present_us = trace_us(app,now-presented,1);
+                    app->stats.stall_log[n].gap_us = trace_us(app,started-app->stats.frame_end,1);
                 }
             }
         }
@@ -2647,7 +2636,7 @@ static __attribute__((noinline)) void event_loop(App *app)
            dock: read one more Folder Stack icon ahead of its opening. */
         if (due && !app->active && !app->gesture.active && !animation_needed(app)) {
             /* The labels first: each is wanted at the first hover. */
-            if (!(app->label_overlay && prebuild_label(app)) && app->prefetch_pending)
+            if (!(app->label_max_width && prebuild_label(app)) && app->prefetch_pending)
                 app->prefetch_pending = prefetch_stack_icons(app);
         }
         /* The backend's background poll (PiP: live capture and drag image).
@@ -2659,10 +2648,11 @@ static __attribute__((noinline)) void event_loop(App *app)
         if (app->gesture_redraw) { redraw = 1; app->gesture_redraw = 0; }
         if (update_hover_label(app)) redraw = 1;
         if (app->profile) app->stats.mark[5] = profile_clock();
-        /* One present per field: a second one in the same field waits for
-           the next inside the present, 13-41 ms of this loop while the
-           pointer moved. With the display pacing the dock, a redraw asked
-           for between fields is drawn at the next one. */
+        /* One present per field, at the field's start: a second one in a
+           field waited for the next inside the present (13-41 ms of this
+           loop), and one started late in a field ran into the next. With
+           the display pacing the dock, a redraw asked for between fields
+           is drawn at the next one. */
         if (app->redraw_due && app->field_pass) { redraw = 1; app->redraw_due = 0; }
         if (redraw && !app->field_pass && app->vblank_open && app->vblank_rate_ok &&
             !app->no_vsync && !app->timer_failed) { app->redraw_due = 1; redraw = 0; }

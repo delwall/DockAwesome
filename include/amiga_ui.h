@@ -81,12 +81,7 @@ void dock_ui_finish_folder_motion(DockUI *ui);
 /* The label is nonactivating and lives outside the visible Dock artwork. */
 int dock_ui_show_label(DockUI *ui, DockEdge edge, const DockRect *anchor, const char *text);
 void dock_ui_move_label(DockUI *ui, DockEdge edge, const DockRect *anchor);
-/* Hides the label and waits for the label task to be idle. */
 void dock_ui_hide_label(DockUI *ui);
-/* Hides the label without waiting. */
-void dock_ui_drop_label(DockUI *ui);
-/* Sends the label task the latest label state once it is idle. */
-void dock_ui_label_pump(DockUI *ui);
 /* The label for the dock's own image: its height with the tip, its width
    for a text, and the label as RGBA (with tip: pointing down at tip_x, -1
    the middle). All 0 without antialiased text. */
@@ -94,9 +89,6 @@ void dock_ui_label_pump(DockUI *ui);
 int dock_ui_label_height(DockUI *ui);
 int dock_ui_label_width(DockUI *ui, const char *text, int max_width);
 int dock_ui_label_image(DockUI *ui, const char *text, int max_width, int tip, int tip_x, DockImage *out);
-/* The label task is opening, moving or closing a window. Screen bitmap and
-   Intuition locks taken meanwhile wait for it (13 ms of the dock's loop). */
-int dock_ui_label_working(const DockUI *ui);
 /* Labels show in this PiP1 layer (no window shapes), or in windows when
    NULL. The UI does not own it. */
 struct AmigaFloat;

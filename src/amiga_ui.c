@@ -17,7 +17,6 @@
 #include <intuition/intuitionbase.h>
 #include <intuition/screens.h>
 #include <graphics/layers.h>
-#include <dos/dostags.h>
 #include <devices/inputevent.h>
 #include <devices/timer.h>
 #include <libraries/asl.h>
@@ -195,21 +194,6 @@ typedef struct {
 
 typedef struct FolderReveal FolderReveal;
 
-/* The label the main task wants, for the label task. */
-typedef struct {
-    struct Message message;
-    struct DockUI *ui;
-    int stop, visible;
-    DockEdge edge;
-    DockRect anchor;
-    ULONG text_serial;
-    char text[DOCK_PREFS_PATH_CAP];
-} LabelJob;
-
-/* The label task's name and its window's title: marks that window as ours
-   from its opening, before the task stores it in label. */
-static const char label_title[] = "DockAwesome label";
-static void stop_label_worker(struct DockUI *ui);
 
 struct DockUI {
     struct Screen *screen;
@@ -223,15 +207,6 @@ struct DockUI {
     struct Library *text_alpha;
     struct Window *popup, *dialog;
     struct Window *label;
-    /* The label window opens, moves and closes in its own task: opening
-       one took 26 ms and closing 13 ms of the dock's main loop, a missed
-       field each time the pointer reached another icon. The task owns
-       label, label_shape, label_left/top and label_serial while it runs. */
-    struct Process *label_worker;
-    struct MsgPort *label_replies;
-    LabelJob label_job, label_want;
-    int label_busy, label_dirty;
-    ULONG label_serial, next_label_serial;
     struct Region *popup_shape;
     /* The popup is drawn rounded (with the Folder Stack's tip): by its
        shape, or over its captured glass where windows cannot be shaped. */
@@ -621,7 +596,6 @@ DockUI *dock_ui_create(struct Screen *screen, int window_shapes, int glass, int 
 void dock_ui_destroy(DockUI *ui)
 {
     if (!ui) return;
-    stop_label_worker(ui);
     dock_ui_hide_label(ui);
     close_popup(ui,0);
     dock_ui_close_dialog(ui);
@@ -649,14 +623,12 @@ ULONG dock_ui_signal_mask(const DockUI *ui)
     if (!ui) return 0;
     if (ui->popup) mask |= 1UL << ui->popup->UserPort->mp_SigBit;
     if (ui->dialog) mask |= 1UL << ui->dialog->UserPort->mp_SigBit;
-    if (ui->label_replies) mask |= 1UL << ui->label_replies->mp_SigBit;
     return mask;
 }
 
 int dock_ui_owns_window(const DockUI *ui, const struct Window *window)
 {
-    return ui && window && (window == ui->popup || window == ui->dialog || window == ui->label ||
-        window->Title == (UBYTE *)label_title);
+    return ui && window && (window == ui->popup || window == ui->dialog || window == ui->label);
 }
 
 int dock_ui_busy(const DockUI *ui)
@@ -2209,40 +2181,12 @@ void dock_ui_set_converters(DockUI *ui, DockConvertRGB24 encode, DockConvertRGB5
     ui->decode = decode;
 }
 
-static void close_label_window(DockUI *ui)
-{
-    if (ui->label) { CloseWindow(ui->label); ui->label = NULL; }
-    if (ui->label_shape) { DisposeRegion(ui->label_shape); ui->label_shape = NULL; }
-}
-
-static void label_pump(DockUI *ui);
-
-/* Hide the label and wait until the label task is idle: before anything
-   else draws with the fonts it shares, and before the screen goes. */
 void dock_ui_hide_label(DockUI *ui)
 {
     if (!ui) return;
     if (ui->label_float) { amiga_float_hide(ui->float_layer); ui->label_float = 0; }
-    if (!ui->label_worker) { close_label_window(ui); ui->label_want.visible = 0; return; }
-    if (ui->label_want.visible || ui->label) { ui->label_want.visible = 0; ui->label_dirty = 1; }
-    for (;;) {
-        if (ui->label_busy) {
-            WaitPort(ui->label_replies);
-            GetMsg(ui->label_replies);
-            ui->label_busy = 0;
-        }
-        if (!ui->label_dirty) return;
-        label_pump(ui);
-    }
-}
-
-/* Hide the label without waiting. */
-void dock_ui_drop_label(DockUI *ui)
-{
-    if (!ui) return;
-    if (ui->label_float || !ui->label_worker) { dock_ui_hide_label(ui); return; }
-    if (ui->label_want.visible) { ui->label_want.visible = 0; ui->label_dirty = 1; }
-    label_pump(ui);
+    if (ui->label) { CloseWindow(ui->label); ui->label = NULL; }
+    if (ui->label_shape) { DisposeRegion(ui->label_shape); ui->label_shape = NULL; }
 }
 
 static int label_position(const DockUI *ui, DockEdge edge, const DockRect *anchor,
@@ -2459,9 +2403,8 @@ static int label_geometry(DockUI *ui, const char *text, int max_width, LabelGeom
     return 1;
 }
 
-/* The outline coverage (outer) and the inset rim's (inner), each
-   width*height bytes in one block the caller frees. */
-static unsigned char *label_outline(int width, int height, int body, int tip, int tip_x)
+/* label_outline sampled at every pixel. */
+static unsigned char *label_outline_sampled(int width, int height, int body, int tip, int tip_x)
 {
     unsigned char *outer = malloc((size_t)width*height*2), *inner;
     int x, y;
@@ -2477,12 +2420,52 @@ static unsigned char *label_outline(int width, int height, int body, int tip, in
     return outer;
 }
 
+/* The outline coverage (outer) and the inset rim's (inner), each
+   width*height bytes in one block the caller frees. The caps and middle
+   column depend only on body, so they are sampled once per label and
+   copied across; only the tip is sampled where it lies (sampling every
+   pixel took ~10 ms of a label's making). */
+static unsigned char *label_outline(int width, int height, int body, int tip, int tip_x)
+{
+    int half = (body+1)/2, cols = half+1, x, y, k;
+    unsigned char *out, *inner, *cap;
+    if (width < 2*half+1) return label_outline_sampled(width,height,body,tip,tip_x);
+    out = malloc((size_t)width*height*2);
+    cap = malloc((size_t)cols*body*2);
+    if (!out || !cap) { free(out); free(cap); return NULL; }
+    inner = out+(size_t)width*height;
+    /* Columns 0..half-1 of the left cap, then the middle; any width of at
+       least 2*half+1 gives the same coverage. */
+    for (k = 0; k < cols; ++k) for (y = 0; y < body; ++y) {
+        int o = label_coverage(k,y,2*half+1,body,0,0,0);
+        cap[(k*body+y)*2] = (unsigned char)o;
+        cap[(k*body+y)*2+1] = (unsigned char)(o ? label_coverage(k,y,2*half+1,body,0,0,1) : 0);
+    }
+    for (y = 0; y < height; ++y) for (x = 0; x < width; ++x) {
+        int col = x < half ? x : x >= width-half ? width-1-x : half;
+        size_t i = (size_t)y*width+x;
+        out[i] = y < body ? cap[(col*body+y)*2] : 0;
+        inner[i] = y < body ? cap[(col*body+y)*2+1] : 0;
+    }
+    free(cap);
+    if (tip) for (y = body > 2 ? body-2 : 0; y < height; ++y)
+        for (x = tip_x-tip-3; x <= tip_x+tip+3; ++x) {
+            size_t i = (size_t)y*width+x;
+            int o;
+            if (x < 0 || x >= width) continue;
+            o = label_coverage(x,y,width,body,tip,tip_x,0);
+            out[i] = (unsigned char)o;
+            inner[i] = (unsigned char)(o ? label_coverage(x,y,width,body,tip,tip_x,1) : 0);
+        }
+    return out;
+}
+
 /* The label's height with its tip, for an overlay label; 0 without
    antialiased text (the label is then a window). */
 int dock_ui_label_height(DockUI *ui)
 {
     LabelGeometry g;
-    if (!ui || !ui->chrome_aa || !ui->text_alpha) return 0;
+    if (!ui || !ui->chrome_aa) return 0;
     return label_geometry(ui,"H",ui->screen->Width,&g) ? g.body+LABEL_TIP : 0;
 }
 
@@ -2593,8 +2576,6 @@ void dock_ui_set_float(DockUI *ui, AmigaFloat *float_layer)
 
 int dock_ui_pill_image(DockUI *ui, const char *text, DockImage *out)
 {
-    /* Not while the label task draws with the same fonts. */
-    if (ui) dock_ui_hide_label(ui);
     LabelGeometry g;
     unsigned char *outer;
     int ok;
@@ -2606,14 +2587,14 @@ int dock_ui_pill_image(DockUI *ui, const char *text, DockImage *out)
     return ok;
 }
 
-/* The label in float_layer, or else its window (in the label task). */
-static int open_label(DockUI *ui, DockEdge edge, const DockRect *anchor, const char *text)
+int dock_ui_show_label(DockUI *ui, DockEdge edge, const DockRect *anchor, const char *text)
 {
     DockImage glass = {0};
     AmigaDisplay *display = NULL;
     LabelGeometry g;
     int width, height, body, max_width, tip_x, tip;
     unsigned char *outer;
+    dock_ui_hide_label(ui);
     max_width = ui->screen->Width-2*LABEL_MARGIN;
     if (edge == DOCK_EDGE_LEFT) max_width = ui->screen->Width-LABEL_MARGIN-anchor->right-LABEL_GAP;
     else if (edge == DOCK_EDGE_RIGHT) max_width = anchor->left-LABEL_GAP-LABEL_MARGIN;
@@ -2639,150 +2620,40 @@ static int open_label(DockUI *ui, DockEdge edge, const DockRect *anchor, const c
     display = capture_label_glass(ui,&glass,ui->label_left,ui->label_top,width,height);
     if (ui->window_shapes && !label_shape(ui,width,height,outer,glass.pixels ? 0 : 127)) {
         free(outer);
-        close_label_window(ui); return 0;
+        dock_ui_hide_label(ui); return 0;
     }
     prepare_popup_colors(ui);
     ui->label = OpenWindowTags(NULL,WA_CustomScreen,(ULONG)ui->screen,
         WA_Left,ui->label_left,WA_Top,ui->label_top,WA_Width,width,WA_Height,height,
         WA_Borderless,TRUE,WA_Activate,FALSE,WA_SmartRefresh,TRUE,WA_NoCareRefresh,TRUE,
-        WA_Title,(ULONG)label_title,
         ui->label_shape ? WA_ShapeRegion : TAG_IGNORE,(ULONG)ui->label_shape,
         WA_IDCMP,0,TAG_DONE);
     if (ui->label) {
         paint_label(ui,&glass,display,outer,outer+(size_t)width*height,g.text_x,g.text_top,g.text);
         ui->label_left = ui->label->LeftEdge; ui->label_top = ui->label->TopEdge;
-    } else close_label_window(ui);
+    } else dock_ui_hide_label(ui);
     free(outer);
     return ui->label != NULL;
 }
 
-static void move_label_window(DockUI *ui, DockEdge edge, const DockRect *anchor)
-{
-    int left, top;
-    struct Window *label = ui->label;
-    if (!label || label->LeftEdge != ui->label_left || label->TopEdge != ui->label_top) return;
-    if (!label_position(ui,edge,anchor,label->Width,label->Height,&left,&top)) {
-        close_label_window(ui); return;
-    }
-    if (left == ui->label_left && top == ui->label_top) return;
-    MoveWindow(label,left-ui->label_left,top-ui->label_top);
-    ui->label_left = left; ui->label_top = top;
-}
-
-/* Bring the label window to the state job asks for. */
-static void apply_label(DockUI *ui, const LabelJob *job)
-{
-    if (!job->visible) close_label_window(ui);
-    else if (!ui->label || job->text_serial != ui->label_serial) {
-        close_label_window(ui);
-        if (open_label(ui,job->edge,&job->anchor,job->text)) ui->label_serial = job->text_serial;
-    } else move_label_window(ui,job->edge,&job->anchor);
-}
-
-static LONG label_worker_entry(void)
-{
-    struct Process *self = (struct Process *)FindTask(NULL);
-    for (;;) {
-        LabelJob *job;
-        WaitPort(&self->pr_MsgPort);
-        job = (LabelJob *)GetMsg(&self->pr_MsgPort);
-        if (!job) continue;
-        if (job->stop) {
-            /* Return to DOS before the caller can unload our program code. */
-            Forbid();
-            ReplyMsg(&job->message);
-            return 0;
-        }
-        apply_label(job->ui,job);
-        ReplyMsg(&job->message);
-    }
-}
-
-static int start_label_worker(DockUI *ui)
-{
-    if (ui->label_worker) return 1;
-    if (!ui->label_replies && !(ui->label_replies = CreateMsgPort())) return 0;
-    /* Below the main task: the dock's frames come first. */
-    ui->label_worker = CreateNewProcTags(NP_Entry,(ULONG)label_worker_entry,
-        NP_Name,(ULONG)label_title,NP_Priority,0,NP_StackSize,32768,
-        NP_CopyVars,FALSE,NP_WindowPtr,(ULONG)-1,TAG_DONE);
-    return ui->label_worker != NULL;
-}
-
-static void stop_label_worker(DockUI *ui)
-{
-    if (ui->label_worker) {
-        dock_ui_hide_label(ui);
-        memset(&ui->label_job,0,sizeof(ui->label_job));
-        ui->label_job.message.mn_Node.ln_Type = NT_MESSAGE;
-        ui->label_job.message.mn_ReplyPort = ui->label_replies;
-        ui->label_job.message.mn_Length = sizeof(ui->label_job);
-        ui->label_job.stop = 1;
-        PutMsg(&ui->label_worker->pr_MsgPort,&ui->label_job.message);
-        WaitPort(ui->label_replies);
-        GetMsg(ui->label_replies);
-        ui->label_worker = NULL;
-    }
-    if (ui->label_replies) { DeleteMsgPort(ui->label_replies); ui->label_replies = NULL; }
-}
-
-/* Collect the label task's answer and send it the latest wish. */
-static void label_pump(DockUI *ui)
-{
-    if (ui->label_busy && GetMsg(ui->label_replies)) ui->label_busy = 0;
-    if (ui->label_busy || !ui->label_dirty) return;
-    ui->label_dirty = 0;
-    if (!start_label_worker(ui)) { apply_label(ui,&ui->label_want); return; }
-    ui->label_job = ui->label_want;
-    ui->label_job.message.mn_Node.ln_Type = NT_MESSAGE;
-    ui->label_job.message.mn_ReplyPort = ui->label_replies;
-    ui->label_job.message.mn_Length = sizeof(ui->label_job);
-    ui->label_job.ui = ui; ui->label_job.stop = 0;
-    PutMsg(&ui->label_worker->pr_MsgPort,&ui->label_job.message);
-    ui->label_busy = 1;
-}
-
-int dock_ui_label_working(const DockUI *ui)
-{
-    return ui && ui->label_busy && ui->label_job.message.mn_Node.ln_Type != NT_REPLYMSG;
-}
-
-void dock_ui_label_pump(DockUI *ui)
-{
-    if (ui && ui->label_replies) label_pump(ui);
-}
-
-int dock_ui_show_label(DockUI *ui, DockEdge edge, const DockRect *anchor, const char *text)
-{
-    if (ui->float_layer) {
-        dock_ui_hide_label(ui);
-        return open_label(ui,edge,anchor,text);
-    }
-    ui->label_want.visible = 1;
-    ui->label_want.edge = edge; ui->label_want.anchor = *anchor;
-    strncpy(ui->label_want.text,text,sizeof(ui->label_want.text)-1);
-    ui->label_want.text[sizeof(ui->label_want.text)-1] = 0;
-    ui->label_want.text_serial = ++ui->next_label_serial;
-    ui->label_dirty = 1;
-    label_pump(ui);
-    return 1;
-}
 
 void dock_ui_move_label(DockUI *ui, DockEdge edge, const DockRect *anchor)
 {
     int left, top;
+    struct Window *label = ui->label;
     if (ui->label_float) {
         if (!label_position(ui,edge,anchor,ui->label_width,ui->label_height,&left,&top) ||
             !amiga_float_move(ui->float_layer,left,top)) { dock_ui_hide_label(ui); return; }
         ui->label_left = left; ui->label_top = top;
         return;
     }
-    if (!ui->label_want.visible) return;
-    if (ui->label_want.edge != edge || memcmp(&ui->label_want.anchor,anchor,sizeof(*anchor))) {
-        ui->label_want.edge = edge; ui->label_want.anchor = *anchor;
-        ui->label_dirty = 1;
+    if (!label || label->LeftEdge != ui->label_left || label->TopEdge != ui->label_top) return;
+    if (!label_position(ui,edge,anchor,label->Width,label->Height,&left,&top)) {
+        dock_ui_hide_label(ui); return;
     }
-    label_pump(ui);
+    if (left == ui->label_left && top == ui->label_top) return;
+    MoveWindow(label,left-ui->label_left,top-ui->label_top);
+    ui->label_left = left; ui->label_top = top;
 }
 
 static int window_bounds(const struct Window *window, DockRect *bounds)
@@ -2840,8 +2711,6 @@ int dock_ui_open_popup(DockUI *ui, DockEdge edge, int anchor_x, int anchor_y,
     const struct Window *native_dock,
     int item_action, int can_keep, int drawer)
 {
-    /* Not while the label task draws with the same fonts. */
-    if (ui) dock_ui_hide_label(ui);
     struct RastPort measure;
     DockRect dock;
     int i, width = 0, height, left, top, screen_top, covers_native_dock;
@@ -2999,8 +2868,6 @@ static int show_folder(DockUI *ui, FolderAnchor anchor, const char *path, size_t
 int dock_ui_open_folder(DockUI *ui, DockEdge edge, int x, int y, const char *path,
     int icon_size, DockUIReadIcon read_icon, const void *context, int profile)
 {
-    /* Not while the label task draws with the same fonts. */
-    if (ui) dock_ui_hide_label(ui);
     return ui && !ui->dialog && *path &&
         show_folder(ui,(FolderAnchor){edge,x,y,icon_size,profile,read_icon,context},path,strlen(path),1);
 }
@@ -3141,8 +3008,6 @@ static void update_limits(DockUI *ui, int live);
 
 int dock_ui_open_settings(DockUI *ui, const DockUIPrefs *initial)
 {
-    /* Not while the label task draws with the same fonts. */
-    if (ui) dock_ui_hide_label(ui);
     static const char *const slider_labels[] = {"_Size","Sc_ale"};
     SettingsView *s;
     struct Window *w;
@@ -3361,8 +3226,6 @@ static void open_about_link(DockUI *ui)
 
 int dock_ui_open_about(DockUI *ui)
 {
-    /* Not while the label task draws with the same fonts. */
-    if (ui) dock_ui_hide_label(ui);
     struct RastPort measure;
     struct Gadget *previous;
     int i, width = 240, height = 2*ABOUT_MARGIN, button_width, button_height;

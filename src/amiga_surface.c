@@ -84,16 +84,18 @@ int open_surface(App *app)
        bottom edge, inside a side dock for its widest label (capped; a
        longer one is shortened). The rows and columns grow on the side
        away from the screen edge, where the layout is not anchored. */
-    app->label_overlay = 0;
-    app->label_column = 0;
-    if (app->count && dock_ui_label_height(app->ui) > 0) {
+    app->label_max_width = 0;
+    if (app->count) {
+        int label = dock_ui_label_height(app->ui);
         DockPlacement rest[DOCK_MAX_ITEMS];
-        if (dock_edge_layout(&app->settings,app->edge,app->count,app->width,app->height,0,0,0,rest)) {
+        if (label > 0 && dock_edge_layout(&app->settings,app->edge,app->count,app->width,app->height,0,0,0,rest)) {
             int need;
             if (app->edge == DOCK_EDGE_BOTTOM) {
                 int headroom = rest[0].y+rest[0].size-app->settings.max_size;
-                need = DOCK_UI_LABEL_GAP+dock_ui_label_height(app->ui)-headroom;
+                need = DOCK_UI_LABEL_GAP+label-headroom;
                 if (need > 0) app->height += need;
+                app->label_max_width = app->screen->Width/2 < pip_visible_width(app) ?
+                    app->screen->Width/2 : pip_visible_width(app);
             } else {
                 int column = app->screen->Width/4 < 240 ? app->screen->Width/4 : 240, widest = 0, i;
                 int headroom = app->edge == DOCK_EDGE_RIGHT ?
@@ -107,9 +109,8 @@ int open_surface(App *app)
                 need = DOCK_UI_LABEL_GAP+widest-headroom;
                 if (need > 0) app->width += (need+31)&~31;
                 if (app->width > app->screen->Width) app->width = app->screen->Width&~31;
-                app->label_column = column;
+                app->label_max_width = column;
             }
-            app->label_overlay = 1;
         }
     }
     if (app->height > available_height) return 0;

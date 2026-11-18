@@ -139,10 +139,11 @@ static int frame_check(const App *app, DockRect *out)
         if (start < low) low = start;
         if (start+extent > high) high = start+extent;
     }
-    /* The hover label may reach past the icons near the row's ends. */
-    if (app->label_rect.right > app->label_rect.left) {
-        int start = bottom ? app->label_rect.left : app->label_rect.top;
-        int end = bottom ? app->label_rect.right : app->label_rect.bottom;
+    /* Overlays (the hover label) may reach past the icons. */
+    for (i = 0; i < app->renderer.previous.overlay_count && i < DOCK_MAX_OVERLAYS; ++i) {
+        const DockRect *r = &app->renderer.previous.overlay_rect[i];
+        int start = bottom ? r->left : r->top, end = bottom ? r->right : r->bottom;
+        if (end <= start) continue;
         if (start < low) low = start;
         if (end > high) high = end;
     }
@@ -209,10 +210,7 @@ static int live_capture(App *app, int full_compare)
     }
     started = app->profile ? profile_clock() : 0;
     force = !app->source_valid || !app->pip_visible;
-    /* The bitmap lock would wait for the label task's window: the next
-       poll captures what changed. */
-    if (!force && dock_ui_label_working(app->ui)) result = 0, box = (DockRect){0,0,0,0};
-    else result = amiga_display_capture565(app->display, app->source565,
+    result = amiga_display_capture565(app->display, app->source565,
         app->left, app->top, force, check, app->renderer.pixels->bytes_equal, &box);
     ++app->stats.source_polls;
     if (app->profile) {
