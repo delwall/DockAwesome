@@ -2,9 +2,10 @@ DockAwesome - a magnifying dock for the Vampire V4
 ==================================================
 
 Requirements
-  Vampire V4 (68080) with ApolloOS R9.5, AmigaOS 3.2.3 or AmigaOS 3.9.
-  Live transparency needs a 16-bit Workbench screen; the dock draws
-  through SAGA PiP and uses AMMX. Other screens get a static background.
+  Vampire V4 (68080) with ApolloOS R9.5, AmigaOS 3.2.3, AmigaOS 3.9,
+  AmigaOS 3.1.4.1 or AmiKit XE. The dock draws through SAGA PiP and uses
+  AMMX, on a 16, 24 or 32-bit Workbench screen. When PiP cannot run, the
+  dock says why and quits.
 
 Install
   1. Copy DockAwesome and DockAwesome.info to SYS:WBStartup to start it

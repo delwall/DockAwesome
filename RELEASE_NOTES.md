@@ -1,6 +1,6 @@
 # Release notes
 
-## Next release
+## 1.0 beta 3
 
 Changes since 1.0 beta 2.
 
@@ -8,6 +8,19 @@ Changes since 1.0 beta 2.
 - Runs on AmiKit XE, AmigaOS 3.9 and AmigaOS 3.1.4.1 on the Vampire.
 - Works with Directory Opus Magellan II as the desktop (AmiKit): icons
   from the desktop and from listers can be dropped on the dock.
+
+**Look and feel**
+- Name labels appear at once when you point at an icon and follow it as it
+  zooms, like the macOS Dock. They are drawn in the dock itself, on every
+  system and on every edge.
+- Moving along the dock no longer stutters: each label used to cost the
+  dock a frame or two.
+- The row keeps its pace when the zoom ends and follows the pointer more
+  closely.
+- The dock keeps zooming while a Folder Stack is open, and the stack's tip
+  follows its pin.
+- The Folder Stack opens more smoothly, with a frame every field and no
+  hitch just before it is fully open.
 
 **PiP only**
 - The dock always uses SAGA PiP. When PiP cannot run (screen depth, core,
@@ -18,6 +31,10 @@ Changes since 1.0 beta 2.
   an illegal instruction.
 
 **Fixes**
+- On 24-bit screens the dock spends about half as much time watching the
+  background while it rests.
+- No old strip left over a window that closes next to the dock (seen on
+  AmigaOS 3.9).
 - A running program's dot goes away when it quits, also without Workbench.
 - A dragged icon no longer blinks over the dock.
 - A selection box drawn across the dock stays visible.
