@@ -402,3 +402,9 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
   means "no hover", not a bug. Aim at an icon's centre from a pip-dump,
   and log the gating state while the pointer is in, not at exit (the
   exit path has already hidden PiP).
+- A later change can make an earlier one dead weight: after moving the
+  label into the canvas, the label task only served the no-AA fallback.
+  Review the whole day's diff, not each step, before installing.
+- "Draw unless this field already has a present" lets a redraw start
+  late in a field and run into the next one; drawing at the field's start
+  measured better (2 vs 4 stalls per sweep).

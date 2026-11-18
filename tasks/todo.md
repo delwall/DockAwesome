@@ -1308,3 +1308,7 @@ to the same slot (inverted offset test, store attributes required).
       the widest label, capped 240 px). Right/left tested with RAM test
       configs: label placement, sweep 1 late frame, damage-check clean.
       Build 473 installed; rollback Disabled/DockAwesome-build465.old.
+- [x] /simplify of today's work: label task removed (only the fallback
+      used it), label outline 3x faster (caps sampled once, identical
+      bytes), slots by pin, one placement and one build function. Build
+      479 installed; rollback Disabled/DockAwesome-build473.old.
