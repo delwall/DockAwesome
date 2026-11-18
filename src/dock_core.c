@@ -697,18 +697,23 @@ int dock_layout(const DockSettings *s, int count, int width, int height,
     return 1;
 }
 
+/* Following the pointer closes 1/DOCK_FOLLOW_DIV of the gap per tick. */
+#ifndef DOCK_FOLLOW_DIV
+#define DOCK_FOLLOW_DIV 3
+#endif
+
 static int ease(int from, int to)
 {
     int delta = to - from;
-    if (delta > 0) return from + (delta + 2) / 3;
-    if (delta < 0) return from - (-delta + 2) / 3;
+    if (delta > 0) return from + (delta + DOCK_FOLLOW_DIV-1) / DOCK_FOLLOW_DIV;
+    if (delta < 0) return from - (-delta + DOCK_FOLLOW_DIV-1) / DOCK_FOLLOW_DIV;
     return from;
 }
 
 static int64_t ease_center(int64_t from, int64_t to)
 {
     int64_t delta = to-from, distance = delta < 0 ? -delta : delta;
-    int64_t step = ((distance+767)/768)*256;
+    int64_t step = ((distance+256*DOCK_FOLLOW_DIV-1)/(256*DOCK_FOLLOW_DIV))*256;
     /* Retain the old one-pixel minimum correction. A 1/256px minimum would
        add a long visible tail without providing subpixel raster rendering. */
     if (step > distance) step = distance;
