@@ -1279,3 +1279,8 @@ to the same slot (inverted offset test, store attributes required).
       (rollback copy and scratch cc1 builds removed). The toolchain build
       needs a PATH without spaces (VMware Fusion's entry broke the port
       libraries' configure).
+- [x] Stable scripts: same bbb-opts.c code, fix applies unchanged. A Stable
+      cc1 before/after over the same 720 compilations: 709 identical, 11
+      only add reloads of stack slots; no wrong code found, so the defect is
+      latent there. PR WDrijver/ApolloCrossDev#31 (patch file identical to
+      #30, plus the step in GCC-6.50-Stable-MacOS.sh/-Linux.sh).
