@@ -1284,3 +1284,8 @@ to the same slot (inverted offset test, store attributes required).
       only add reloads of stack slots; no wrong code found, so the defect is
       latent there. PR WDrijver/ApolloCrossDev#31 (patch file identical to
       #30, plus the step in GCC-6.50-Stable-MacOS.sh/-Linux.sh).
+- [x] Zoom curve: 8, 10 and 12 ticks looked the same to the user (the
+      cubic ease-out differs by about 40 ms). Following divisors 1/4 and
+      1/5 (40 -> 60/80 ms lag) gave no visible gain either. Kept 8 ticks
+      and 1/3: build 434 stays installed; all variants deleted from
+      SYS:WBStartup/Disabled (412 rollback kept).
