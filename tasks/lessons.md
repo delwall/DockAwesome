@@ -378,3 +378,14 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
 - The independent review of a day's fixes found seven defects in them,
   two in code that had passed on hardware. Run it before installing, not
   after (2026-11-17).
+- "It stutters" with on-time frames: look at motion, not timing. A frame
+  trace showed every zoom frame inside its field and --damage-check found
+  no wrong pixel; the hitch was a velocity change where the zoom envelope
+  handed over to pointer following (2026-11-18). Simulate a moving pointer
+  on the host before tuning curves the user cannot tell apart.
+- Several amiga_move_mouse calls in one message run back to back: each
+  entry was cut off by the next exit after 40 ms. One move per message,
+  with the test dock started and settled first (Wait 6).
+- A copy over SYS:WBStartup/DockAwesome can fail "object is in use" while
+  no dock runs; copy to .new and Rename instead. The 64-entry TaskList hid
+  the dock (now 256 entries).
