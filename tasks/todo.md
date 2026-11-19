@@ -1407,7 +1407,18 @@ to the same slot (inverted offset test, store attributes required).
       the window inactive (border 128 -> 168 grey); the capture stopped at
       the press but the receiver's copy was used only near the dock. Now it
       is used from the press. User: "Perfekt!".
+- [x] Drag on 3.2.3: the press redrew the window under the dock inactive
+      and that border was drawn over the icons as drag image; the reference
+      is now read from the screen as the gesture starts. User: "inga band".
+- [x] Drop on 3.2.3: a disk dropped on the plate over a drawer was copied
+      into it. The receiver without shapes arms over the plate in front of
+      other programs' windows; it steps back while the wheel scrolls a
+      window under the plate. User: "Nu ser det ut att fungera bra".
+- [ ] Personal:1234-5678 (partial copy from the drop bug): ask the user
+      before deleting.
 - [ ] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete{,2,3} after
-      the next ApolloOS reboot; RAM:BreakTask when testing is done.
+      the next ApolloOS reboot, and -locked-delete{,2,3,4} after the next
+      3.2.3 boot; RAM:BreakTask and RAM:TaskList when testing is done.
+- [ ] ApolloOS: recheck the drag (reference now read from the screen).
 - [ ] Quick look at bottom and right docks on Coffin and 3.2.3 before the
       push (edge_padding and drag reference change apply everywhere).

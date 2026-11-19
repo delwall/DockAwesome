@@ -995,7 +995,7 @@ static void drop_catcher_flags(App *app, unsigned int flags)
 static void update_drop_catcher(App *app)
 {
     struct Screen *screen;
-    ULONG serial;
+    ULONG serial, wheel;
     int x, y, held, dragged, cancelled, up_x, up_y, up_known;
     unsigned int flags;
     if (!app->drop_catcher) return;
@@ -1008,11 +1008,19 @@ static void update_drop_catcher(App *app)
     cancelled = app->input_context.external_cancelled;
     up_known = app->input_context.external_up_known;
     up_x = app->input_context.external_up_x; up_y = app->input_context.external_up_y;
+    wheel = app->input_context.wheel_serial;
     Enable();
     if (cancelled || app->gesture.active || app->input_context.held || dock_ui_busy(app->ui))
         flags = amiga_drop_catcher_cancel(app->drop_catcher);
-    else flags = amiga_drop_catcher_update(app->drop_catcher, serial, screen, x, y, held, dragged,
-        up_known, up_x, up_y, PeekQualifier(), profile_clock(), app->clock_hz);
+    else {
+        uint64_t now = profile_clock();
+        flags = 0;
+        if (wheel != app->wheel_seen && !held)
+            flags = amiga_drop_catcher_wheel(app->drop_catcher, now, app->clock_hz);
+        flags |= amiga_drop_catcher_update(app->drop_catcher, serial, screen, x, y, held, dragged,
+            up_known, up_x, up_y, PeekQualifier(), now, app->clock_hz);
+    }
+    app->wheel_seen = wheel;
     drop_catcher_flags(app, flags);
 }
 

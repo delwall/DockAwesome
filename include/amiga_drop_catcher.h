@@ -39,6 +39,10 @@ unsigned int amiga_drop_catcher_update(AmigaDropCatcher *catcher,
    with ambiguous coordinates retains the catcher until acceptance or a 300ms
    deadline. Keep servicing the existing timer during that grace. */
 unsigned int amiga_drop_catcher_accepted(AmigaDropCatcher *catcher);
+/* Without shapes: a wheel event arrived. Over a window that lies under the
+   plate the receiver steps back and arms again only once the wheel has been
+   still a moment. Returns flags as update does. */
+unsigned int amiga_drop_catcher_wheel(AmigaDropCatcher *catcher, uint64_t now, uint32_t frequency);
 unsigned int amiga_drop_catcher_cancel(AmigaDropCatcher *catcher);
 int amiga_drop_catcher_active(const AmigaDropCatcher *catcher);
 /* Nonzero when the screen point (x, y) lies where drops are caught now. */

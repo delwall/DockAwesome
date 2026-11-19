@@ -486,3 +486,10 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
   dockan"), measure exactly that spot frame by frame before theorising;
   then check what the OS itself changes there (a window border is drawn
   darker when active) and when the dock's copy of it is taken.
+- A drop target that waits behind other windows hands drops to them: a
+  disk dropped on the plate over a drawer started copying into it (3.2.3).
+  Weigh such a trade-off with the user up front; then cover its side
+  effect where it shows (the wheel scrolling a window hidden under the
+  receiver).
+- Check what the machine is (Version, volumes) before naming the system in
+  reports, and take the user's word for which boot it is.

@@ -59,7 +59,8 @@ icon or drawer (on the Directory Opus desktop, always) it covers the plate,
 grown for a drop, in front of other programs' windows and behind the dock's
 own: a drop on the plate reaches the dock even where a window lies under
 it. That window shows under the plate as it was when the receiver armed
-until it steps back.
+until it steps back; it steps back while the wheel scrolls a window that
+lies under the plate and arms again 250 ms after the wheel stops.
 
 Keep the insertion gap through the AppMessage handoff. Save the release
 coordinates before later motion can overwrite them. Restore the idle

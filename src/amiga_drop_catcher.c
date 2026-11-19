@@ -481,6 +481,30 @@ static unsigned int arm_for_pointer(AmigaDropCatcher *c, uint64_t now, uint32_t 
     return AMIGA_DROP_STARTED;
 }
 
+/* The wheel scrolls the window under the pointer. Where that window lies
+   under the plate the armed receiver hid the change: a drawer's old icons
+   stayed under the plate while it scrolled (AmigaOS 3.2.3). Step back while
+   it scrolls; arm again once the wheel has been still a moment. */
+unsigned int amiga_drop_catcher_wheel(AmigaDropCatcher *c, uint64_t now, uint32_t frequency)
+{
+    const struct Layer *layer;
+    const struct Rectangle *r;
+    int under = 0;
+    if (!c || c->shaped || c->active || c->waiting) return 0;
+    if (!AttemptSemaphore(&c->screen->LayerInfo.Lock)) return 0;
+    layer = WhichLayer(&c->screen->LayerInfo, c->screen->MouseX, c->screen->MouseY);
+    if (layer && layer != c->window->WLayer && layer->Window &&
+        !(((const struct Window *)layer->Window)->Flags & WFLG_BACKDROP)) {
+        const struct Rectangle *b = &layer->bounds;
+        r = &c->rest;
+        under = b->MaxX >= r->MinX && b->MinX <= r->MaxX && b->MaxY >= r->MinY && b->MinY <= r->MaxY;
+    }
+    ReleaseSemaphore(&c->screen->LayerInfo.Lock);
+    if (!under) return 0;
+    c->rearm_at = now+frequency/4;
+    return c->armed ? end_catch(c, 1) : 0;
+}
+
 unsigned int amiga_drop_catcher_accepted(AmigaDropCatcher *c)
 {
     return amiga_drop_catcher_cancel(c);

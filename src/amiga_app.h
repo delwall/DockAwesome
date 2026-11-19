@@ -124,6 +124,7 @@ typedef struct {
     volatile ULONG external_serial;
     volatile int external_held;
     volatile int external_dragged, external_cancelled;
+    volatile ULONG wheel_serial; /* counts wheel events */
     volatile int right_held, menu_cancelled, ui_busy, popup_open, popup_dismiss;
     /* The Folder Stack's close button in screen coordinates, while it is
        shown: a press there closes the stack and the pair is consumed. */
@@ -478,6 +479,7 @@ typedef struct App {
     int label_room; /* rows (bottom) or columns (sides) the canvas grew for it */
     /* app->count when the receiver's resting plate was last set. */
     int rest_count;
+    ULONG wheel_seen; /* input_context.wheel_serial when last handled */
     LabelSlot label_slot[DOCK_MAX_ITEMS];
     unsigned long label_stamp;
     /* The close button that replaces the Folder Stack pin while it is

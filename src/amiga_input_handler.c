@@ -4,6 +4,17 @@
    handler (dispatch_shell_close). The main task publishes hit snapshots
    (input_publish) and reads the queued button pairs (input_pop). */
 #include "amiga_app.h"
+#include <libraries/keymap.h>
+
+/* NewMouse drivers send the wheel as raw keys, some also in this class. */
+#define DOCK_IECLASS_NEWMOUSE 0x16
+
+static int wheel_event(const struct InputEvent *e)
+{
+    UWORD code = e->ie_Code & ~IECODE_UP_PREFIX;
+    return e->ie_Class == DOCK_IECLASS_NEWMOUSE ||
+        (e->ie_Class == IECLASS_RAWKEY && code >= RAWKEY_WHEEL_UP && code <= RAWKEY_WHEEL_RIGHT);
+}
 
 static int snapshot_hit(const InputSnapshot *s, int x, int y)
 {
@@ -265,7 +276,10 @@ struct InputEvent *dock_input_observe(struct InputEvent *events, void *context)
             /* Intuition applies acceleration later. Injected move/button chains
                must not use guessed button coordinates. Their owned UP cancels. */
             if (e->ie_Code == IECODE_NOBUTTON || (!relative_left && (e->ie_X || e->ie_Y))) moved = 1;
-        } else if (e->ie_Class != IECLASS_NULL) moved = 1;
+        } else if (e->ie_Class != IECLASS_NULL) {
+            moved = 1;
+            if (wheel_event(e)) { ++c->wheel_serial; notify = 1; }
+        }
     }
     /* Pointer motion on another screen cannot change the dock. The live
        timer still notices when the dock screen returns to the front. */
