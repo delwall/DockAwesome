@@ -47,13 +47,13 @@ int amiga_drop_catcher_contains(const AmigaDropCatcher *catcher, int x, int y);
    shapes where the armed window lies, else the whole box. */
 void amiga_drop_catcher_rect(const AmigaDropCatcher *catcher,
     int *left, int *top, int *right, int *bottom);
-/* Without shapes: the part of the box the window covers while it rests on
-   the Directory Opus desktop (the dock's resting plate), clipped to the
-   box. It moves there on a later pass once the pointer is off the dock. */
+/* Without shapes: the part of the box the window covers while armed (the
+   dock's resting plate, grown for a drop), clipped to the box. It moves
+   there on a later pass once the pointer is off the dock. */
 void amiga_drop_catcher_set_rest(AmigaDropCatcher *catcher, int left, int top, int width, int height);
-/* The dock's own windows (popups, menus, the dragged pin): the window
-   resting on the Directory Opus desktop lies in front of every other
-   program's window on the plate, but behind these. */
+/* The dock's own windows (popups, menus, the dragged pin): the armed
+   window lies in front of every other program's window on the plate, but
+   behind these. */
 void amiga_drop_catcher_set_owner(AmigaDropCatcher *catcher,
     int (*ours)(void *data, struct Window *window), void *data);
 /* Call ONLY AFTER CloseWindow: the temporary Region must outlive its Layer,

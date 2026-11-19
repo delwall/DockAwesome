@@ -41,11 +41,10 @@ static DockRect drop_box(const App *app)
     return box;
 }
 
-/* Without shapes the receiver rests on the Directory Opus desktop over the
-   plate alone: at rest, and as it grows while it makes room for a drop (an
-   external drag does not zoom). Without the room, the dragged icon was cut
-   where the grown plate passed the receiver: it seemed to go through the
-   last pin (AmiKit). */
+/* Without shapes the armed receiver lies over the plate alone: at rest,
+   and as it grows while it makes room for a drop (an external drag does not
+   zoom). Without the room, the dragged icon was cut where the grown plate
+   passed the receiver: it seemed to go through the last pin (AmiKit). */
 static void rest_plate(App *app)
 {
     DockPlacement rest[DOCK_MAX_ITEMS];

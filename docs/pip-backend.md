@@ -53,6 +53,14 @@ read takes the screen under the box as the reference (after the press has
 redrawn the window it deactivated); later reads compare the screen with
 it. The source key then shows the native drag image over the dock.
 
+Without window shapes (AmigaOS 3.x) the receiver is a plain window that
+must lie on the dock before the press. While the pointer is on a Workbench
+icon or drawer (on the Directory Opus desktop, always) it covers the plate,
+grown for a drop, in front of other programs' windows and behind the dock's
+own: a drop on the plate reaches the dock even where a window lies under
+it. That window shows under the plate as it was when the receiver armed
+until it steps back.
+
 Keep the insertion gap through the AppMessage handoff. Save the release
 coordinates before later motion can overwrite them. Restore the idle
 shape after the message, cancellation, a known outside release, or a

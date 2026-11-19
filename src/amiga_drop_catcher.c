@@ -38,15 +38,15 @@ struct AmigaDropCatcher {
     int shaped; /* catch by shape (ApolloOS) or by moving the window */
     int armed;  /* no shapes: the window waits on the dock's box */
     /* No shapes: where the window lies while armed (screen coordinates,
-       inside the box). On a Workbench icon it is the box; resting on the
-       Directory Opus desktop (rest_armed) it is only the plate (rest). */
+       inside the box): the plate (rest). rest_armed: it stays there
+       between gestures (the Directory Opus desktop). */
     struct Rectangle armed_at, rest;
     int rest_armed;
     int dopus_desktop; /* the pointer has been on a Directory Opus 5 desktop */
-    /* The dock's own windows, which a resting window stays behind. */
+    /* The dock's own windows, which the armed window stays behind. */
     int (*ours)(void *data, struct Window *window);
     void *ours_data;
-    uint64_t order_check_at; /* resting: check its place in front from then */
+    uint64_t order_check_at; /* armed: check its place in front from then */
     int repaint; /* armed: the corner pixel still shows what the move carried */
     AmigaDropCatcherStats stats;
     uint32_t serial;
@@ -319,24 +319,20 @@ static int set_catching(AmigaDropCatcher *c, int catching)
         struct Region *previous = amiga_change_window_shape(c->window, catching ? c->catch_region : c->normal);
         return previous == expected || (!catching && previous == c->normal);
     }
-    /* Behind the other windows (in front of the backdrop): in front, a
-       window on the dock's box was hidden behind the save-under while
-       armed, and changes in it (scrolling, a move) showed as stale bands
-       through PiP (Coffin, AmigaOS 3.2.3). A drop where a window lies on
-       the box goes to that window. */
+    /* It covers only the plate, where the dock hides every window: in front
+       of the other programs' windows there (behind the dock's own). Behind
+       them, a drop over a window under the dock went to that window: a
+       Directory Opus lister (AmiKit), a Workbench drawer that started
+       copying the dropped disk into itself (AmigaOS 3.2.3). Over the whole
+       box a window in the headroom was cut and showed stale bands through
+       PiP (Coffin). Under the plate a window shows as it was when the
+       receiver armed until it steps back. */
     if (catching) {
         const struct Rectangle *r = &c->armed_at;
+        int busy;
         ChangeWindowBox(c->window, r->MinX, r->MinY, r->MaxX-r->MinX+1, r->MaxY-r->MinY+1);
-        /* Resting on the Directory Opus desktop, it covers only the plate,
-           where the dock hides every window: in front of the other
-           programs' windows there (behind the dock's own). Behind them, a
-           drop over a lister under the dock went to that lister, and the
-           lister redrawn by the press read as drag image (AmiKit). */
-        if (c->rest_armed) {
-            int busy;
-            foreign_front(c, r, 0, &busy, c->window);
-            if (busy) WindowToBack(c->window);
-        } else WindowToBack(c->window);
+        foreign_front(c, r, 0, &busy, c->window);
+        if (busy) WindowToBack(c->window);
     } else ChangeWindowBox(c->window, 0, 0, 1, 1);
     return 1;
 }
@@ -420,9 +416,8 @@ static unsigned int arm_for_pointer(AmigaDropCatcher *c, uint64_t now, uint32_t 
     if (c->armed) {
         ULONG windows = box_windows(c, &c->armed_at);
         if (windows && windows != c->windows) {
-            /* A window on the dock's box closed or moved while the armed
-               window lay behind it: the part it uncovered was filled from
-               the copy, which still shows that window (a band of it stayed
+            /* A window on the plate closed or moved while the receiver lay
+               there: the copy still shows that window (a band of it stayed
                on the screen for as long as the pointer rested on the dock,
                Coffin). Step back so the desktop redraws, and arm again
                only after it has. */
@@ -431,8 +426,8 @@ static unsigned int arm_for_pointer(AmigaDropCatcher *c, uint64_t now, uint32_t 
         }
     }
     if (c->armed && c->repaint) repaint_corner(c);
-    if (c->armed && c->rest_armed && now >= c->order_check_at) {
-        /* Another program's window came in front of the resting window:
+    if (c->armed && now >= c->order_check_at) {
+        /* Another program's window came in front of the armed window:
            step back and arm again in front of it. */
         int busy;
         if (foreign_front(c, &c->armed_at, 1, &busy, NULL) && !busy) {
@@ -453,18 +448,18 @@ static unsigned int arm_for_pointer(AmigaDropCatcher *c, uint64_t now, uint32_t 
        desktop anyway: on the whole box it took the clicks on desktop icons
        beside and above the dock, and Directory Opus could not redraw there
        (half of a moved icon stayed, AmiKit). */
-    /* Once Directory Opus is seen as the desktop, rest on the plate for
-       its lister icons too: leaving the whole box made it erase and redraw
-       every desktop icon there (they vanished for a few frames, AmiKit).
-       Workbench never gives 2, so its arms keep the whole box. */
+    /* Once Directory Opus is seen as the desktop, stay on the plate for
+       its lister icons too: leaving made it erase and redraw every desktop
+       icon there (they vanished for a few frames, AmiKit). Workbench never
+       gives 2. */
     if (client == 2) c->dopus_desktop = 1;
-    want = c->dopus_desktop ? c->rest :
-        (struct Rectangle){c->left, c->top, c->left+c->width-1, c->top+c->height-1};
+    want = c->rest;
     if (c->armed) {
         if (client && !memcmp(&want, &c->armed_at, sizeof(want))) return 0;
-        /* The desktop redraws where a resting window was: a copy taken
-           before it has finished showed a stale rectangle through PiP. */
-        if (c->rest_armed) c->rearm_at = now+frequency/4;
+        /* The desktop and windows redraw where the receiver was: a copy
+           taken before they have finished showed a stale rectangle through
+           PiP. */
+        c->rearm_at = now+frequency/4;
         return end_catch(c, 1);
     }
     if (!client) return 0;
