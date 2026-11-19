@@ -1010,6 +1010,14 @@ working on 2026-11-10.
 - [x] Installed on AmiKit: build 503 (ca64844) in place of 1.0b3 at
       SYS:WBStartup/DockAwesome, started from the Shell (WBRun needs
       Workbench). RAM: test files removed. ApolloExplorerSrv left running.
+- [x] ApolloOS R9.5 (2026-11-19): build 503 installed at SYS:WBStartup (the
+      locked old file moved to Disabled/DockAwesome-locked-delete, delete it
+      after the next boot; the two older locked files deleted). Agent drags:
+      desktop icon dropped mid-dock pinned at the middle slot (messages=1
+      added=1), drag image painted (5 frames), drop on the desktop and a
+      click on a desktop icon pinned nothing. Config restored, test files
+      removed, dock restarted with WBRun.
+- [ ] Coffin and AmigaOS 3.2.3 still to re-run.
 - [ ] Old bug (also in 1.0b3, reproduced twice): a second dock started while
       one runs fails with "PiP2 is already in use" and crashes the machine
       after OK, while exiting. No more crash tests on AmiKit (user). Plan:
