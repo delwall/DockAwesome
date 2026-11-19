@@ -1395,3 +1395,19 @@ to the same slot (inverted offset test, store attributes required).
 - [x] Release binary (DockAwesome 1.0 (2026-11-18) beta 3) installed on
       ApolloOS. Disabled/DockAwesome-locked-delete and -locked-delete-482:
       delete after the next reboot.
+
+## ApolloOS: left dock alignment and drag flicker (2026-11-19)
+
+- [x] Left dock: windows under the plate showed shifted a few px. SAGA
+      cannot start a PiP at x 0; the overlay now starts at x 3 (negative
+      edge_padding), the plate stays on the same pixels. pip-dump matched;
+      user: "Nu är det rätt!".
+- [x] Drag of a desktop icon: the window border under the plate flipped
+      from dark to light grey as the drag neared the dock. The press made
+      the window inactive (border 128 -> 168 grey); the capture stopped at
+      the press but the receiver's copy was used only near the dock. Now it
+      is used from the press. User: "Perfekt!".
+- [ ] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete{,2,3} after
+      the next ApolloOS reboot; RAM:BreakTask when testing is done.
+- [ ] Quick look at bottom and right docks on Coffin and 3.2.3 before the
+      push (edge_padding and drag reference change apply everywhere).

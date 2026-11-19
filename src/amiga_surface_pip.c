@@ -82,7 +82,7 @@ static int update_drag_mask(App *app, int sample)
     enum { DRAG_RADIUS = 128 };
     int x = app->screen->MouseX-app->left, y = app->screen->MouseY-app->top;
     int left = x-DRAG_RADIUS, top = y-DRAG_RADIUS;
-    int right = x+DRAG_RADIUS+1, bottom = y+DRAG_RADIUS+1, row;
+    int right = x+DRAG_RADIUS+1, bottom = y+DRAG_RADIUS+1, row, catching, near, reference_changed = 0;
     DockRect catch_box = {0,0,0,0};
     /* Only where the receiver lies is the baseline exact (its copy, taken
        before the press). Elsewhere the screen shows through the clear
@@ -100,24 +100,30 @@ static int update_drag_mask(App *app, int sample)
     if (top < catch_box.top) top = catch_box.top;
     if (right > catch_box.right) right = catch_box.right;
     if (bottom > catch_box.bottom) bottom = catch_box.bottom;
-    if (amiga_drop_catcher_active(app->drop_catcher) && app->input_context.external_held &&
-        app->input_context.external_dragged && right > left && bottom > top) {
-        int changed, reference_changed = 0;
+    catching = amiga_drop_catcher_active(app->drop_catcher) && app->input_context.external_held;
+    near = catching && app->input_context.external_dragged && right > left && bottom > top;
+    /* The capture stops as the gesture starts: take the receiver's copy
+       then, not once the pointer comes near. Until then the dock kept its
+       capture from before the press, and what the press changed under it
+       (a window's border drawn inactive) showed only as the drag neared:
+       the border flipped from dark to light grey (ApolloOS). */
+    if (catching && sample && !app->drag_reference) {
+        DockRect backing_box = drop_box(app);
+        backing_box.left -= app->left; backing_box.right -= app->left;
+        backing_box.top -= app->top; backing_box.bottom -= app->top;
+        if (amiga_display_drag_reference565(app->display,
+                amiga_drop_catcher_backing(app->drop_catcher),app->source565,pip_visible_width(app),
+                &backing_box,&catch_box)) {
+            app->drag_reference = 1;
+            app->renderer.pixels->decode565(app->backdrop.pixels,app->source565,
+                (unsigned long)app->width*app->height);
+            dock_renderer_backdrop_changed(&app->renderer);
+            reference_changed = 1;
+        } else app->drag_reference = -1;
+    }
+    if (near) {
+        int changed;
         if (!sample) return 0;
-        if (!app->drag_reference) {
-            DockRect backing_box = drop_box(app);
-            backing_box.left -= app->left; backing_box.right -= app->left;
-            backing_box.top -= app->top; backing_box.bottom -= app->top;
-            if (amiga_display_drag_reference565(app->display,
-                    amiga_drop_catcher_backing(app->drop_catcher),app->source565,pip_visible_width(app),
-                    &backing_box,&catch_box)) {
-                app->drag_reference = 1;
-                app->renderer.pixels->decode565(app->backdrop.pixels,app->source565,
-                    (unsigned long)app->width*app->height);
-                dock_renderer_backdrop_changed(&app->renderer);
-                reference_changed = 1;
-            } else app->drag_reference = -1;
-        }
         if (app->drag_reference > 0) {
             /* The drag image moves with the pointer, so a read that finds
                none mid-drag caught the drag between Directory Opus erasing
@@ -136,7 +142,7 @@ static int update_drag_mask(App *app, int sample)
             }
         }
     }
-    if (!app->drag_mask_live) return 0;
+    if (!app->drag_mask_live) return reference_changed;
     for (row = app->drag_box.top; row < app->drag_box.bottom; ++row)
         memset(app->drag_mask+(size_t)row*app->width+app->drag_box.left,0,
             (size_t)(app->drag_box.right-app->drag_box.left));

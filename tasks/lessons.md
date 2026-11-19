@@ -478,3 +478,11 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
   DockAwesome/...; `CD RAM:pkg` + `DockAwesome/` drops the folder.
 - Check the generated release body before publishing (a sed error left
   only the install line; fixed with gh release edit).
+- An alignment probe at one position does not prove alignment at a screen
+  edge: test where the overlay actually lies (a left dock at x 0 was off
+  by a few pixels while the centre was exact), and check that the probe's
+  arguments take effect (X Y were ignored when W H were given).
+- When the user names a spot that flickers ("fönstrets underkant bakom
+  dockan"), measure exactly that spot frame by frame before theorising;
+  then check what the OS itself changes there (a window border is drawn
+  darker when active) and when the dock's copy of it is taken.
