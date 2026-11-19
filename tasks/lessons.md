@@ -341,6 +341,58 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
 - Measure before the next guess: a per-frame count of painted drag pixels
   (all 1561 or 0, never partial) showed whole reads between Directory Opus's
   erase and redraw, where the "keep half-torn reads" guess had made it worse.
+- Read the other program's source before theorising about it (2026-11-19).
+  Directory Opus 5 (opus_magellan) takes LockLayers at the first drag move and
+  holds it until release, then asks WhichLayer at the release point; a foreign
+  window gets the drop only when it is frontmost there and in DOpus's own
+  AppWindow list (it patches AddAppWindowA). So the receiver must already lie
+  over the dock before the press: arming on the drag image or on the first
+  move lands after the release (messages=0), and moving a window during the
+  drag ends it (the icon stuck or vanished). Three wrong theories (late arm by
+  press point, timing gap, "DOpus keeps its drag when a window moves") each
+  cost the user a test before I read the code.
+- Every window move over the DOpus desktop makes DOpus redraw under it; a
+  copy taken before that redraw shows a stale rectangle through PiP. Keep the
+  receiver in place across clicks and drops, and wait before re-arming.
+- Shrinking a region changes every consumer of it: the catch box lost the
+  label strip, and the drag-image baseline (read from the receiver's copy
+  as if it covered the whole canvas) failed silently, so the dragged icon
+  vanished under the dock (frames=0). The first fix read the strip from the
+  last capture, which can be stale, and painted fragments. Grep every user
+  of a buffer before resizing it, and give a baseline only where it is exact.
+- A window that rests armed must cover only what the dock itself covers
+  (2026-11-19): resting on the whole catch box (651 rows, zoom headroom) it
+  took clicks on desktop icons above and beside the dock and froze DOpus's
+  redraws there (half an icon left behind, video IMG_2580). Ask what else a
+  permanent window hides before making one permanent.
+- Cover every path to the same window, not only the one in the report: the
+  plate rule was tied to the desktop arm, so a DOpus lister icon still armed
+  the whole box, and leaving it made DOpus erase and redraw every desktop
+  icon there (IMG_2581, 18.5 s). Step through the video frame by frame
+  (ffmpeg fps=15 tiles) to see what moves, not the 1 fps overview.
+- Test with windows lying under the dock (IMG_2582): a receiver behind the
+  other windows loses the drop to a lister under the dock, and the lister
+  redrawn by the press reads as drag image. Where the dock covers, the
+  receiver must lie in front of other programs' windows, behind the dock's
+  own. Ask the user to include overlapping windows in each drag test.
+- A screenshot shows the real screen without PiP: use it to tell a stray
+  pixel on the screen from one in the dock's picture (break the dock, look
+  again). ChangeWindowBox from 1x1 carries the window's old pixel to its new
+  corner; the backfill hook only fills what the move uncovered (2026-11-19).
+- A catch area must cover the plate as it grows while making room, not only
+  at rest: the drag image is drawn only inside it.
+- Clip a drawn copy by what hides the original, not by a nearby rectangle:
+  the drag image belongs wherever the dock is opaque (the native one is
+  hidden there) and nowhere on clear parts outside the receiver (the native
+  one shows). Clipped to the receiver, the plate's edge row crossed the image
+  as a line (IMG_2586).
+- A Workbench project can be its icon alone (AmigaOS 3.2 Shell: Shell.info,
+  tool SYS:System/CLI, no Shell file). A launcher that replaces Workbench
+  must pass drawer + name without locking the file. Read the requester text
+  with an enlarged screenshot crop when VisualPrefs patterns garble it.
+- A diagnostic that needs a semaphore another program holds records nothing:
+  AttemptSemaphore failed while DOpus held LayerInfo. Record unconditionally,
+  resolve later.
 
 - A dock started from WBStartup has no CLI number for Break. Stop it with a
   small tool that does FindTask("DockAwesome") and Signal(SIGBREAKF_CTRL_C)

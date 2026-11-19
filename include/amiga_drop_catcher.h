@@ -41,7 +41,23 @@ unsigned int amiga_drop_catcher_update(AmigaDropCatcher *catcher,
 unsigned int amiga_drop_catcher_accepted(AmigaDropCatcher *catcher);
 unsigned int amiga_drop_catcher_cancel(AmigaDropCatcher *catcher);
 int amiga_drop_catcher_active(const AmigaDropCatcher *catcher);
-/* Immutable desktop pixels sampled before Workbench starts the drag. */
+/* Nonzero when the screen point (x, y) lies where drops are caught now. */
+int amiga_drop_catcher_contains(const AmigaDropCatcher *catcher, int x, int y);
+/* Where drops are caught now, half-open, in screen coordinates: without
+   shapes where the armed window lies, else the whole box. */
+void amiga_drop_catcher_rect(const AmigaDropCatcher *catcher,
+    int *left, int *top, int *right, int *bottom);
+/* Without shapes: the part of the box the window covers while it rests on
+   the Directory Opus desktop (the dock's resting plate), clipped to the
+   box. It moves there on a later pass once the pointer is off the dock. */
+void amiga_drop_catcher_set_rest(AmigaDropCatcher *catcher, int left, int top, int width, int height);
+/* The dock's own windows (popups, menus, the dragged pin): the window
+   resting on the Directory Opus desktop lies in front of every other
+   program's window on the plate, but behind these. */
+void amiga_drop_catcher_set_owner(AmigaDropCatcher *catcher,
+    int (*ours)(void *data, struct Window *window), void *data);
+/* Immutable desktop pixels sampled before Workbench starts the drag, laid
+   out as the box (valid inside amiga_drop_catcher_rect). */
 struct BitMap *amiga_drop_catcher_backing(const AmigaDropCatcher *catcher);
 /* Call ONLY AFTER CloseWindow: the temporary Region must outlive its Layer,
    even if a shape operation failed. Does not dispose the caller's normal shape. */

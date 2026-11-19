@@ -25,9 +25,6 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
-#define CYBERGFX_BASE_NAME c->cyber
-#include <proto/cybergraphics.h>
-#include <cybergraphx/cybergraphics.h>
 
 enum { DESKTOP_ICON_CAP = 128 };
 
@@ -40,20 +37,26 @@ struct AmigaDropCatcher {
     int left, top, width, height;
     int shaped; /* catch by shape (ApolloOS) or by moving the window */
     int armed;  /* no shapes: the window waits on the dock's box */
+    /* No shapes: where the window lies while armed (screen coordinates,
+       inside the box). On a Workbench icon it is the box; resting on the
+       Directory Opus desktop (rest_armed) it is only the plate (rest). */
+    struct Rectangle armed_at, rest;
+    int rest_armed;
+    int dopus_desktop; /* the pointer has been on a Directory Opus 5 desktop */
+    /* The dock's own windows, which a resting window stays behind. */
+    int (*ours)(void *data, struct Window *window);
+    void *ours_data;
+    uint64_t order_check_at; /* resting: check its place in front from then */
+    int repaint; /* armed: the corner pixel still shows what the move carried */
     AmigaDropCatcherStats stats;
     uint32_t serial;
     uint64_t deadline, next_icons, icons_not_before;
     int have_serial, active, waiting, failed;
-    /* No shapes: a press on the Directory Opus desktop arms only once the
-       held drag shows its image on the dock's box, see arm_late. */
-    int late;
     /* No shapes, armed: the window shows a copy of the screen taken when it
        armed. windows: the other layers on the dock's box at that moment,
        see box_windows; once they differ the copy shows what is gone. */
     ULONG windows;
     uint64_t rearm_at;
-    struct Library *cyber; /* reads pixels for arm_late; NULL arms at once */
-    struct RastPort screen_rp, backing_rp;
     volatile int backing_valid;
     const struct Window *desktop;
     int icon_count, icons_incomplete;
@@ -185,9 +188,9 @@ static int workbench_client_start(const AmigaDropCatcher *c, int x, int y)
     return result;
 }
 
-/* The layers that lie on the dock's box, other than the receiver's own, as
-   one number: which they are and where. 0 when the layer list is busy. */
-static ULONG box_windows(const AmigaDropCatcher *c)
+/* The layers that lie on r, other than the receiver's own, as one number:
+   which they are and where. 0 when the layer list is busy. */
+static ULONG box_windows(const AmigaDropCatcher *c, const struct Rectangle *r)
 {
     struct Layer_Info *info = &c->screen->LayerInfo;
     const struct Layer *layer;
@@ -195,8 +198,8 @@ static ULONG box_windows(const AmigaDropCatcher *c)
     if (!AttemptSemaphore(&info->Lock)) return 0;
     for (layer = info->top_layer; layer; layer = layer->back) {
         const struct Rectangle *b = &layer->bounds;
-        if (layer == c->window->WLayer || b->MaxX < c->left || b->MinX >= c->left+c->width ||
-            b->MaxY < c->top || b->MinY >= c->top+c->height) continue;
+        if (layer == c->window->WLayer || b->MaxX < r->MinX || b->MinX > r->MaxX ||
+            b->MaxY < r->MinY || b->MinY > r->MaxY) continue;
         stamp = (stamp ^ (ULONG)layer) * 16777619UL;
         stamp = (stamp ^ (((ULONG)(UWORD)b->MinX<<16) | (UWORD)b->MinY)) * 16777619UL;
         stamp = (stamp ^ (((ULONG)(UWORD)b->MaxX<<16) | (UWORD)b->MaxY)) * 16777619UL;
@@ -205,10 +208,105 @@ static ULONG box_windows(const AmigaDropCatcher *c)
     return stamp ? stamp : 1;
 }
 
+/* The frontmost window on r of another program (not a backdrop), or NULL;
+   with before_own, only one in front of the receiver. busy when the layer
+   list is. Depth changes are deferred, so the caller may ask for one while
+   the list is held here: no window can close before it is released. */
+static struct Window *foreign_front(const AmigaDropCatcher *c, const struct Rectangle *r,
+    int before_own, int *busy, struct Window *place_behind)
+{
+    struct Layer_Info *info = &c->screen->LayerInfo;
+    const struct Layer *layer;
+    struct Window *found = NULL;
+    if (!AttemptSemaphore(&info->Lock)) { *busy = 1; return NULL; }
+    *busy = 0;
+    for (layer = info->top_layer; layer; layer = layer->back) {
+        const struct Rectangle *b = &layer->bounds;
+        struct Window *w = layer->Window;
+        if (layer == c->window->WLayer) {
+            if (before_own) break;
+            continue;
+        }
+        if (!w || (w->Flags & WFLG_BACKDROP) || (c->ours && c->ours(c->ours_data, w)) ||
+            b->MaxX < r->MinX || b->MinX > r->MaxX || b->MaxY < r->MinY || b->MinY > r->MaxY) continue;
+        found = w;
+        break;
+    }
+    if (place_behind) {
+        if (found) MoveWindowInFrontOf(place_behind, found);
+        else WindowToBack(place_behind);
+    }
+    ReleaseSemaphore(&info->Lock);
+    return found;
+}
+
+/* The move from 1x1 onto the box carries the window's one pixel along:
+   the screen's corner, shown at the box's corner (a stray dot beside the
+   plate, AmiKit). The backfill only fills what the move uncovered. Paint
+   that pixel from the copy once Intuition has moved the window. */
+static void repaint_corner(AmigaDropCatcher *c)
+{
+    struct Window *w = c->window;
+    const struct Rectangle *r = &c->armed_at;
+    if (w->LeftEdge != r->MinX || w->TopEdge != r->MinY ||
+        w->Width != r->MaxX-r->MinX+1 || w->Height != r->MaxY-r->MinY+1) return;
+    /* A held drag owns the layers: try again on a later pass. */
+    if (!AttemptLockLayerRom(w->WLayer)) return;
+    BltBitMapRastPort(c->backing, r->MinX-c->left, r->MinY-c->top, w->RPort, 0, 0, 1, 1, 0xc0);
+    UnlockLayerRom(w->WLayer);
+    c->repaint = 0;
+}
+
 static int inside(const AmigaDropCatcher *c, int x, int y)
 {
     return x >= c->left && x < c->left + c->width &&
            y >= c->top && y < c->top + c->height;
+}
+
+/* Where a drop is caught now: where the armed window lies, else the box. */
+static struct Rectangle catch_rect(const AmigaDropCatcher *c)
+{
+    if (!c->shaped && c->armed) return c->armed_at;
+    return (struct Rectangle){c->left, c->top, c->left+c->width-1, c->top+c->height-1};
+}
+
+static int inside_catch(const AmigaDropCatcher *c, int x, int y)
+{
+    struct Rectangle r = catch_rect(c);
+    return x >= r.MinX && x <= r.MaxX && y >= r.MinY && y <= r.MaxY;
+}
+
+int amiga_drop_catcher_contains(const AmigaDropCatcher *c, int x, int y)
+{
+    return c && inside_catch(c, x, y);
+}
+
+void amiga_drop_catcher_rect(const AmigaDropCatcher *c, int *left, int *top, int *right, int *bottom)
+{
+    struct Rectangle r = catch_rect(c);
+    *left = r.MinX; *top = r.MinY; *right = r.MaxX+1; *bottom = r.MaxY+1;
+}
+
+void amiga_drop_catcher_set_owner(AmigaDropCatcher *c, int (*ours)(void *data, struct Window *window), void *data)
+{
+    if (!c) return;
+    c->ours = ours; c->ours_data = data;
+}
+
+void amiga_drop_catcher_set_rest(AmigaDropCatcher *c, int left, int top, int width, int height)
+{
+    int right = left+width, bottom = top+height;
+    if (!c) return;
+    if (left < c->left) left = c->left;
+    if (top < c->top) top = c->top;
+    if (right > c->left+c->width) right = c->left+c->width;
+    if (bottom > c->top+c->height) bottom = c->top+c->height;
+    /* Nothing left: rest on the whole box. */
+    if (right <= left || bottom <= top) {
+        left = c->left; top = c->top; right = c->left+c->width; bottom = c->top+c->height;
+    }
+    /* A rest-armed window elsewhere moves on the next arm_for_pointer. */
+    c->rest = (struct Rectangle){left, top, right-1, bottom-1};
 }
 
 /* Cover the dock's box (catching) or not. Shapes report the region they
@@ -227,8 +325,18 @@ static int set_catching(AmigaDropCatcher *c, int catching)
        through PiP (Coffin, AmigaOS 3.2.3). A drop where a window lies on
        the box goes to that window. */
     if (catching) {
-        ChangeWindowBox(c->window, c->left, c->top, c->width, c->height);
-        WindowToBack(c->window);
+        const struct Rectangle *r = &c->armed_at;
+        ChangeWindowBox(c->window, r->MinX, r->MinY, r->MaxX-r->MinX+1, r->MaxY-r->MinY+1);
+        /* Resting on the Directory Opus desktop, it covers only the plate,
+           where the dock hides every window: in front of the other
+           programs' windows there (behind the dock's own). Behind them, a
+           drop over a lister under the dock went to that lister, and the
+           lister redrawn by the press read as drag image (AmiKit). */
+        if (c->rest_armed) {
+            int busy;
+            foreign_front(c, r, 0, &busy, c->window);
+            if (busy) WindowToBack(c->window);
+        } else WindowToBack(c->window);
     } else ChangeWindowBox(c->window, 0, 0, 1, 1);
     return 1;
 }
@@ -243,7 +351,9 @@ AmigaDropCatcher *amiga_drop_catcher_init(struct Screen *screen,
     c = calloc(1, sizeof(*c));
     if (!c) return NULL;
     c->catch_region = NewRegion();
-    rect.MinX = rect.MinY = 0; rect.MaxX = width - 1; rect.MaxY = height - 1;
+    /* The catching shape covers the box, in the window's own coordinates. */
+    rect.MinX = left - window->LeftEdge; rect.MinY = top - window->TopEdge;
+    rect.MaxX = rect.MinX + width - 1; rect.MaxY = rect.MinY + height - 1;
     if (!c->catch_region || !OrRectRegion(c->catch_region, &rect)) {
         if (c->catch_region) DisposeRegion(c->catch_region);
         free(c); return NULL;
@@ -251,14 +361,12 @@ AmigaDropCatcher *amiga_drop_catcher_init(struct Screen *screen,
     c->screen = screen; c->window = window; c->normal = normal_shape;
     c->shaped = normal_shape != NULL;
     c->left = left; c->top = top; c->width = width; c->height = height;
+    c->rest = (struct Rectangle){left, top, left+width-1, top+height-1};
     c->backing = AllocBitMap(width,height,GetBitMapAttr(screen->RastPort.BitMap,BMA_DEPTH),
         BMF_MINPLANES,screen->RastPort.BitMap);
     if (!c->backing) { DisposeRegion(c->catch_region); free(c); return NULL; }
     c->backfill.h_Entry = dock_backfill_entry;
     c->backfill.h_Data = c;
-    c->cyber = OpenLibrary((STRPTR)"cybergraphics.library", 40);
-    InitRastPort(&c->screen_rp); c->screen_rp.BitMap = screen->RastPort.BitMap;
-    InitRastPort(&c->backing_rp); c->backing_rp.BitMap = c->backing;
     InstallLayerHook(window->WLayer,&c->backfill);
     return c;
 }
@@ -268,14 +376,13 @@ AmigaDropCatcher *amiga_drop_catcher_init(struct Screen *screen,
 static unsigned int end_catch(AmigaDropCatcher *c, int disarm)
 {
     c->waiting = 0;
-    c->late = 0;
     if (!c->shaped) {
         unsigned int flags = c->active ? AMIGA_DROP_RESTORED : 0;
         c->active = 0;
         if (disarm && c->armed) {
             ++c->stats.disarms;
             set_catching(c, 0);
-            c->armed = 0;
+            c->armed = c->rest_armed = 0;
             c->backing_valid = 0;
             flags |= AMIGA_DROP_RESTORED;
         }
@@ -291,10 +398,14 @@ static unsigned int end_catch(AmigaDropCatcher *c, int disarm)
     return AMIGA_DROP_RESTORED | (c->failed ? AMIGA_DROP_ERROR : 0);
 }
 
+/* Without shapes the window leaves the dock after each gesture, except
+   resting on the Directory Opus desktop: there each move away made the
+   desktop redraw under the dock (a flicker after every click), and only
+   arm_for_pointer moves it. */
 unsigned int amiga_drop_catcher_cancel(AmigaDropCatcher *c)
 {
     if (!c) return 0;
-    return end_catch(c, 1);
+    return end_catch(c, !c->rest_armed);
 }
 
 /* Without shapes the window must be on the dock before Workbench starts a
@@ -303,10 +414,11 @@ unsigned int amiga_drop_catcher_cancel(AmigaDropCatcher *c)
    leaves. */
 static unsigned int arm_for_pointer(AmigaDropCatcher *c, uint64_t now, uint32_t frequency)
 {
+    struct Rectangle want;
     int client;
     if (c->shaped || c->active || c->waiting) return 0;
     if (c->armed) {
-        ULONG windows = box_windows(c);
+        ULONG windows = box_windows(c, &c->armed_at);
         if (windows && windows != c->windows) {
             /* A window on the dock's box closed or moved while the armed
                window lay behind it: the part it uncovered was filled from
@@ -318,69 +430,58 @@ static unsigned int arm_for_pointer(AmigaDropCatcher *c, uint64_t now, uint32_t 
             return end_catch(c, 1);
         }
     }
+    if (c->armed && c->repaint) repaint_corner(c);
+    if (c->armed && c->rest_armed && now >= c->order_check_at) {
+        /* Another program's window came in front of the resting window:
+           step back and arm again in front of it. */
+        int busy;
+        if (foreign_front(c, &c->armed_at, 1, &busy, NULL) && !busy) {
+            c->rearm_at = now+frequency/4;
+            return end_catch(c, 1);
+        }
+    }
     if (now < c->rearm_at) return 0;
     /* On the dock itself the pointer is on no drawer: stay as it is. */
     if (inside(c, c->screen->MouseX, c->screen->MouseY)) return 0;
     client = workbench_client_start(c, c->screen->MouseX, c->screen->MouseY);
-    /* Armed on the Directory Opus desktop, the window clipped a selection
-       box drawn across the dock's box: arm there only during a drag. */
-    if (client == 2) client = 0;
-    if (client < 0 || client == c->armed) return 0;
-    if (!client) return end_catch(c, 1);
+    if (client < 0) return 0;
+    /* The Directory Opus desktop (2) cannot tell its icons from its
+       background, so the window rests there whenever the pointer is on it:
+       Directory Opus gives a drop only to a window that lay at the release
+       point before the press (moved during its drag, the window ended the
+       drag). Resting, it only covers the plate, where the dock hides the
+       desktop anyway: on the whole box it took the clicks on desktop icons
+       beside and above the dock, and Directory Opus could not redraw there
+       (half of a moved icon stayed, AmiKit). */
+    /* Once Directory Opus is seen as the desktop, rest on the plate for
+       its lister icons too: leaving the whole box made it erase and redraw
+       every desktop icon there (they vanished for a few frames, AmiKit).
+       Workbench never gives 2, so its arms keep the whole box. */
+    if (client == 2) c->dopus_desktop = 1;
+    want = c->dopus_desktop ? c->rest :
+        (struct Rectangle){c->left, c->top, c->left+c->width-1, c->top+c->height-1};
+    if (c->armed) {
+        if (client && !memcmp(&want, &c->armed_at, sizeof(want))) return 0;
+        /* The desktop redraws where a resting window was: a copy taken
+           before it has finished showed a stale rectangle through PiP. */
+        if (c->rest_armed) c->rearm_at = now+frequency/4;
+        return end_catch(c, 1);
+    }
+    if (!client) return 0;
     /* Taken with the copy: what the copy shows on the box. With the layer
        list busy, arm on a later pass. */
-    if (!(c->windows = box_windows(c))) return 0;
-    BltBitMap(c->screen->RastPort.BitMap,c->left,c->top,
-        c->backing,0,0,c->width,c->height,0xc0,0xff,NULL);
+    if (!(c->windows = box_windows(c, &want))) return 0;
+    BltBitMap(c->screen->RastPort.BitMap,want.MinX,want.MinY,
+        c->backing,want.MinX-c->left,want.MinY-c->top,
+        want.MaxX-want.MinX+1,want.MaxY-want.MinY+1,0xc0,0xff,NULL);
     WaitBlit();
     c->backing_valid = 1;
+    c->armed_at = want;
+    c->rest_armed = c->dopus_desktop;
+    /* The depth change is deferred: check the order once it is done. */
+    c->order_check_at = now+frequency/4;
     set_catching(c, 1);
-    c->armed = 1;
-    ++c->stats.arms;
-    return AMIGA_DROP_STARTED;
-}
-
-/* A drag held from the Directory Opus desktop reached the dock's box with
-   its image: step in now (unarmed, PiP hid the image over the zoomed
-   icons). Directory Opus keeps its drag when the window moves. The
-   backing was taken at the press: sampled now, it held the selection box
-   Directory Opus had drawn, which then stuck in the dock's box (PiP shows
-   the window) until the release. */
-/* 1 when the screen around (x, y) differs from the backing in a patch:
-   Directory Opus draws the dragged icon around the pointer, while its
-   selection box has only two thin lines meeting there. */
-static int drag_image_at(AmigaDropCatcher *c, int x, int y)
-{
-    enum { HALF = 16, SIDE = 2*HALF, ICON_PIXELS = 120 };
-    unsigned char now[SIDE*SIDE*3], before[SIDE*SIDE*3];
-    int left = x-HALF, top = y-HALF, right = x+HALF, bottom = y+HALF, w, h, i, changed = 0;
-    if (!c->cyber) return 1;
-    if (left < c->left) left = c->left;
-    if (top < c->top) top = c->top;
-    if (right > c->left+c->width) right = c->left+c->width;
-    if (bottom > c->top+c->height) bottom = c->top+c->height;
-    w = right-left; h = bottom-top;
-    if (w <= 0 || h <= 0) return 0;
-    ReadPixelArray(now,0,0,SIDE*3,&c->screen_rp,left,top,w,h,RECTFMT_RGB);
-    ReadPixelArray(before,0,0,SIDE*3,&c->backing_rp,left-c->left,top-c->top,w,h,RECTFMT_RGB);
-    for (i = 0; i < h; ++i) {
-        const unsigned char *a = now+i*SIDE*3, *b = before+i*SIDE*3;
-        int k;
-        for (k = 0; k < w; ++k, a += 3, b += 3)
-            if (a[0] != b[0] || a[1] != b[1] || a[2] != b[2]) ++changed;
-    }
-    return changed >= ICON_PIXELS;
-}
-
-static unsigned int arm_late(AmigaDropCatcher *c)
-{
-    int x = c->screen->MouseX, y = c->screen->MouseY;
-    if (!inside(c, x, y)) return 0;
-    /* A selection box: stay out of the way, it draws across the dock. */
-    if (!drag_image_at(c, x, y)) return 0;
-    set_catching(c, 1);
-    c->armed = c->active = 1;
-    c->late = 0;
+    c->armed = c->repaint = 1;
     ++c->stats.arms;
     return AMIGA_DROP_STARTED;
 }
@@ -425,16 +526,7 @@ unsigned int amiga_drop_catcher_update(AmigaDropCatcher *c,
             if (client < 0) return flags;
         }
         c->serial = external_serial; c->have_serial = 1;
-        if (client == 2 && !c->shaped) {
-            /* The desktop as it is at the press, before any selection box
-               or drag image is drawn: arm_late shows it. */
-            BltBitMap(c->screen->RastPort.BitMap,c->left,c->top,
-                c->backing,0,0,c->width,c->height,0xc0,0xff,NULL);
-            WaitBlit();
-            c->backing_valid = 1;
-            c->late = 1;
-        }
-        else if (client && !c->shaped) {
+        if (client && !c->shaped) {
             /* Only an armed window can catch; moving now cancels the drag. */
             if (c->armed) { c->active = 1; flags |= AMIGA_DROP_STARTED; }
         } else if (client) {
@@ -451,10 +543,9 @@ unsigned int amiga_drop_catcher_update(AmigaDropCatcher *c,
         if (now >= c->deadline) flags |= amiga_drop_catcher_cancel(c);
         return flags;
     }
-    if (c->late && external_held && !c->active) flags |= arm_late(c);
     if (!external_held && !c->active && !c->waiting) flags |= arm_for_pointer(c, now, frequency);
     if (!c->active || external_held) return flags;
-    if (release_known && (!inside(c, release_x, release_y) ||
+    if (release_known && (!inside_catch(c, release_x, release_y) ||
         (!external_dragged && release_x == down_x && release_y == down_y)))
         return flags | amiga_drop_catcher_cancel(c);
     c->waiting = 1;
@@ -485,7 +576,6 @@ void amiga_drop_catcher_destroy(AmigaDropCatcher *c)
 {
     if (!c) return;
     WaitBlit();
-    if (c->cyber) CloseLibrary(c->cyber);
     FreeBitMap(c->backing);
     DisposeRegion(c->catch_region);
     free(c);

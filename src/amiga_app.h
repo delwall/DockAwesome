@@ -359,6 +359,7 @@ typedef struct App {
        mask is painted moved with the pointer since. */
     int drag_pointer_x, drag_pointer_y;
     DockRect drag_box; /* bounds every nonzero drag_mask pixel */
+    DockRect drag_clip; /* where the receiver lies (canvas): the image is painted only there */
     uint64_t front_requested;
     uint64_t settle_started;
     int settling;
@@ -474,6 +475,9 @@ typedef struct App {
        drawn that way (a colour font, or taller than 32 px): no labels.
        label_slot: the pictures, one per pin, made while the dock is idle. */
     int label_max_width;
+    int label_room; /* rows (bottom) or columns (sides) the canvas grew for it */
+    /* app->count when the receiver's resting plate was last set. */
+    int rest_count;
     LabelSlot label_slot[DOCK_MAX_ITEMS];
     unsigned long label_stamp;
     /* The close button that replaces the Folder Stack pin while it is

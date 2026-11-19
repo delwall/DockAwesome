@@ -5,10 +5,11 @@
 
 /* Pending AppMessages stay queued. accept_drops handles them on the next
    surface, and main replies to any that remain at exit. */
-/* Queued drops are relative to the surface that received them. Make them
-   screen-relative while no surface is open, and relative to the new surface
-   once it opens, so a drop queued across Save or R lands where it was made. */
-static void shift_held_drops(App *app, int closing)
+/* Queued drops are relative to the receiver window, which goes away with
+   the surface. Make them screen-relative while no surface is open:
+   accept_drops takes them relative to the new one, so a drop queued across
+   Save or R lands where it was made. */
+static void hold_drops(App *app)
 {
     struct Node *node;
     int index = 0;
@@ -16,17 +17,17 @@ static void shift_held_drops(App *app, int closing)
     Forbid();
     for (node = app->drop_port->mp_MsgList.lh_Head; node->ln_Succ; node = node->ln_Succ, ++index) {
         struct AppMessage *msg = (struct AppMessage *)node;
-        if (closing ? index < app->held_drops : index >= app->held_drops) continue;
-        msg->am_MouseX += closing ? app->left : -app->left;
-        msg->am_MouseY += closing ? app->top : -app->top;
+        if (index < app->held_drops) continue;
+        msg->am_MouseX += app->window->LeftEdge;
+        msg->am_MouseY += app->window->TopEdge;
     }
-    app->held_drops = closing ? index : 0;
+    app->held_drops = index;
     Permit();
 }
 
 void close_surface(App *app)
 {
-    if (app->window) shift_held_drops(app,1);
+    if (app->window) hold_drops(app);
     app->label_pin_id = 0;
     label_slots_free(app);
     amiga_drag_preview_close(app->drag_preview); app->drag_preview = NULL;
@@ -84,6 +85,7 @@ int open_surface(App *app)
        longer one is shortened). The rows and columns grow on the side
        away from the screen edge, where the layout is not anchored. */
     app->label_max_width = 0;
+    app->label_room = 0;
     {
         /* Measured on a row of at least one icon: a pin added to an
            empty dock has its label too. */
@@ -94,7 +96,7 @@ int open_surface(App *app)
             if (app->edge == DOCK_EDGE_BOTTOM) {
                 int headroom = rest[0].y+rest[0].size-app->settings.max_size;
                 need = DOCK_UI_LABEL_GAP+label-headroom;
-                if (need > 0) app->height += need;
+                if (need > 0) { app->height += need; app->label_room = need; }
                 app->label_max_width = app->screen->Width/2 < pip_visible_width(app) ?
                     app->screen->Width/2 : pip_visible_width(app);
             } else {
@@ -108,8 +110,12 @@ int open_surface(App *app)
                     if (w > widest) widest = w;
                 }
                 need = DOCK_UI_LABEL_GAP+widest-headroom;
-                if (need > 0) app->width += (need+31)&~31;
-                if (app->width > app->screen->Width) app->width = app->screen->Width&~31;
+                if (need > 0) app->label_room = (need+31)&~31;
+                app->width += app->label_room;
+                if (app->width > app->screen->Width) {
+                    app->label_room -= app->width-(app->screen->Width&~31);
+                    app->width = app->screen->Width&~31;
+                }
                 app->label_max_width = column;
             }
         }
@@ -142,7 +148,6 @@ int open_surface(App *app)
     }
     /* The backdrop, the native window and AppWindow, and present's needs. */
     if (!app->surface->open(app)) return 0;
-    shift_held_drops(app,0);
     stack_button_build(app);
     return 1;
 }

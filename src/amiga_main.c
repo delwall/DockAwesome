@@ -772,7 +772,9 @@ static void update_target(App *app)
     if (catching || app->renderer.center_panel) {
         /* Keep the shown gap while the AppWindow message is in flight. */
         if (catching && !app->input_context.external_held && app->drop_preview_slot >= 0) return;
-        if (catching && app->input_context.external_held && app->input_context.external_dragged) {
+        /* Room only where the drop is caught: not over the label strip. */
+        if (catching && app->input_context.external_held && app->input_context.external_dragged &&
+            amiga_drop_catcher_contains(app->drop_catcher, app->screen->MouseX, app->screen->MouseY)) {
             int slot = dock_edge_insertion_slot(&app->settings, app->edge, app->count,
                 app->width, app->height, app->screen->MouseX-app->left, app->screen->MouseY-app->top);
             if (slot > stack_index(app)) slot = stack_index(app);
@@ -1660,7 +1662,13 @@ static __attribute__((noinline)) int accept_drops(App *app, int *recreate)
     struct AppMessage *msg;
     int changed = 0;
     while ((msg = (struct AppMessage *)GetMsg(app->drop_port))) {
-        int slot = dock_edge_insertion_slot(&app->settings, app->edge, app->count,
+        int slot;
+        /* Relative to the receiver, wherever it lay (without shapes it
+           moves), unless held across a surface rebuild (screen). */
+        if (app->held_drops) --app->held_drops;
+        else { msg->am_MouseX += app->window->LeftEdge; msg->am_MouseY += app->window->TopEdge; }
+        msg->am_MouseX -= app->left; msg->am_MouseY -= app->top;
+        slot = dock_edge_insertion_slot(&app->settings, app->edge, app->count,
             app->width, app->height, msg->am_MouseX, msg->am_MouseY);
         int i, in_slot = slot >= 0;
         int snap = in_slot && amiga_drop_catcher_active(app->drop_catcher);

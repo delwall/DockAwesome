@@ -962,9 +962,49 @@ working on 2026-11-10.
   frames), receiver armed late on the drag image (arms=2 / 1), presses
   unarmed (2 / 1), and no AppMessage at all (messages=0): Directory Opus
   did not deliver the drop to the receiver window.
-- [ ] Find what changed since 2026-11-10 (screen depth? DOpus settings?) and
-      whether lister drops still work. Agent input does not reach the dock
-      on AmiKit: each try needs the user's drag.
+- [x] Cause (2026-11-19, from DOpus 5 source): DOpus holds LockLayers for
+      the whole drag and delivers to the window WhichLayer finds at release,
+      so the late-armed receiver was never there. Fix (branch after-1.0b3):
+      the receiver is armed in advance whenever the pointer is over the DOpus
+      desktop, stays armed through clicks and drops, waits 1/4 s before
+      re-arming, and the catch box and insertion gap exclude the label strip.
+- [x] Verified on AmiKit (user drags, profile): Workbench drops messages=2
+      added=2, receiver arms=3 disarms=2 over a 10-hour session.
+- [x] User video (IMG_2580): icons above/beside the dock not selectable, half
+      a moved icon left behind, fragments while dragging. Cause: the resting
+      receiver covered the whole catch box. Fix (built 19:08): resting on the
+      DOpus desktop it covers only the resting plate; Workbench hover arms
+      and shapes keep the full box and the 1.0b3 cancel (other systems as
+      before). Drop positions now follow the receiver's window.
+- [x] Follow-ups from user videos IMG_2581-2586, each fixed and confirmed
+      by the user on AmiKit (build 19:46):
+      - DOpus lister icons armed the whole box: leaving it made DOpus redraw
+        every desktop icon there. Once DOpus is the desktop, every arm rests
+        on the plate.
+      - A lister under the dock took the drop and its redraw read as drag
+        image: the resting receiver lies in front of other programs' windows
+        on the plate (MoveWindowInFrontOf), behind the dock's own; it re-arms
+        when one comes in front.
+      - Stray dot at the plate's corner: ChangeWindowBox carried the 1x1
+        window's pixel; repainted from the copy once moved.
+      - Icon cut at the grown plate's end: the rest rect covers the plate as
+        it grows while making room.
+      - Ghost image trailing along the plate's edge, then a line across it:
+        the drag image is painted where the dock is opaque and inside the
+        receiver, never on clear parts outside it.
+      - Shell pin "Could not open": the 3.2 Shell is Shell.info alone; the
+        launcher passes drawer and name for icon-only projects.
+      Profiles: drops messages=6 added=2 reordered=1, receiver arms=1
+      disarms=0 over the session; drag image painted (438 frames).
+- [ ] Regression on Coffin, 3.2.3 and ApolloOS (Workbench drops, the gap,
+      the drag image, clicks beside the dock): shared changes are the label
+      strip exclusion, drop positions from the receiver's window, the corner
+      repaint, and painting the drag image only where opaque or inside the
+      receiver.
+- [x] Lister drops on AmiKit: confirmed in IMG_2582/2583 (drops from a
+      lister pinned).
+- One system hang on AmiKit during a test (19:39 build); the profile was lost
+  with the reboot; not repeated in later sessions.
 - Cleaned: config restored, test files removed from RAM:, installed dock
   running (started by the user from a lister). A C:ApolloExplorerSrv that I
   started (none ran at boot) stays until the next reboot.

@@ -164,6 +164,24 @@ static int set_arg(struct DockLaunched *launch, int n, BPTR file)
     return ok;
 }
 
+/* Argument n as a drawer lock (taken over) and a name in it. */
+static void set_arg_named(struct DockLaunched *launch, int n, BPTR drawer, const char *name)
+{
+    strncpy(launch->names[n],name,NAME_CAP-1);
+    launch->args[n].wa_Lock = drawer;
+    launch->args[n].wa_Name = (STRPTR)launch->names[n];
+}
+
+/* The drawer path names, locked. */
+static BPTR drawer_lock(const char *path)
+{
+    char drawer[PATH_CAP];
+    size_t n = (size_t)((const char *)PathPart((STRPTR)path)-path);
+    if (n >= sizeof(drawer)) return 0;
+    memcpy(drawer,path,n); drawer[n] = 0;
+    return Lock((STRPTR)drawer,ACCESS_READ);
+}
+
 static void launch_free(struct DockLaunched *launch)
 {
     int i;
@@ -331,18 +349,25 @@ int launch_object(App *app, const char *path, LONG *error)
         launch_free(launch);
         return started;
     }
-    if (!(file = Lock((STRPTR)path,ACCESS_READ))) { *error = IoErr(); goto fail; }
+    file = Lock((STRPTR)path,ACCESS_READ);
+    if (!file && icon->do_Type != WBPROJECT) { *error = IoErr(); goto fail; }
     if (icon->do_Type == WBPROJECT) {
-        BPTR project_dir = ParentDir(file), tool;
-        if (!icon->do_DefaultTool || !icon->do_DefaultTool[0]) {
+        /* A project can be its icon alone: the AmigaOS 3.2 Shell is
+           Shell.info with SYS:System/CLI as its tool ("Could not open",
+           AmiKit). Workbench passes its drawer and name then too. */
+        BPTR project_dir = file ? ParentDir(file) : drawer_lock(path), tool;
+        if (!icon->do_DefaultTool || !icon->do_DefaultTool[0] || !project_dir) {
             *error = ERROR_OBJECT_NOT_FOUND;
-            UnLock(file); if (project_dir) UnLock(project_dir);
+            if (file) UnLock(file);
+            if (project_dir) UnLock(project_dir);
             goto fail;
         }
         tool = find_tool(project_dir,(const char *)icon->do_DefaultTool);
-        if (project_dir) UnLock(project_dir);
-        if (!tool) { *error = ERROR_OBJECT_NOT_FOUND; UnLock(file); goto fail; }
-        if (!set_arg(launch,1,file)) { *error = IoErr(); UnLock(tool); goto fail; }
+        if (!tool) { *error = ERROR_OBJECT_NOT_FOUND; if (file) UnLock(file); UnLock(project_dir); goto fail; }
+        if (file) {
+            UnLock(project_dir);
+            if (!set_arg(launch,1,file)) { *error = IoErr(); UnLock(tool); goto fail; }
+        } else set_arg_named(launch,1,project_dir,(const char *)FilePart((STRPTR)path));
         file = tool;
     }
     if (!set_arg(launch,0,file)) { *error = IoErr(); goto fail; }
