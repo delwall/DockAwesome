@@ -120,19 +120,25 @@ static int show_copy(AmigaPip *pip,const unsigned char *roi,int w,int h)
 
 int main(int argc,char **argv)
 {
-    enum { W=352,H=160 };
+    int W=352,H=160;
     struct Screen *pub=NULL,*screen=NULL;
     struct Window *window=NULL;
     AmigaPip *pip=NULL;
     unsigned char *roi=NULL;
     ULONG mode,sec,micro,start_sec,start_micro,elapsed,last_blink=0;
-    int x,y,dx=17,dy=-1,enabled=1,finish=0,status=20;
+    int x,y,dx=17,dy=-1,enabled=1,finish=0,status=20,keyed=0;
     char error[192];
     { BPTR file=Open((STRPTR)"RAM:DockAwesomePiPAlign.stage",MODE_NEWFILE);if(file) Close(file); }
     stage("start");
-    if(argc!=2 || strcmp(argv[1],"--reserved-pip2")) {
-        puts("Usage: DockAwesomePipAlignProbe080 --reserved-pip2\nStop Dock/video PiP2 users first. Own-screen visual calibration;120-second timeout.");return 20;
+    /* KEY last: the dock's colour key (0xf81f shows the screen). */
+    if(argc>2 && !strcmp(argv[argc-1],"KEY")) { keyed=1;--argc; }
+    if((argc!=2 && argc!=4 && argc!=6) || strcmp(argv[1],"--reserved-pip2")) {
+        puts("Usage: DockAwesomePipAlignProbe080 --reserved-pip2 [X Y [W H]] [KEY]\nStop Dock/video PiP2 users first. Own-screen visual calibration;120-second timeout.\n"
+             "X Y place the PiP's top left (default: centred), e.g. 0 300 where a left dock lies;\n"
+             "W H set its size (W in 32 px steps, default 352 160), e.g. a side dock's 192:\nthe offsets can differ by position and size.");return 20;
     }
+    if(argc==6) { W=atoi(argv[4]);H=atoi(argv[5]); }
+    if(W<64 || W%32 || H<32) { puts("FAIL: W must be 64 or more in 32 px steps, H 32 or more");return 20; }
     IntuitionBase=(struct IntuitionBase *)OpenLibrary((STRPTR)"intuition.library",39);
     GfxBase=(struct GfxBase *)OpenLibrary((STRPTR)"graphics.library",39);
     CyberGfxBase=OpenLibrary((STRPTR)"cybergraphics.library",40);
@@ -150,9 +156,22 @@ int main(int argc,char **argv)
     if(!screen) { puts("FAIL: private screen");goto done; }
     stage("private screen open");
     x=(screen->Width-W)/2;y=(screen->Height-H)/2+50;
+    if(argc>=4) {
+        x=atoi(argv[2]);y=atoi(argv[3]);
+        /* Inside the screen; keep it below the control window (y 20-128). */
+        if(x<0 || x>screen->Width-W || y<1 || y>screen->Height-H) { puts("FAIL: X Y outside the screen");goto done; }
+    }
     roi=malloc(W*H*2);
     if(!roi || !make_pattern(screen,roi,x,y,W,H)) { puts("FAIL: native RGB565 pattern/capture");goto done; }
     stage("pattern copied");
+    /* Keyed: the right third shows the screen through the key, so the copy
+       meets the live screen inside the PiP, as at the dock's plate edge. */
+    if(keyed) {
+        int row,col;
+        for(row=0;row<H;++row) for(col=W*2/3;col<W;++col) {
+            roi[((size_t)row*W+col)*2]=0xf8; roi[((size_t)row*W+col)*2+1]=0x1f;
+        }
+    }
     window=OpenWindowTags(NULL,WA_CustomScreen,(ULONG)screen,WA_Left,20,WA_Top,20,
         WA_Width,screen->Width-40,WA_Height,108,WA_Activate,TRUE,WA_CloseGadget,TRUE,
         WA_SimpleRefresh,TRUE,WA_IDCMP,IDCMP_RAWKEY|IDCMP_CLOSEWINDOW|IDCMP_REFRESHWINDOW,
@@ -163,6 +182,7 @@ int main(int argc,char **argv)
     if(!pip) { printf("FAIL: %s\n",error);goto done; }
     /* Start from the dock's default offsets. */
     if(!amiga_pip_set_alignment(pip,dx,dy)) { puts("FAIL: initial alignment");goto done; }
+    if(keyed && !amiga_pip_set_keying(pip,1)) { puts("FAIL: keying");goto done; }
     stage("PiP state allocated; hardware not enabled");
     printf("Core%u; exact native ROI(%d,%d)%dx%d; initial corrections x=%d y=%d\n",
         amiga_pip_core_revision(pip),x,y,W,H,dx,dy);fflush(stdout);

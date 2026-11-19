@@ -64,6 +64,10 @@ Test each new mode on the display.
 
 The example uses offsets +16 and -1 in a different mode. The tested
 Workbench mode uses +17 and -1. The alignment probe checks physical output.
+SAGA cannot start a PiP at screen x 0: there no X offset showed the image
+in place (it sat a few pixels right, ApolloOS 1280x720). From x 3 the usual
++17/-1 was exact (x 3 to 928, widths 192 and 352, keyed or not), so a left
+dock's overlay starts at x 3, where its desktop gap ends.
 The source probe passed 200 submissions and 199 known source updates and
 left the Workbench bitmap intact.
 

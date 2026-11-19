@@ -125,6 +125,15 @@ static void test_panel_rect(void)
     assert(dock_edge_panel_rect(&s,DOCK_EDGE_RIGHT,p,N,CROSS,LONG,&r));
     assert(CROSS-r.right == 8);
     assert(CROSS-s.edge_padding-r.right == 3);
+    /* A left canvas starting at the gap (SAGA cannot start a PiP at x 0):
+       the plate begins at its first column, still 3 px from the screen edge. */
+    s.edge_padding = -DOCK_DESKTOP_GAP;
+    assert(dock_settings_valid(&s));
+    assert(dock_edge_layout(&s,DOCK_EDGE_LEFT,N,CROSS,LONG,0,0,0,p));
+    assert(dock_edge_panel_rect(&s,DOCK_EDGE_LEFT,p,N,CROSS,LONG,&r));
+    assert(r.left == 0);
+    s.edge_padding = -DOCK_DESKTOP_GAP-1;
+    assert(!dock_settings_valid(&s));
 }
 
 static void test_animation(void)

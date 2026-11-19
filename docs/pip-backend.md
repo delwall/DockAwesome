@@ -110,7 +110,11 @@ buffers, and release the lease. Keep window regions alive until close.
 - `make ammx-probe` checks pixel kernels and measures RAM throughput.
 - `make pip-probe` checks source integrity on a private screen.
 - `make pip-align-probe` checks alignment. Arrows move by 1 px. Shift-arrow
-  moves by 8 px. Escape or Return prints the offsets.
+  moves by 8 px. Escape or Return prints the offsets. With
+  `--reserved-pip2 [X Y [W H]] [KEY]` it opens the overlay at screen
+  position X Y with size W H (W at least 64 in 32 px steps, H at least 32),
+  and KEY fills the right third with the colour key. Test where the dock's
+  overlay actually lies: alignment can differ by position.
 - `make pip-coexist-probe` checks the lease and screen changes with the dock running.
 
 Stop the dock before running the standalone PiP and alignment probes.

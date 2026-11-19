@@ -623,11 +623,17 @@ int reset_watch_open(App *app);
 ULONG reset_watch_mask(const App *app);
 void reset_watch_done(App *app);
 void reset_watch_close(App *app);
+/* The canvas columns past the screen's right edge (a right dock's keyed
+   tail). A negative edge_padding is a left canvas starting inside the screen. */
+static inline int pip_right_padding(const App *app)
+{
+    return app->settings.edge_padding > 0 ? app->settings.edge_padding : 0;
+}
 /* PiP's columns that show the dock: the last ones of each row are a keyed
    tail (the right edge's past the screen, a left dock's on its far side). */
 static inline int pip_visible_width(const App *app)
 {
-    return app->width-app->settings.edge_padding-app->pip_tail;
+    return app->width-pip_right_padding(app)-app->pip_tail;
 }
 void stack_button_build(App *app);
 void ui_blocking(void *context, int blocking);

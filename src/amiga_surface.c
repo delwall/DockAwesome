@@ -50,13 +50,18 @@ void close_surface(App *app)
 
 int open_surface(App *app)
 {
-    enum { RIGHT_PIP_TAIL = 8 };
+    /* SAGA cannot start a PiP at the screen's left edge: at x 0 no
+       alignment showed the image in place (it sat a few pixels right; the
+       ApolloOS 1280x720 probe), from x 3 the usual one did. A left dock's
+       canvas starts there, where its desktop gap ends: nothing moves. */
+    enum { RIGHT_PIP_TAIL = 8, PIP_LEFT_INSET = DOCK_DESKTOP_GAP };
     int reserve = app->count, wanted, limit = viewport_limit(app,app->edge);
     int cross = app->settings.max_size+2*app->settings.padding+12;
     int available_height = app->screen->Height-app->screen->BarHeight-2;
     /* Keep the right PiP raster's keyed tail even where it crosses the screen edge. */
-    int right_padding = app->edge == DOCK_EDGE_RIGHT ? RIGHT_PIP_TAIL-DOCK_DESKTOP_GAP : 0;
-    int panel_cross = dock_panel_thickness(&app->settings)+DOCK_DESKTOP_GAP+right_padding;
+    int edge_padding = app->edge == DOCK_EDGE_RIGHT ? RIGHT_PIP_TAIL-DOCK_DESKTOP_GAP :
+        app->edge == DOCK_EDGE_LEFT ? -PIP_LEFT_INSET : 0;
+    int panel_cross = dock_panel_thickness(&app->settings)+DOCK_DESKTOP_GAP+edge_padding;
     /* SAGA shows the last columns of each PiP row at the start of the next
        one: a right dock keeps them past the screen edge, a left dock keyed
        on its far side. Without them a pin dragged out of a left dock (on
@@ -65,7 +70,7 @@ int open_surface(App *app)
     app->pip_tail = app->edge == DOCK_EDGE_LEFT ? RIGHT_PIP_TAIL : 0;
     /* Each attempt reports its own error. Keep the text of an earlier failure. */
     if (!app->failed) app->surface_error[0] = 0;
-    app->settings.edge_padding = right_padding;
+    app->settings.edge_padding = edge_padding;
     if (cross < panel_cross) cross = panel_cross;
     /* Pinning can use this spare room without closing and opening the surface. */
     if (reserve && app->settings.max_size > app->settings.base_size) {
@@ -121,8 +126,8 @@ int open_surface(App *app)
         }
     }
     if (app->height > available_height) return 0;
-    app->left = app->edge == DOCK_EDGE_LEFT ? 0 : app->edge == DOCK_EDGE_RIGHT ?
-        app->screen->Width-app->width+right_padding : (app->screen->Width-app->width)/2;
+    app->left = app->edge == DOCK_EDGE_LEFT ? PIP_LEFT_INSET : app->edge == DOCK_EDGE_RIGHT ?
+        app->screen->Width-app->width+edge_padding : (app->screen->Width-app->width)/2;
     app->top = app->edge == DOCK_EDGE_BOTTOM ? app->screen->Height-app->height :
         app->screen->BarHeight+2+(available_height-app->height)/2;
     app->renderer.edge = app->edge;

@@ -514,7 +514,7 @@ enum { PIP_SHARE_WIDTH = 256 };
 static int pip_open(App *app)
 {
     /* The keyed tail of a right dock lies past the native window. */
-    int right_padding = app->settings.edge_padding;
+    int right_padding = pip_right_padding(app);
     dock_damage_set_full(&app->pip_pending[0]); dock_damage_set_full(&app->pip_pending[1]);
     app->pip_masked[0] = app->pip_masked[1] = 0;
     app->pip_mask_clip[0] = app->pip_mask_clip[1] = (DockRect){0,0,0,0};
