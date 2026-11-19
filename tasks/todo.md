@@ -1003,8 +1003,10 @@ working on 2026-11-10.
       receiver.
 - [x] Lister drops on AmiKit: confirmed in IMG_2582/2583 (drops from a
       lister pinned).
-- One system hang on AmiKit during a test (19:39 build); the profile was lost
-  with the reboot; not repeated in later sessions.
+- Crash dropping the GlobalTrash AppIcon (and likely the earlier hang):
+  Directory Opus sends an AppIcon with no lock, and accept_drops passed the
+  zero lock to NameFromLock. Lockless arguments are now skipped as bad paths
+  (build 19:50). [ ] User check: drop GlobalTrash, no crash, nothing pinned.
 - Cleaned: config restored, test files removed from RAM:, installed dock
   running (started by the user from a lister). A C:ApolloExplorerSrv that I
   started (none ran at boot) stays until the next reboot.

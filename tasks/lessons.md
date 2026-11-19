@@ -386,6 +386,10 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
   hidden there) and nowhere on clear parts outside the receiver (the native
   one shows). Clipped to the receiver, the plate's edge row crossed the image
   as a line (IMG_2586).
+- A drop can carry no lock: Directory Opus sends an AppIcon (GlobalTrash,
+  "Stop Apollo Explorer") as its name alone. NameFromLock on a zero lock
+  crashed AmiKit twice before I looked; check every WBArg field from another
+  program before using it, and read its source for what it sends.
 - A Workbench project can be its icon alone (AmigaOS 3.2 Shell: Shell.info,
   tool SYS:System/CLI, no Shell file). A launcher that replaces Workbench
   must pass drawer + name without locking the file. Read the requester text

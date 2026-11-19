@@ -1681,7 +1681,10 @@ static __attribute__((noinline)) int accept_drops(App *app, int *recreate)
             const struct WBArg *arg = &msg->am_ArgList[i];
             char path[PATH_CAP];
             ++app->stats.drop_arguments;
-            if (NameFromLock(arg->wa_Lock, (STRPTR)path, sizeof(path)) &&
+            /* No lock: an AppIcon (Directory Opus sends its name alone, as
+               for the GlobalTrash icon on AmiKit). It names no file, and
+               NameFromLock on a zero lock took the machine down. */
+            if (arg->wa_Lock && NameFromLock(arg->wa_Lock, (STRPTR)path, sizeof(path)) &&
                 (!arg->wa_Name || !arg->wa_Name[0] || AddPart((STRPTR)path, arg->wa_Name, sizeof(path)))) {
                 int before = app->count, index = pin_path(app,path,1)-1;
                 int added = app->count != before;
