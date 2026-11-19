@@ -1007,6 +1007,14 @@ working on 2026-11-10.
   Directory Opus sends an AppIcon with no lock, and accept_drops passed the
   zero lock to NameFromLock. Lockless arguments are now skipped as bad paths
   (build 19:50). [ ] User check: drop GlobalTrash, no crash, nothing pinned.
+- [x] Installed on AmiKit: build 503 (ca64844) in place of 1.0b3 at
+      SYS:WBStartup/DockAwesome, started from the Shell (WBRun needs
+      Workbench). RAM: test files removed. ApolloExplorerSrv left running.
+- [ ] Old bug (also in 1.0b3, reproduced twice): a second dock started while
+      one runs fails with "PiP2 is already in use" and crashes the machine
+      after OK, while exiting. No more crash tests on AmiKit (user). Plan:
+      detect the running dock at startup and exit quietly before opening
+      anything; find the crashing exit step on another system with logging.
 - Cleaned: config restored, test files removed from RAM:, installed dock
   running (started by the user from a lister). A C:ApolloExplorerSrv that I
   started (none ran at boot) stays until the next reboot.
