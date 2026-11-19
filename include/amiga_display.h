@@ -26,13 +26,12 @@ int amiga_display_capture(AmigaDisplay *display, DockImage *image, int x, int y)
    equal, the whole canvas on force. The caller owns width*height*2 bytes. */
 int amiga_display_capture565(AmigaDisplay *display, unsigned char *cache,
     int x, int y, int force, const DockRect *check, DockBytesEqual equal, DockRect *box);
-/* Read the drag baseline from the catcher bitmap into box of reference.
-   The bitmap is laid out as backing_box; both are in canvas coordinates and
-   box lies inside backing_box. The rest of reference is left as captured.
-   The mask update reads native RGB16 through an unlayered RastPort on the
-   supported SAGA screen. Returns 0 on read failure. */
-int amiga_display_drag_reference565(AmigaDisplay *display, struct BitMap *backing,
-    unsigned char *reference, int visible_width, const DockRect *backing_box, const DockRect *box);
+/* Read the drag baseline from the screen into box of reference (canvas
+   coordinates; the canvas lies at x, y). The rest of reference is left as
+   captured. Read as the drag mask reads, without layer locks. Returns 0 on
+   read failure. */
+int amiga_display_drag_reference565(AmigaDisplay *display, unsigned char *reference,
+    int x, int y, int visible_width, const DockRect *box);
 /* marked bounds every nonzero mask pixel (empty when left >= right): only
    its union with the pointer box is scanned, and it returns the new bound.
    NULL scans the whole mask. colors (RGB565, the reference's layout), when

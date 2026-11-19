@@ -567,11 +567,6 @@ int amiga_drop_catcher_active(const AmigaDropCatcher *c)
     return c && c->active;
 }
 
-struct BitMap *amiga_drop_catcher_backing(const AmigaDropCatcher *c)
-{
-    return c && c->backing_valid ? c->backing : NULL;
-}
-
 void amiga_drop_catcher_destroy(AmigaDropCatcher *c)
 {
     if (!c) return;

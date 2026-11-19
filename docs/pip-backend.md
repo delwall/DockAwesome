@@ -48,9 +48,10 @@ desktop icon bounds between gestures.
 
 Copy the clean desktop to a reusable bitmap before expanding the receiver.
 Backfill the exposed regions from that bitmap. Skip normal layer and
-background reads while the gesture is active. An unlayered read compares
-the primary plane with the saved pixels. The source key then shows the
-native drag image over the dock.
+background reads while the gesture is active. As it starts, an unlayered
+read takes the screen under the box as the reference (after the press has
+redrawn the window it deactivated); later reads compare the screen with
+it. The source key then shows the native drag image over the dock.
 
 Keep the insertion gap through the AppMessage handoff. Save the release
 coordinates before later motion can overwrite them. Restore the idle

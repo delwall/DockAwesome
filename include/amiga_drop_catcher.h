@@ -56,9 +56,6 @@ void amiga_drop_catcher_set_rest(AmigaDropCatcher *catcher, int left, int top, i
    program's window on the plate, but behind these. */
 void amiga_drop_catcher_set_owner(AmigaDropCatcher *catcher,
     int (*ours)(void *data, struct Window *window), void *data);
-/* Immutable desktop pixels sampled before Workbench starts the drag, laid
-   out as the box (valid inside amiga_drop_catcher_rect). */
-struct BitMap *amiga_drop_catcher_backing(const AmigaDropCatcher *catcher);
 /* Call ONLY AFTER CloseWindow: the temporary Region must outlive its Layer,
    even if a shape operation failed. Does not dispose the caller's normal shape. */
 void amiga_drop_catcher_destroy(AmigaDropCatcher *catcher);

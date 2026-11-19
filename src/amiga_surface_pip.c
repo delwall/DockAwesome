@@ -84,11 +84,10 @@ static int update_drag_mask(App *app, int sample)
     int left = x-DRAG_RADIUS, top = y-DRAG_RADIUS;
     int right = x+DRAG_RADIUS+1, bottom = y+DRAG_RADIUS+1, row, catching, near, reference_changed = 0;
     DockRect catch_box = {0,0,0,0};
-    /* Only where the receiver lies is the baseline exact (its copy, taken
-       before the press). Elsewhere the screen shows through the clear
-       parts, and the capture there could be stale (an icon highlighted by
-       the press), which read as drag image and left fragments of it on the
-       dock (AmiKit). */
+    /* Only where the receiver lies is the baseline exact (read as the
+       gesture starts). Elsewhere the reference keeps the capture, which
+       could be stale (an icon highlighted by the press): it read as drag
+       image and left fragments of it on the dock (AmiKit). */
     if (app->drop_catcher) {
         amiga_drop_catcher_rect(app->drop_catcher,&catch_box.left,&catch_box.top,
             &catch_box.right,&catch_box.bottom);
@@ -102,18 +101,16 @@ static int update_drag_mask(App *app, int sample)
     if (bottom > catch_box.bottom) bottom = catch_box.bottom;
     catching = amiga_drop_catcher_active(app->drop_catcher) && app->input_context.external_held;
     near = catching && app->input_context.external_dragged && right > left && bottom > top;
-    /* The capture stops as the gesture starts: take the receiver's copy
-       then, not once the pointer comes near. Until then the dock kept its
-       capture from before the press, and what the press changed under it
-       (a window's border drawn inactive) showed only as the drag neared:
-       the border flipped from dark to light grey (ApolloOS). */
+    /* The capture stops as the gesture starts: read the reference then,
+       from the screen as the press left it, before the drag image. Taken
+       once the pointer came near, what the press changed under the dock (a
+       window's border drawn inactive) showed only then: the border flipped
+       from dark to light grey (ApolloOS). Read from the receiver's copy,
+       taken before the press, that border differed from the screen and was
+       drawn over the icons as drag image (Coffin). */
     if (catching && sample && !app->drag_reference) {
-        DockRect backing_box = drop_box(app);
-        backing_box.left -= app->left; backing_box.right -= app->left;
-        backing_box.top -= app->top; backing_box.bottom -= app->top;
-        if (amiga_display_drag_reference565(app->display,
-                amiga_drop_catcher_backing(app->drop_catcher),app->source565,pip_visible_width(app),
-                &backing_box,&catch_box)) {
+        if (amiga_display_drag_reference565(app->display,app->source565,
+                app->left,app->top,pip_visible_width(app),&catch_box)) {
             app->drag_reference = 1;
             app->renderer.pixels->decode565(app->backdrop.pixels,app->source565,
                 (unsigned long)app->width*app->height);

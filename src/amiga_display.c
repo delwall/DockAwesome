@@ -437,29 +437,28 @@ int amiga_display_capture565(AmigaDisplay *d, unsigned char *cache,
     return changed;
 }
 
-int amiga_display_drag_reference565(AmigaDisplay *d, struct BitMap *backing,
-    unsigned char *reference, int visible_width, const DockRect *backing_box, const DockRect *box)
+int amiga_display_drag_reference565(AmigaDisplay *d, unsigned char *reference,
+    int x, int y, int visible_width, const DockRect *box)
 {
     struct RastPort rp;
-    int row, w, h, sx, sy;
-    if (!d || !d->cyber || d->depth < 15 || !backing || !backing_box || !box ||
+    int row, w, h;
+    if (!d || !d->cyber || d->depth < 15 || !box ||
+        d->screen->RastPort.BitMap != d->source_bitmap || x < 0 || y < 0 ||
         visible_width < 1 || visible_width > d->width || box->left < 0 || box->top < 0 ||
         box->right > visible_width || box->bottom > d->height ||
         box->left >= box->right || box->top >= box->bottom ||
-        box->left < backing_box->left || box->top < backing_box->top ||
-        box->right > backing_box->right || box->bottom > backing_box->bottom) return 0;
+        x+box->right > d->screen->Width || y+box->bottom > d->screen->Height) return 0;
     w = box->right-box->left; h = box->bottom-box->top;
-    sx = box->left-backing_box->left; sy = box->top-backing_box->top;
     /* reference is the capture's RGB565 cache: the raw copy no longer matches. */
     d->raw_valid = 0; d->peek_left = 0;
     /* Only box is read; the rest of reference keeps the capture. */
     reference += ((size_t)box->top*d->width+box->left)*2;
-    if (GetCyberMapAttr(backing,CYBRMATTR_PIXFMT) != PIXFMT_RGB16) {
-        if (!read_rect565(d,backing,sx,sy,w,h,reference,(size_t)d->width*2)) return 0;
+    if (GetCyberMapAttr(d->source_bitmap,CYBRMATTR_PIXFMT) != PIXFMT_RGB16) {
+        if (!read_rect565(d,d->source_bitmap,x+box->left,y+box->top,w,h,reference,(size_t)d->width*2)) return 0;
     } else {
         InitRastPort(&rp);
-        rp.BitMap = backing;
-        if (ReadPixelArray(reference,0,0,d->width*2,&rp,sx,sy,w,h,RECTFMT_RAW) != (ULONG)w*h) return 0;
+        rp.BitMap = d->source_bitmap;
+        if (ReadPixelArray(reference,0,0,d->width*2,&rp,x+box->left,y+box->top,w,h,RECTFMT_RAW) != (ULONG)w*h) return 0;
     }
     reference -= ((size_t)box->top*d->width+box->left)*2;
     if (visible_width < d->width) for (row = 0; row < d->height; ++row)
