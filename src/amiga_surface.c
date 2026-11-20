@@ -131,7 +131,7 @@ int open_surface(App *app)
     app->top = app->edge == DOCK_EDGE_BOTTOM ? app->screen->Height-app->height :
         app->screen->BarHeight+2+(available_height-app->height)/2;
     app->renderer.edge = app->edge;
-    app->renderer.panel_include = (DockRect){0,0,0,0};
+    end_gap(app);
     app->dialog_clip = (DockRect){0};
     app->drop_preview_slot = app->displayed_drop_slot = -1;
     app->screen_left = app->screen->LeftEdge; app->screen_top = app->screen->TopEdge;

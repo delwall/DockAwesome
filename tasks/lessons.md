@@ -493,3 +493,11 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
   receiver).
 - Check what the machine is (Version, volumes) before naming the system in
   reports, and take the user's word for which boot it is.
+- A shape that bounds the plate must move the way the row does. A value set
+  at once (the gap's reach) jumped where only animated icons bounded the
+  plate before; animate it with the row's own animator and test the
+  plate's end per tick on both ends and every edge, so symmetry is proven
+  on the host instead of by the user.
+- Hit tests (near/outside) must use the geometry on screen, not a copy
+  kept from the press: the frozen zoomed row made "near" reach ~77 px past
+  the plate the user saw.

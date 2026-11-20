@@ -403,6 +403,8 @@ typedef struct App {
     DockPlacement moving_placement[DOCK_MAX_ITEMS];
     DockPlacement held_icon, held_target;
     DockAnimation animation, held_animation;
+    /* A drag's or a drop preview's empty slot; the plate reaches over it. */
+    DockGap gap;
     DockGesture gesture;
     int moving_item; /* One-based. */
     AmigaDragPreview *drag_preview;
@@ -640,8 +642,18 @@ static inline int pip_visible_width(const App *app)
 /* The plate reaches over an empty slot: a drag's gap or a drop preview. */
 static inline int panel_reaching(const App *app)
 {
-    const DockRect *r = &app->renderer.panel_include;
-    return r->left < r->right && r->top < r->bottom;
+    return app->gap.slot >= 0;
+}
+/* The plate as drawn reaches over the shown gap. */
+static inline void show_gap(App *app)
+{
+    app->renderer.panel_include = dock_gap_rect(&app->gap);
+}
+/* The gap is filled, or the row rebuilt: no more reach. */
+static inline void end_gap(App *app)
+{
+    dock_gap_reset(&app->gap);
+    show_gap(app);
 }
 void stack_button_build(App *app);
 void ui_blocking(void *context, int blocking);

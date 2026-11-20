@@ -51,8 +51,8 @@ void input_publish(App *app)
     s = c->active == &c->snapshots[0] ? &c->snapshots[1] : &c->snapshots[0];
     s->screen = app->screen; s->left = app->left; s->top = app->top;
     s->count = row_count(app); s->generation = app->input_generation;
-    dock_edge_panel_rect(&app->settings,app->edge,row,s->count,
-        app->width,app->height,&s->panel);
+    dock_edge_panel_reach(&app->settings,app->edge,row,s->count,
+        app->width,app->height,&app->renderer.panel_include,&s->panel);
     s->panel_radius = app->renderer.panel.radius;
     for (i = 0; i < s->count; ++i) {
         int item = row_item(app,i);

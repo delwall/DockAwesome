@@ -39,10 +39,9 @@ void dock_render_oriented_mask(DockImage *canvas, const DockImage *backdrop,
    never change in place. */
 typedef struct { const DockImage *image; int x, y; unsigned long stamp; } DockOverlay;
 
-/* The plate as drawn: dock_edge_panel_rect, reaching along the row over
-   include (an empty slot, canvas coordinates; NULL or empty for none) with
-   the icons' padding, and its corner radius. An empty plate is {0,0,0,0}
-   with radius 0. Returns 0 when nothing is drawn. */
+/* The plate as drawn (dock_edge_panel_reach over include) and its corner
+   radius. An empty plate is {0,0,0,0} with radius 0. Returns 0 when nothing
+   is drawn. */
 int dock_render_panel(const DockSettings *s, int edge, const DockPlacement *p, int count,
                       int width, int height, const DockRect *include, DockRect *rect, int *radius);
 /* dock_render_oriented_mask plus overlays, writing canvas and coverage only

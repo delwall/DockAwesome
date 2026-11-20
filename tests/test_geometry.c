@@ -5,6 +5,7 @@
 #include <limits.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 
 enum { LONG = 640, CROSS = 96, N = 9 };
 
@@ -81,10 +82,10 @@ static void test_interaction(void)
             actual_point((DockEdge)edge,vx,vy,&x,&y);
             assert(dock_edge_hover(&s,(DockEdge)edge,p,N,w,h,x,y) ==
                 dock_hover_contains(&s,v,N,LONG,CROSS,vx,vy));
-            assert(dock_edge_outside(&s,(DockEdge)edge,p,N,w,h,x,y,5) ==
+            assert(dock_edge_outside(&s,(DockEdge)edge,p,N,w,h,NULL,x,y,5) ==
                 dock_interaction_outside(&s,v,N,LONG,CROSS,vx,vy,5));
         }
-        assert(dock_edge_outside(&s,(DockEdge)edge,p,N,w,h,INT_MIN,INT_MAX,0));
+        assert(dock_edge_outside(&s,(DockEdge)edge,p,N,w,h,NULL,INT_MIN,INT_MAX,0));
         assert(!dock_edge_hover(&s,(DockEdge)edge,p,N,w,h,INT_MIN,INT_MAX));
     }
 }
@@ -338,6 +339,147 @@ static void test_stack_gap(void)
     }
 }
 
+static int along_low(DockEdge edge, DockRect r) { return edge == DOCK_EDGE_BOTTOM ? r.left : r.top; }
+static int along_high(DockEdge edge, DockRect r) { return edge == DOCK_EDGE_BOTTOM ? r.right : r.bottom; }
+
+/* The plate's end at one end of the row (high: the far end), as drawn. */
+static int plate_end(const DockSettings *s, DockEdge edge, const DockPlacement *row, int count,
+    int w, int h, const DockGap *gap, int high)
+{
+    DockRect include = dock_gap_rect(gap), r;
+    assert(dock_edge_panel_reach(s,edge,row,count,w,h,&include,&r));
+    return high ? along_high(edge,r) : along_low(edge,r);
+}
+
+/* Steps row and gap together until both settle; records the plate end each
+   tick. Returns the tick count. */
+static int run_gap(const DockSettings *s, DockEdge edge, DockAnimation *animation,
+    DockPlacement *row, const DockPlacement *target, int count, int w, int h,
+    DockGap *gap, int high, int *ends)
+{
+    int tick;
+    for (tick = 0; memcmp(row,target,sizeof(*row)*count) || dock_gap_moving(gap); ++tick) {
+        assert(tick < 32);
+        dock_edge_animate(s,edge,animation,row,target,count);
+        dock_gap_step(s,edge,gap);
+        ends[tick] = plate_end(s,edge,row,count,w,h,gap,high);
+    }
+    return tick;
+}
+
+/* A gap opening or closing at either end moves the plate's end as smoothly
+   as the icons move the middle: monotonic, the first step at most half the
+   way (set at once it jumped there in one frame, IMG_2595), and the same at
+   both ends and on every edge. */
+static void test_gap_motion(void)
+{
+    enum { n = N-1 };
+    DockSettings settings[2];
+    int k, edge, high, phase, i;
+    settings[0] = dock_settings_default();
+    settings[1] = settings[0];
+    settings[1].base_size = 36; settings[1].max_size = 68; /* ApolloOS: size 36, 190 % */
+    for (k = 0; k < 2; ++k) for (edge = DOCK_EDGE_BOTTOM; edge <= DOCK_EDGE_RIGHT; ++edge) {
+        const DockSettings *s = &settings[k];
+        int w, h, ticks[2][2], steps[2][2][32];
+        dimensions((DockEdge)edge,&w,&h);
+        for (high = 0; high < 2; ++high) {
+            DockPlacement row[n], rest[n], target[n], gap;
+            DockAnimation animation;
+            DockGap g;
+            DockRect hole;
+            int x, y, along, slot = high ? n : 0, end = high ? n-1 : 0, from, to;
+            assert(dock_edge_layout(s,(DockEdge)edge,n,w,h,0,0,0,rest));
+            memcpy(row,rest,sizeof(row));
+            /* The pointer half a pitch past the end icon, on the row. */
+            along = high ? (edge == DOCK_EDGE_BOTTOM ? rest[n-1].x : rest[n-1].y)+s->base_size+s->gap :
+                (edge == DOCK_EDGE_BOTTOM ? rest[0].x : rest[0].y)-s->gap;
+            actual_point((DockEdge)edge,along,CROSS-s->padding-s->base_size/2,&x,&y);
+            assert(dock_edge_gap_layout(s,(DockEdge)edge,n,w,h,slot,x,y,1,target,&gap));
+            hole = (DockRect){gap.x,gap.y,gap.x+gap.size,gap.y+gap.size};
+            from = plate_end(s,(DockEdge)edge,rest,n,w,h,NULL,high);
+            to = high ? along_high((DockEdge)edge,hole)+s->padding : along_low((DockEdge)edge,hole)-s->padding;
+            dock_animation_reset(&animation);
+            dock_gap_reset(&g);
+            assert(g.slot == -1 && !dock_gap_moving(&g) && dock_gap_rect(&g).right == 0);
+            dock_gap_open(&g,slot,&gap,&row[end]);
+            /* Hidden under the end icon at first: the plate is unchanged. */
+            assert(plate_end(s,(DockEdge)edge,row,n,w,h,&g,high) == from);
+            for (phase = 0; phase < 2; ++phase) {
+                int a = phase ? to : from, b = phase ? from : to, ends[32], count, previous = a;
+                if (phase) dock_gap_close(&g,rest,n);
+                count = run_gap(s,(DockEdge)edge,&animation,row,phase ? rest : target,n,w,h,&g,high,ends);
+                assert(count > 2 && a != b && ends[count-1] == b);
+                assert(2*abs(ends[0]-a) <= abs(b-a));
+                for (i = 0; i < count; ++i) {
+                    int step = ends[i]-previous;
+                    assert(step*(b-a) >= 0);
+                    previous = ends[i];
+                    steps[high][phase][i] = high ? step : -step;
+                }
+                ticks[high][phase] = count;
+            }
+            /* Closed, it stays under the end icon (inside the plate) until
+               the caller ends it with the row settled. */
+            assert(g.slot == slot && !memcmp(&g.shown,&rest[end],sizeof(g.shown)));
+            dock_gap_reset(&g);
+            assert(g.slot == -1 && dock_gap_rect(&g).right == 0);
+        }
+        /* Both ends alike: the same ticks and mirrored steps within a pixel. */
+        for (phase = 0; phase < 2; ++phase) {
+            assert(ticks[0][phase] == ticks[1][phase]);
+            for (i = 0; i < ticks[0][phase]; ++i)
+                assert(abs(steps[0][phase][i]-steps[1][phase][i]) <= 1);
+        }
+    }
+}
+
+/* "Near the dock" is measured from what is drawn: margin pixels past the
+   plate at both ends of the row and outside its outer side, on every edge,
+   and past a gap's reach where one is shown (IMG_2595: the press's frozen,
+   zoomed row reached ~77 px further on the left). */
+static void test_outside_shown(void)
+{
+    enum { MARGIN = 24, n = N-1 };
+    DockSettings s = dock_settings_default();
+    int edge;
+    for (edge = DOCK_EDGE_BOTTOM; edge <= DOCK_EDGE_RIGHT; ++edge) {
+        DockPlacement rest[n], gap;
+        DockRect plate, hole;
+        int w, h, x, y, inner, outer, cross, low, high, reach;
+        dimensions((DockEdge)edge,&w,&h);
+        dock_panel_cross_bounds(&s,CROSS,&inner,&outer);
+        cross = (inner+outer)/2;
+        assert(dock_edge_layout(&s,(DockEdge)edge,n,w,h,0,0,0,rest));
+        assert(dock_edge_panel_rect(&s,(DockEdge)edge,rest,n,w,h,&plate));
+        low = along_low((DockEdge)edge,plate); high = along_high((DockEdge)edge,plate);
+        actual_point((DockEdge)edge,low-MARGIN,cross,&x,&y);
+        assert(!dock_edge_outside(&s,(DockEdge)edge,rest,n,w,h,NULL,x,y,MARGIN));
+        actual_point((DockEdge)edge,low-MARGIN-1,cross,&x,&y);
+        assert(dock_edge_outside(&s,(DockEdge)edge,rest,n,w,h,NULL,x,y,MARGIN));
+        actual_point((DockEdge)edge,high+MARGIN-1,cross,&x,&y);
+        assert(!dock_edge_outside(&s,(DockEdge)edge,rest,n,w,h,NULL,x,y,MARGIN));
+        actual_point((DockEdge)edge,high+MARGIN,cross,&x,&y);
+        assert(dock_edge_outside(&s,(DockEdge)edge,rest,n,w,h,NULL,x,y,MARGIN));
+        actual_point((DockEdge)edge,(low+high)/2,inner-MARGIN,&x,&y);
+        assert(!dock_edge_outside(&s,(DockEdge)edge,rest,n,w,h,NULL,x,y,MARGIN));
+        actual_point((DockEdge)edge,(low+high)/2,inner-MARGIN-1,&x,&y);
+        assert(dock_edge_outside(&s,(DockEdge)edge,rest,n,w,h,NULL,x,y,MARGIN));
+        /* A drop preview's gap before the first icon: that side moves out. */
+        assert(dock_edge_gap_layout(&s,(DockEdge)edge,n,w,h,0,0,0,0,rest,&gap));
+        hole = (DockRect){gap.x,gap.y,gap.x+gap.size,gap.y+gap.size};
+        reach = along_low((DockEdge)edge,hole)-s.padding;
+        assert(dock_edge_panel_rect(&s,(DockEdge)edge,rest,n,w,h,&plate));
+        assert(reach < along_low((DockEdge)edge,plate));
+        actual_point((DockEdge)edge,reach-MARGIN,cross,&x,&y);
+        assert(!dock_edge_outside(&s,(DockEdge)edge,rest,n,w,h,&hole,x,y,MARGIN));
+        actual_point((DockEdge)edge,reach-MARGIN-1,cross,&x,&y);
+        assert(dock_edge_outside(&s,(DockEdge)edge,rest,n,w,h,&hole,x,y,MARGIN));
+        actual_point((DockEdge)edge,reach-MARGIN,cross,&x,&y);
+        assert(dock_edge_outside(&s,(DockEdge)edge,rest,n,w,h,NULL,x,y,MARGIN));
+    }
+}
+
 int main(void)
 {
     test_layout_and_baseline();
@@ -349,6 +491,8 @@ int main(void)
     test_zoomed_reorder_gap();
     test_zoom_room_after_insertion();
     test_stack_gap();
+    test_gap_motion();
+    test_outside_shown();
     puts("geometry: bottom/left/right layout, upright hit/slot/outside, half-open panel bounds and animation equivalence PASS");
     return 0;
 }

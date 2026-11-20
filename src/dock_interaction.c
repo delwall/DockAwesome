@@ -71,22 +71,8 @@ DockGestureEffects dock_gesture_update(DockGesture *g, const DockGestureInput *i
     return effect;
 }
 
-static int inside_margin(int x, int y, int64_t left, int top,
-    int64_t right, int64_t bottom, int margin)
-{
-    return (int64_t)x >= left-margin && (int64_t)x < right+margin &&
-        (int64_t)y >= (int64_t)top-margin && (int64_t)y < bottom+margin;
-}
-
 int dock_interaction_outside(const DockSettings *s, const DockPlacement *p,
     int count, int width, int height, int x, int y, int margin)
 {
-    DockRect r;
-    int i;
-    if (margin < 0 || !dock_edge_panel_rect(s, DOCK_EDGE_BOTTOM, p, count, width, height, &r)) return 0;
-    if (inside_margin(x, y, r.left, r.top, r.right, r.bottom, margin)) return 0;
-    for (i = 0; i < count; ++i)
-        if (inside_margin(x, y, p[i].x, p[i].y,
-                (int64_t)p[i].x+p[i].size, (int64_t)p[i].y+p[i].size, margin)) return 0;
-    return 1;
+    return dock_edge_outside(s, DOCK_EDGE_BOTTOM, p, count, width, height, NULL, x, y, margin);
 }

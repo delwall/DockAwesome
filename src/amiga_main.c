@@ -74,6 +74,22 @@ static void exchange_stack(App *app, int index, Item *replacement)
     *replacement = previous;
 }
 
+/* The gap in slot opens from the shown row's icon there (past the end, the
+   last): hidden under it at first, it slides out as the row parts. */
+static void open_gap(App *app, int slot, const DockPlacement *gap,
+    const DockPlacement *row, int count)
+{
+    dock_gap_open(&app->gap, slot, gap, &row[slot < count ? slot : count-1]);
+    show_gap(app);
+}
+
+/* Close the gap into its neighbour in the new target row. */
+static void close_gap(App *app, int count)
+{
+    dock_gap_close(&app->gap, app->target, count);
+    show_gap(app);
+}
+
 static void finish_move(App *app, int slot, const DockGestureInput *release)
 {
     if (!app->moving_item) return;
@@ -85,7 +101,7 @@ static void finish_move(App *app, int slot, const DockGestureInput *release)
     memcpy(app->placement+slot+1, app->moving_placement+slot,
         (app->count-slot-1)*sizeof(*app->placement));
     app->moving_item = 0;
-    app->renderer.panel_include = (DockRect){0,0,0,0};
+    end_gap(app);
     dock_animation_reset(&app->animation);
 }
 
@@ -560,6 +576,7 @@ int animation_needed(const App *app)
 {
     if (morph_due(app,dock_ui_folder_progress(app->ui))) return 1;
     return (app->moving_item && app->held_icon.level != app->held_target.level) ||
+        dock_gap_moving(&app->gap) ||
         memcmp(row_placement(app), app->target, sizeof(*app->placement)*row_count(app)) != 0;
 }
 
@@ -729,6 +746,10 @@ static int animate_row(App *app)
     if (app->moving_item && app->held_icon.level != app->held_target.level)
         changed |= dock_animate_step(&app->settings, &app->held_animation,
             &app->held_icon, &app->held_target, 1);
+    if (dock_gap_step(&app->settings, app->edge, &app->gap)) {
+        show_gap(app);
+        changed = 1;
+    }
     return changed;
 }
 
@@ -742,24 +763,23 @@ static void update_target(App *app)
         DockGesture *gesture = &app->gesture;
         int count = row_count(app), zoom = !gesture->remove_armed;
         int slot = app->gesture.target_slot;
-        DockRect include = {0,0,0,0};
         if (app->moving_item && zoom) {
             DockPlacement gap;
             if (slot < 0) slot = app->moving_item-1;
             if (dock_edge_gap_layout(&app->settings, app->edge, count, app->width, app->height,
                     slot, gesture->x, gesture->y, zoom, app->target, &gap)) {
                 app->held_target = (DockPlacement){0, app->settings.max_size-gap.size, gap.size, gap.level};
-                include = (DockRect){gap.x, gap.y, gap.x+gap.size, gap.y+gap.size};
+                open_gap(app, slot, &gap, app->moving_placement, count);
             }
         } else {
             dock_edge_layout(&app->settings, app->edge, count, app->width, app->height,
                 gesture->x, gesture->y, zoom, app->target);
-            if (app->moving_item)
+            if (app->moving_item) {
                 app->held_target = (DockPlacement){0, app->settings.max_size-app->settings.base_size,
                     app->settings.base_size, 0};
+                close_gap(app, count);
+            }
         }
-        if (memcmp(&app->renderer.panel_include, &include, sizeof(include))) app->gesture_redraw = 1;
-        app->renderer.panel_include = include;
         app->hovered = -1;
         return;
     }
@@ -781,7 +801,7 @@ static void update_target(App *app)
             if (slot > stack_index(app)) slot = stack_index(app);
             if (dock_edge_gap_layout(&app->settings, app->edge, app->count,
                     app->width, app->height, slot, 0, 0, 0, app->target, &gap)) {
-                app->renderer.panel_include = (DockRect){gap.x, gap.y, gap.x+gap.size, gap.y+gap.size};
+                open_gap(app, slot, &gap, app->placement, app->count);
                 app->drop_preview_slot = slot;
                 app->hovered = -1;
                 return;
@@ -791,11 +811,10 @@ static void update_target(App *app)
         dock_edge_layout(&app->settings, app->edge, app->count, app->width, app->height,
             0, 0, 0, app->target);
         app->hovered = -1;
+        /* The gap closes into its neighbour as the row closes up. */
+        close_gap(app, app->count);
         if (animation_needed(app)) return;
-        if (panel_reaching(app)) {
-            app->renderer.panel_include = (DockRect){0,0,0,0};
-            app->gesture_redraw = 1;
-        }
+        end_gap(app);
         if (catching) return;
     }
     inside = pointer_inside(app, &x, &y);
@@ -1661,7 +1680,7 @@ int rest_after_pin_change(App *app, int before)
     }
     if (!dock_edge_layout(&app->settings, app->edge, app->count,
             app->width, app->height, 0, 0, 0, app->target)) return 0;
-    app->renderer.panel_include = (DockRect){0,0,0,0};
+    end_gap(app);
     dock_animation_reset(&app->animation);
     return 1;
 }
@@ -1758,9 +1777,13 @@ static DockGestureInput gesture_point(App *app, int kind, uint32_t token,
             in.target_slot = dock_edge_insertion_slot(&app->settings, app->edge, app->count-1,
                 app->width, app->height, x, y);
         if (in.target_slot >= stack_index(app)) in.target_slot = stack_index(app)-1;
+        /* Near what is shown: the row as it moves and the plate over the
+           gap. The frozen row from the press, zoomed there, reached ~77 px
+           past the plate a removal shows, so a pin far off the left end
+           already opened a gap (IMG_2595). */
         in.outside = in.target_slot < 0 &&
-            dock_edge_outside(&app->settings, app->edge, app->placement, app->count,
-            app->width, app->height, x, y, 24);
+            dock_edge_outside(&app->settings, app->edge, row_placement(app), row_count(app),
+            app->width, app->height, &app->renderer.panel_include, x, y, 24);
         /* Not a removal, but off the row (above the plate where the zoomed
            icons reach, or past an end): the slot still follows the pointer.
            Kept from the row, the gap and the drop went to where the pin
@@ -1913,6 +1936,10 @@ static void apply_gesture(App *app, const DockGestureInput *in, int *redraw, int
         app->held_icon.y = app->settings.max_size-app->held_icon.size;
         app->held_target = app->held_icon;
         dock_animation_reset(&app->held_animation);
+        /* The gap starts as the pin, where it was: the first frame stays. */
+        dock_gap_reset(&app->gap);
+        dock_gap_open(&app->gap, index, &app->placement[index], &app->placement[index]);
+        show_gap(app);
         app->moving_item = index+1;
         app->snap_wait_motion = 0;
     }
@@ -2770,6 +2797,7 @@ int main(int argc, char **argv)
     dock_apollo_bit();
 #endif
     app->settings = dock_settings_default(); app->input_bit = app->vblank_bit = -1;
+    dock_gap_reset(&app->gap);
     app->reset.bit = -1;
     {
         /* The icon cache may use a quarter of the free memory, at least the

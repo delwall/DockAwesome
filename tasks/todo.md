@@ -1414,9 +1414,22 @@ to the same slot (inverted offset test, store attributes required).
       into it. The receiver without shapes arms over the plate in front of
       other programs' windows; it steps back while the wheel scrolls a
       window under the plate. User: "Nu ser det ut att fungera bra".
+- [x] Reorder: dragged out and back, the gap opened where the pin last
+      left the row (IMG_2593). Off the row the slot follows the pointer
+      (dock_edge_row_slot). User: "Bra".
+- [x] Reorder at the row ends: far more empty plate than in the middle
+      (IMG_2594). The plate reaches the gap by the padding instead of
+      mirroring the row. User: "Bättre".
+- [x] Reorder (IMG_2595): at an end the plate jumped out in one frame while
+      the icons slid, and the gap opened ~135 px left of the plate. The gap
+      now animates like an icon (DockGap, also for drop previews) and
+      "near" is measured against the row and plate as shown, not the row
+      frozen at the press. Host tests: plate end monotonic, first step at
+      most half, both ends and all edges alike; outside exactly 24 px from
+      the drawn plate on every side. User: "Nu verkar allt fungera".
 - [ ] Personal:1234-5678 (partial copy from the drop bug): ask the user
       before deleting.
-- [ ] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete{,2,3} after
+- [ ] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete{,2,3,4} after
       the next ApolloOS reboot, and -locked-delete{,2,3,4} after the next
       3.2.3 boot; RAM:BreakTask and RAM:TaskList when testing is done.
 - [ ] ApolloOS: recheck the drag (reference now read from the screen).

@@ -263,20 +263,7 @@ int dock_render_panel(const DockSettings *s, int edge, const DockPlacement *p, i
 {
     DockRect rect;
     int radius;
-    if (!dock_edge_panel_rect(s, (DockEdge)edge, p, count, width, height, &rect)) return 0;
-    if (include && include->left < include->right && include->top < include->bottom) {
-        /* An empty slot (the gap of a drag) has no artwork to extend the
-           panel: reach it with the padding the icons get. Mirroring the
-           row instead overshot where the zoomed row is not centred: far
-           more room at the ends than in the middle (IMG_2594). */
-        if (edge == DOCK_EDGE_BOTTOM) {
-            rect.left = dock_clamp(include->left-s->padding < rect.left ? include->left-s->padding : rect.left, 0, width);
-            rect.right = dock_clamp(include->right+s->padding > rect.right ? include->right+s->padding : rect.right, 0, width);
-        } else {
-            rect.top = dock_clamp(include->top-s->padding < rect.top ? include->top-s->padding : rect.top, 0, height);
-            rect.bottom = dock_clamp(include->bottom+s->padding > rect.bottom ? include->bottom+s->padding : rect.bottom, 0, height);
-        }
-    }
+    if (!dock_edge_panel_reach(s, (DockEdge)edge, p, count, width, height, include, &rect)) return 0;
     if (rect.right <= rect.left || rect.bottom <= rect.top) rect = (DockRect){0,0,0,0};
     radius = (edge == DOCK_EDGE_BOTTOM ? rect.bottom-rect.top : rect.right-rect.left)/4;
     if (radius > (rect.right - rect.left) / 2) radius = (rect.right - rect.left) / 2;
