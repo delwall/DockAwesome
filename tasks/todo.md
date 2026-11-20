@@ -1526,3 +1526,39 @@ to the same slot (inverted offset test, store attributes required).
 - [x] AmiKit XE: new build installed (started with Run: WBRun reports no
       memory under the Directory Opus desktop); agent drags do not move
       Directory Opus icons, so the user looked: "Amikit såg ok ut".
+
+## Release 1.0 beta 4 (2026-11-20)
+
+- [x] PR #12 (after-1.0b3) merged into main (237c843); tag v1.0b4; GitHub
+      prerelease "DockAwesome 1.0 beta 4" with DockAwesome-1.0b4.lha
+      (171,130 bytes, SHA-256 252bfb43...02dbc8bd), packed with LhA 2.15 on
+      ApolloOS; lha t passes and all five files match build/release. The
+      archive's dates are ApolloOS's clock (18 May 2026).
+- [x] Release binary (DockAwesome 1.0 (20.11.2026) beta 4) installed on
+      ApolloOS; the old -locked-delete copies there are deleted. After
+      the next boot (2026-11-21) the 0.518 -locked-delete is deleted too,
+      and 1.0 beta 4 started from WBStartup by itself.
+- [x] Coffin (2026-11-21): -locked-delete, -2 and -3 deleted; release
+      binary (1.0 beta 4) installed and running; the previous build is now
+      Disabled/DockAwesome-locked-delete: delete after the next boot.
+- [x] 3.1.4.1 (2026-11-21): the 10 Nov -locked-delete deleted; release
+      binary (1.0 beta 4) installed and running; the previous build is now
+      Disabled/DockAwesome-locked-delete: delete after the next boot.
+- [x] AmiKit XE (2026-11-21): release binary (1.0 beta 4) installed over
+      the unlocked previous build (no -locked-delete needed) and running,
+      started with Run.
+- [x] AmigaOS 3.9 (plain, AOS39 boot, 2026-11-21): four old -locked-delete
+      copies deleted; release binary installed over build 509 (now
+      Disabled/DockAwesome-locked-delete: delete after the next boot) and
+      running. Agent: the disk icon dropped on the plate pinned at slot 7
+      and dragged out again; prefs exactly as before. The coloured dots at
+      y 649-652 under the rainbow bar stay after Workbench redraws there:
+      they are in the wallpaper. Release 1.0 beta 4 now runs on all six
+      boots (ApolloOS, 3.2.3, Coffin, 3.1.4.1, AmiKit XE, 3.9).
+- [x] Personal:1234-5678 (partial copy from the drop bug; user: "radera
+      den"): already gone on 2026-11-21. No 1234-5678#? anywhere on
+      Personal (searched ALL), nor in the roots of Archives, AOS32, BOOT.
+      3.2.3 had no -locked-delete files.
+- [x] AmigaOS 3.2.3: release binary (1.0 beta 4, from the published LHA)
+      installed and running; build 518 is now
+      Disabled/DockAwesome-locked-delete: delete after the next 3.2.3 boot.
