@@ -15,7 +15,7 @@ int dock_settings_valid(const DockSettings *s)
     return s && s->base_size >= DOCK_MIN_ICON_SIZE && s->max_size >= s->base_size &&
         s->max_size <= DOCK_MAX_ICON_SIZE && s->levels >= 2 && s->levels <= DOCK_MAX_LEVELS &&
         s->gap >= 0 && s->gap <= 32 && s->padding >= 0 && s->padding <= 64 &&
-        s->end_gap >= 0 && s->end_gap <= 32 && s->edge_padding >= 0 && s->edge_padding <= 32;
+        s->end_gap >= 0 && s->end_gap <= 32 && s->edge_padding >= -DOCK_DESKTOP_GAP && s->edge_padding <= 32;
 }
 
 int dock_row_length(const DockSettings *s, int count)

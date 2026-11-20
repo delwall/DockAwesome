@@ -4,6 +4,7 @@
    docs/pip-backend.md. */
 #include "amiga_app.h"
 #include "amiga_float.h"
+#include "dock_compose.h"
 
 /* The overlay's columns on the screen. A right dock's keyed transport
    padding lies past the screen edge. */
@@ -28,30 +29,99 @@ static DockRect dialog_clip(const App *app)
     return clip;
 }
 
+/* Where drops are caught: the dock's box without the strip kept for the
+   hover label. Over that strip the armed receiver lay on desktop icons
+   beside a side dock: a click on one was taken as a drop and pinned it. */
+static DockRect drop_box(const App *app)
+{
+    DockRect box = {app->left,app->top,app->left+pip_visible_width(app),app->top+app->height};
+    if (app->edge == DOCK_EDGE_BOTTOM) box.top += app->label_room;
+    else if (app->edge == DOCK_EDGE_RIGHT) box.left += app->label_room;
+    else box.right -= app->label_room;
+    return box;
+}
+
+/* The receiver catches over the plate alone, with shapes or without: at
+   rest, and as it grows while it makes room for a drop (an external drag
+   does not zoom). Without the room, the dragged icon was cut where the
+   grown plate passed the receiver: it seemed to go through the last pin
+   (AmiKit). */
+static void rest_plate(App *app)
+{
+    DockPlacement rest[DOCK_MAX_ITEMS], gap;
+    DockRect plate, grown, room;
+    int radius;
+    app->rest_count = app->count;
+    if (!dock_edge_layout(&app->settings,app->edge,app->count,app->width,app->height,0,0,0,rest) ||
+        !dock_edge_panel_rect(&app->settings,app->edge,rest,app->count,app->width,app->height,&plate))
+        return;
+    if (!dock_edge_gap_layout(&app->settings,app->edge,app->count,app->width,app->height,
+            app->count/2,0,0,0,rest,&gap)) gap.size = 0;
+    room = (DockRect){gap.x,gap.y,gap.x+gap.size,gap.y+gap.size};
+    if (gap.size &&
+        dock_render_panel(&app->settings,app->edge,rest,app->count,app->width,app->height,&room,&grown,&radius) &&
+        grown.right > grown.left && grown.bottom > grown.top) {
+        if (grown.left < plate.left) plate.left = grown.left;
+        if (grown.top < plate.top) plate.top = grown.top;
+        if (grown.right > plate.right) plate.right = grown.right;
+        if (grown.bottom > plate.bottom) plate.bottom = grown.bottom;
+    }
+    amiga_drop_catcher_set_rest(app->drop_catcher,app->left+plate.left,app->top+plate.top,
+        plate.right-plate.left,plate.bottom-plate.top);
+}
+
+/* The dock's own windows: its receiver, popups, menus and the dragged pin. */
+static int owns_window(void *data, struct Window *window)
+{
+    App *app = data;
+    return window == app->window || dock_ui_owns_window(app->ui,window) ||
+        amiga_drag_preview_owns(app->drag_preview,window);
+}
+
 static int update_drag_mask(App *app, int sample)
 {
     enum { DRAG_RADIUS = 128 };
     int x = app->screen->MouseX-app->left, y = app->screen->MouseY-app->top;
     int left = x-DRAG_RADIUS, top = y-DRAG_RADIUS;
-    int right = x+DRAG_RADIUS+1, bottom = y+DRAG_RADIUS+1, row;
-    if (left < 0) left = 0;
-    if (top < 0) top = 0;
-    if (right > pip_visible_width(app)) right = pip_visible_width(app);
-    if (bottom > app->height) bottom = app->height;
-    if (amiga_drop_catcher_active(app->drop_catcher) && app->input_context.external_held &&
-        app->input_context.external_dragged && right > left && bottom > top) {
-        int changed, reference_changed = 0;
+    int right = x+DRAG_RADIUS+1, bottom = y+DRAG_RADIUS+1, row, catching, near, reference_changed = 0;
+    DockRect catch_box = {0,0,0,0};
+    /* Only where the receiver lies is the baseline exact (read as the
+       gesture starts). Elsewhere the reference keeps the capture, which
+       could be stale (an icon highlighted by the press): it read as drag
+       image and left fragments of it on the dock (AmiKit). */
+    if (app->drop_catcher) {
+        amiga_drop_catcher_rect(app->drop_catcher,&catch_box.left,&catch_box.top,
+            &catch_box.right,&catch_box.bottom);
+        catch_box.left -= app->left; catch_box.right -= app->left;
+        catch_box.top -= app->top; catch_box.bottom -= app->top;
+    }
+    app->drag_clip = catch_box;
+    if (left < catch_box.left) left = catch_box.left;
+    if (top < catch_box.top) top = catch_box.top;
+    if (right > catch_box.right) right = catch_box.right;
+    if (bottom > catch_box.bottom) bottom = catch_box.bottom;
+    catching = amiga_drop_catcher_active(app->drop_catcher) && app->input_context.external_held;
+    near = catching && app->input_context.external_dragged && right > left && bottom > top;
+    /* The capture stops as the gesture starts: read the reference then,
+       from the screen as the press left it, before the drag image. Taken
+       once the pointer came near, what the press changed under the dock (a
+       window's border drawn inactive) showed only then: the border flipped
+       from dark to light grey (ApolloOS). Read from the receiver's copy,
+       taken before the press, that border differed from the screen and was
+       drawn over the icons as drag image (Coffin). */
+    if (catching && sample && !app->drag_reference) {
+        if (amiga_display_drag_reference565(app->display,app->source565,
+                app->left,app->top,pip_visible_width(app),&catch_box)) {
+            app->drag_reference = 1;
+            app->renderer.pixels->decode565(app->backdrop.pixels,app->source565,
+                (unsigned long)app->width*app->height);
+            dock_renderer_backdrop_changed(&app->renderer);
+            reference_changed = 1;
+        } else app->drag_reference = -1;
+    }
+    if (near) {
+        int changed;
         if (!sample) return 0;
-        if (!app->drag_reference) {
-            if (amiga_display_drag_reference565(app->display,
-                    amiga_drop_catcher_backing(app->drop_catcher),app->source565,pip_visible_width(app))) {
-                app->drag_reference = 1;
-                app->renderer.pixels->decode565(app->backdrop.pixels,app->source565,
-                    (unsigned long)app->width*app->height);
-                dock_renderer_backdrop_changed(&app->renderer);
-                reference_changed = 1;
-            } else app->drag_reference = -1;
-        }
         if (app->drag_reference > 0) {
             /* The drag image moves with the pointer, so a read that finds
                none mid-drag caught the drag between Directory Opus erasing
@@ -70,7 +140,7 @@ static int update_drag_mask(App *app, int sample)
             }
         }
     }
-    if (!app->drag_mask_live) return 0;
+    if (!app->drag_mask_live) return reference_changed;
     for (row = app->drag_box.top; row < app->drag_box.bottom; ++row)
         memset(app->drag_mask+(size_t)row*app->width+app->drag_box.left,0,
             (size_t)(app->drag_box.right-app->drag_box.left));
@@ -125,7 +195,7 @@ static int frame_check(const App *app, DockRect *out)
     int i, low, high, limit, bottom = app->edge == DOCK_EDGE_BOTTOM;
     int visible = pip_visible_width(app);
     DockRect plate;
-    if (app->moving_item || app->gesture.active || app->renderer.center_panel ||
+    if (app->moving_item || app->gesture.active || panel_reaching(app) ||
         !dock_edge_panel_rect(&app->settings,app->edge,app->placement,app->count,
             app->width,app->height,&plate)) return 0;
     low = bottom ? plate.left : plate.top;
@@ -182,9 +252,7 @@ static int live_capture(App *app, int full_compare)
         /* The one-pixel receiver (no shapes) comes to the front when it
            catches a drop; its place at rest does not matter. */
         if (app->caps.shaped_windows) for (layer = app->window->WLayer->front; layer; layer = layer->front)
-            if (layer->Window && layer->Window != app->window &&
-                !dock_ui_owns_window(app->ui,layer->Window) &&
-                !amiga_drag_preview_owns(app->drag_preview,layer->Window)) { obscured = 1; break; }
+            if (layer->Window && !owns_window(app,layer->Window)) { obscured = 1; break; }
         ReleaseSemaphore(&app->screen->LayerInfo.Lock);
         if (!obscured || dock_ui_busy(app->ui)) app->front_pending = 0;
         else {
@@ -285,7 +353,12 @@ static void pip_mask(void *context, int y, int left, int right, unsigned char *s
    sample. Holes that let the screen through instead lagged behind the image
    (Workbench draws it after the pointer moves), cutting it at the plate.
    It is painted on the clear parts of the surface too, so the image on the
-   surface is one picture: half Workbench's and half ours lagged apart. */
+   surface is one picture: half Workbench's and half ours lagged apart.
+   Not on clear parts outside the receiver, though: there the screen shows
+   the native image, and a kept image moved with the pointer trailed beside
+   it (dragged along the plate's edge, AmiKit). Opaque parts hide the
+   native image wherever they are: clipped to the receiver alone, the
+   plate's edge row above it crossed the image as a line. */
 /* The mask as read, moved by the pointer's travel since. */
 static ULONG paint_drag_image(App *app, unsigned char *buffer, int stride)
 {
@@ -293,14 +366,20 @@ static ULONG paint_drag_image(App *app, unsigned char *buffer, int stride)
     int dx = app->screen->MouseX-app->left-app->drag_pointer_x;
     int dy = app->screen->MouseY-app->top-app->drag_pointer_y;
     int visible = pip_visible_width(app), y, x;
+    const DockRect *clip = &app->drag_clip;
     for (y = app->drag_box.top; y < app->drag_box.bottom; ++y) {
         const unsigned char *mask = app->drag_mask+(size_t)y*app->width;
         const unsigned char *color = app->drag_color+(size_t)y*app->width*2;
+        const unsigned char *opaque;
         unsigned char *out;
+        int row_in;
         if (y+dy < 0 || y+dy >= app->height) continue;
         out = buffer+(size_t)(y+dy)*stride;
+        opaque = app->coverage+(size_t)(y+dy)*app->width;
+        row_in = y+dy >= clip->top && y+dy < clip->bottom;
         for (x = app->drag_box.left; x < app->drag_box.right; ++x)
-            if (mask[x] && x+dx >= 0 && x+dx < visible) {
+            if (mask[x] && x+dx >= 0 && x+dx < visible &&
+                ((row_in && x+dx >= clip->left && x+dx < clip->right) || opaque[x+dx])) {
                 unsigned int v = ((unsigned int)color[x*2]<<8)|color[x*2+1];
                 if (v == 0xf81f) v ^= 0x20; /* never the colour key */
                 out[(x+dx)*2] = (unsigned char)(v>>8); out[(x+dx)*2+1] = (unsigned char)v;
@@ -427,6 +506,7 @@ static int pip_poll(App *app, int due, int redraw)
         if (live_capture(app,redraw || app->gesture_redraw)) redraw = 1;
         live_cancel(app);
     }
+    if (app->drop_catcher && app->rest_count != app->count) rest_plate(app);
     if (update_drag_mask(app,due || redraw)) redraw = 1;
     return redraw;
 }
@@ -438,7 +518,7 @@ enum { PIP_SHARE_WIDTH = 256 };
 static int pip_open(App *app)
 {
     /* The keyed tail of a right dock lies past the native window. */
-    int right_padding = app->settings.edge_padding;
+    int right_padding = pip_right_padding(app);
     dock_damage_set_full(&app->pip_pending[0]); dock_damage_set_full(&app->pip_pending[1]);
     app->pip_masked[0] = app->pip_masked[1] = 0;
     app->pip_mask_clip[0] = app->pip_mask_clip[1] = (DockRect){0,0,0,0};
@@ -496,8 +576,13 @@ static int pip_open(App *app)
                 app->settings.max_size+64, app->settings.max_size+32);
         app->appwindow = AddAppWindowA(0, 0, app->window, app->drop_port, NULL);
         if (!app->appwindow) return 0;
+        DockRect box = drop_box(app);
         app->drop_catcher = amiga_drop_catcher_init(app->screen, app->window, NULL,
-            app->left, app->top, pip_visible_width(app), app->height);
+            box.left, box.top, box.right-box.left, box.bottom-box.top);
+        if (app->drop_catcher) {
+            amiga_drop_catcher_set_owner(app->drop_catcher,owns_window,app);
+            rest_plate(app);
+        }
         return app->drop_catcher != NULL;
     }
     app->window = OpenWindowTags(NULL, WA_CustomScreen, (ULONG)app->screen,
@@ -513,8 +598,15 @@ static int pip_open(App *app)
     }
     app->appwindow = AddAppWindowA(0, 0, app->window, app->drop_port, NULL);
     if (!app->appwindow) return 0;
-    app->drop_catcher = amiga_drop_catcher_init(app->screen, app->window,
-        app->shape, app->left, app->top, pip_visible_width(app), app->height);
+    {
+        DockRect box = drop_box(app);
+        app->drop_catcher = amiga_drop_catcher_init(app->screen, app->window,
+            app->shape, box.left, box.top, box.right-box.left, box.bottom-box.top);
+    }
+    /* Each new receiver rests on the plate. pip_poll only follows count:
+       after a rebuild (another edge) this one caught over the whole box
+       and the windows in the headroom blinked (IMG_2600). */
+    if (app->drop_catcher) rest_plate(app);
     return app->drop_catcher != NULL;
 }
 

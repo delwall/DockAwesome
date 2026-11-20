@@ -5,10 +5,11 @@
 
 /* Pending AppMessages stay queued. accept_drops handles them on the next
    surface, and main replies to any that remain at exit. */
-/* Queued drops are relative to the surface that received them. Make them
-   screen-relative while no surface is open, and relative to the new surface
-   once it opens, so a drop queued across Save or R lands where it was made. */
-static void shift_held_drops(App *app, int closing)
+/* Queued drops are relative to the receiver window, which goes away with
+   the surface. Make them screen-relative while no surface is open:
+   accept_drops takes them relative to the new one, so a drop queued across
+   Save or R lands where it was made. */
+static void hold_drops(App *app)
 {
     struct Node *node;
     int index = 0;
@@ -16,17 +17,17 @@ static void shift_held_drops(App *app, int closing)
     Forbid();
     for (node = app->drop_port->mp_MsgList.lh_Head; node->ln_Succ; node = node->ln_Succ, ++index) {
         struct AppMessage *msg = (struct AppMessage *)node;
-        if (closing ? index < app->held_drops : index >= app->held_drops) continue;
-        msg->am_MouseX += closing ? app->left : -app->left;
-        msg->am_MouseY += closing ? app->top : -app->top;
+        if (index < app->held_drops) continue;
+        msg->am_MouseX += app->window->LeftEdge;
+        msg->am_MouseY += app->window->TopEdge;
     }
-    app->held_drops = closing ? index : 0;
+    app->held_drops = index;
     Permit();
 }
 
 void close_surface(App *app)
 {
-    if (app->window) shift_held_drops(app,1);
+    if (app->window) hold_drops(app);
     app->label_pin_id = 0;
     label_slots_free(app);
     amiga_drag_preview_close(app->drag_preview); app->drag_preview = NULL;
@@ -49,13 +50,18 @@ void close_surface(App *app)
 
 int open_surface(App *app)
 {
-    enum { RIGHT_PIP_TAIL = 8 };
+    /* SAGA cannot start a PiP at the screen's left edge: at x 0 no
+       alignment showed the image in place (it sat a few pixels right; the
+       ApolloOS 1280x720 probe), from x 3 the usual one did. A left dock's
+       canvas starts there, where its desktop gap ends: nothing moves. */
+    enum { RIGHT_PIP_TAIL = 8, PIP_LEFT_INSET = DOCK_DESKTOP_GAP };
     int reserve = app->count, wanted, limit = viewport_limit(app,app->edge);
     int cross = app->settings.max_size+2*app->settings.padding+12;
     int available_height = app->screen->Height-app->screen->BarHeight-2;
     /* Keep the right PiP raster's keyed tail even where it crosses the screen edge. */
-    int right_padding = app->edge == DOCK_EDGE_RIGHT ? RIGHT_PIP_TAIL-DOCK_DESKTOP_GAP : 0;
-    int panel_cross = dock_panel_thickness(&app->settings)+DOCK_DESKTOP_GAP+right_padding;
+    int edge_padding = app->edge == DOCK_EDGE_RIGHT ? RIGHT_PIP_TAIL-DOCK_DESKTOP_GAP :
+        app->edge == DOCK_EDGE_LEFT ? -PIP_LEFT_INSET : 0;
+    int panel_cross = dock_panel_thickness(&app->settings)+DOCK_DESKTOP_GAP+edge_padding;
     /* SAGA shows the last columns of each PiP row at the start of the next
        one: a right dock keeps them past the screen edge, a left dock keyed
        on its far side. Without them a pin dragged out of a left dock (on
@@ -64,7 +70,7 @@ int open_surface(App *app)
     app->pip_tail = app->edge == DOCK_EDGE_LEFT ? RIGHT_PIP_TAIL : 0;
     /* Each attempt reports its own error. Keep the text of an earlier failure. */
     if (!app->failed) app->surface_error[0] = 0;
-    app->settings.edge_padding = right_padding;
+    app->settings.edge_padding = edge_padding;
     if (cross < panel_cross) cross = panel_cross;
     /* Pinning can use this spare room without closing and opening the surface. */
     if (reserve && app->settings.max_size > app->settings.base_size) {
@@ -84,6 +90,7 @@ int open_surface(App *app)
        longer one is shortened). The rows and columns grow on the side
        away from the screen edge, where the layout is not anchored. */
     app->label_max_width = 0;
+    app->label_room = 0;
     {
         /* Measured on a row of at least one icon: a pin added to an
            empty dock has its label too. */
@@ -94,7 +101,7 @@ int open_surface(App *app)
             if (app->edge == DOCK_EDGE_BOTTOM) {
                 int headroom = rest[0].y+rest[0].size-app->settings.max_size;
                 need = DOCK_UI_LABEL_GAP+label-headroom;
-                if (need > 0) app->height += need;
+                if (need > 0) { app->height += need; app->label_room = need; }
                 app->label_max_width = app->screen->Width/2 < pip_visible_width(app) ?
                     app->screen->Width/2 : pip_visible_width(app);
             } else {
@@ -108,19 +115,23 @@ int open_surface(App *app)
                     if (w > widest) widest = w;
                 }
                 need = DOCK_UI_LABEL_GAP+widest-headroom;
-                if (need > 0) app->width += (need+31)&~31;
-                if (app->width > app->screen->Width) app->width = app->screen->Width&~31;
+                if (need > 0) app->label_room = (need+31)&~31;
+                app->width += app->label_room;
+                if (app->width > app->screen->Width) {
+                    app->label_room -= app->width-(app->screen->Width&~31);
+                    app->width = app->screen->Width&~31;
+                }
                 app->label_max_width = column;
             }
         }
     }
     if (app->height > available_height) return 0;
-    app->left = app->edge == DOCK_EDGE_LEFT ? 0 : app->edge == DOCK_EDGE_RIGHT ?
-        app->screen->Width-app->width+right_padding : (app->screen->Width-app->width)/2;
+    app->left = app->edge == DOCK_EDGE_LEFT ? PIP_LEFT_INSET : app->edge == DOCK_EDGE_RIGHT ?
+        app->screen->Width-app->width+edge_padding : (app->screen->Width-app->width)/2;
     app->top = app->edge == DOCK_EDGE_BOTTOM ? app->screen->Height-app->height :
         app->screen->BarHeight+2+(available_height-app->height)/2;
     app->renderer.edge = app->edge;
-    app->renderer.center_panel = 0;
+    end_gap(app);
     app->dialog_clip = (DockRect){0};
     app->drop_preview_slot = app->displayed_drop_slot = -1;
     app->screen_left = app->screen->LeftEdge; app->screen_top = app->screen->TopEdge;
@@ -142,7 +153,6 @@ int open_surface(App *app)
     }
     /* The backdrop, the native window and AppWindow, and present's needs. */
     if (!app->surface->open(app)) return 0;
-    shift_held_drops(app,0);
     stack_button_build(app);
     return 1;
 }

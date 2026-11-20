@@ -1,5 +1,6 @@
 #include "dock_geometry.h"
 #include "dock_interaction.h"
+#include <string.h>
 
 static int side_edge(DockEdge edge)
 {
@@ -127,42 +128,67 @@ int dock_edge_hover(const DockSettings *s, DockEdge edge, const DockPlacement *p
     return dock_hover_contains(s, virtual, count, height, width, vx, vy);
 }
 
-int dock_edge_outside(const DockSettings *s, DockEdge edge, const DockPlacement *p,
-    int count, int width, int height, int x, int y, int margin)
+static int near_rect(int x, int y, int64_t left, int64_t top,
+    int64_t right, int64_t bottom, int margin)
 {
-    DockPlacement virtual[DOCK_MAX_ITEMS];
-    int vx, vy;
-    if (edge == DOCK_EDGE_BOTTOM)
-        return dock_interaction_outside(s, p, count, width, height, x, y, margin);
-    if (!side_edge(edge) || !valid(s, edge, p, count, width, height)) return 0;
-    to_virtual(edge, width, p, virtual, count);
-    pointer_virtual(edge, width, x, y, &vx, &vy);
-    return dock_interaction_outside(s, virtual, count, height, width, vx, vy, margin);
+    return (int64_t)x >= left-margin && (int64_t)x < right+margin &&
+        (int64_t)y >= top-margin && (int64_t)y < bottom+margin;
 }
 
-int dock_edge_insertion_slot(const DockSettings *s, DockEdge edge,
-    int count, int width, int height, int x, int y)
+/* Rectangles are axis aligned and the margin is the same on every side, so
+   the test needs no turn into bottom coordinates: each edge measures from
+   what it draws. */
+int dock_edge_outside(const DockSettings *s, DockEdge edge, const DockPlacement *p,
+    int count, int width, int height, const DockRect *include, int x, int y, int margin)
+{
+    DockRect r;
+    int i;
+    if (margin < 0 || !dock_edge_panel_reach(s, edge, p, count, width, height, include, &r)) return 0;
+    if (near_rect(x, y, r.left, r.top, r.right, r.bottom, margin)) return 0;
+    for (i = 0; i < count; ++i)
+        if (near_rect(x, y, p[i].x, p[i].y,
+                (int64_t)p[i].x+p[i].size, (int64_t)p[i].y+p[i].size, margin)) return 0;
+    return 1;
+}
+
+/* anywhere: the slot from the position along the row alone, for every
+   point (no drop band, row ends or canvas bounds). */
+static int insertion_slot(const DockSettings *s, DockEdge edge,
+    int count, int width, int height, int x, int y, int anywhere)
 {
     int pitch, start, span, expanded_start, slot, inner, outer;
     if (!dock_settings_valid(s) || count < 0 || count > DOCK_MAX_ITEMS ||
-        (edge != DOCK_EDGE_BOTTOM && !side_edge(edge)) ||
-        x < 0 || x >= width || y < 0 || y >= height) return -1;
+        (edge != DOCK_EDGE_BOTTOM && !side_edge(edge)) || width < 1 || height < 1 ||
+        (!anywhere && (x < 0 || x >= width || y < 0 || y >= height))) return -1;
     if (side_edge(edge)) {
         int vx, vy, swap = width;
         pointer_virtual(edge, width, x, y, &vx, &vy);
         x = vx; y = vy; width = height; height = swap;
     }
     dock_panel_cross_bounds(s,height,&inner,&outer);
-    if (y < inner || y >= outer) return -1;
-    if (!count) return x >= s->padding && x < width-s->padding ? 0 : -1;
+    if (!anywhere && (y < inner || y >= outer)) return -1;
+    if (!count) return anywhere || (x >= s->padding && x < width-s->padding) ? 0 : -1;
     pitch = s->base_size+s->gap;
     span = dock_row_length(s,count);
     expanded_start = (width-span-pitch)/2;
-    if (x < expanded_start-s->padding || x >= expanded_start+span+pitch+s->padding) return -1;
+    if (!anywhere && (x < expanded_start-s->padding || x >= expanded_start+span+pitch+s->padding))
+        return -1;
     start = (width-span)/2;
     for (slot = 0; slot < count; ++slot)
         if (x < start+slot*pitch+s->base_size/2+(slot && slot == count-1 ? s->end_gap : 0)) break;
     return slot;
+}
+
+int dock_edge_insertion_slot(const DockSettings *s, DockEdge edge,
+    int count, int width, int height, int x, int y)
+{
+    return insertion_slot(s, edge, count, width, height, x, y, 0);
+}
+
+int dock_edge_row_slot(const DockSettings *s, DockEdge edge,
+    int count, int width, int height, int x, int y)
+{
+    return insertion_slot(s, edge, count, width, height, x, y, 1);
 }
 
 int dock_edge_gap_layout(const DockSettings *s, DockEdge edge,
@@ -213,4 +239,77 @@ int dock_edge_panel_rect(const DockSettings *s, DockEdge edge, const DockPlaceme
         out->top = r.left; out->bottom = r.right;
     } else *out = r;
     return 1;
+}
+
+int dock_edge_panel_reach(const DockSettings *s, DockEdge edge, const DockPlacement *p,
+    int count, int width, int height, const DockRect *include, DockRect *out)
+{
+    DockRect r;
+    if (!dock_edge_panel_rect(s, edge, p, count, width, height, &r)) return 0;
+    if (include && include->left < include->right && include->top < include->bottom) {
+        /* An empty slot (the gap of a drag) has no artwork to extend the
+           plate: reach it with the padding the icons get. Mirroring the row
+           instead overshot where the zoomed row is not centred (IMG_2594). */
+        if (edge == DOCK_EDGE_BOTTOM) {
+            int64_t low = (int64_t)include->left-s->padding, high = (int64_t)include->right+s->padding;
+            if (low < r.left) r.left = dock_clamp(dock_saturate_int(low), 0, width);
+            if (high > r.right) r.right = dock_clamp(dock_saturate_int(high), 0, width);
+        } else {
+            int64_t low = (int64_t)include->top-s->padding, high = (int64_t)include->bottom+s->padding;
+            if (low < r.top) r.top = dock_clamp(dock_saturate_int(low), 0, height);
+            if (high > r.bottom) r.bottom = dock_clamp(dock_saturate_int(high), 0, height);
+        }
+    }
+    *out = r;
+    return 1;
+}
+
+void dock_gap_reset(DockGap *g)
+{
+    if (!g) return;
+    memset(g, 0, sizeof(*g));
+    g->slot = -1;
+}
+
+void dock_gap_open(DockGap *g, int slot, const DockPlacement *gap, const DockPlacement *from)
+{
+    if (!g || !gap || slot < 0) return;
+    if (g->slot < 0) {
+        if (!from) from = gap;
+        g->shown = *from;
+        dock_animation_reset(&g->animation);
+    }
+    g->slot = slot; g->target = *gap;
+}
+
+void dock_gap_close(DockGap *g, const DockPlacement *row, int count)
+{
+    if (!g || g->slot < 0) return;
+    if (!row || count < 1) { dock_gap_reset(g); return; }
+    g->target = row[g->slot < count ? g->slot : count-1];
+}
+
+int dock_gap_moving(const DockGap *g)
+{
+    return g && g->slot >= 0 && memcmp(&g->shown, &g->target, sizeof(g->shown)) != 0;
+}
+
+int dock_gap_step(const DockSettings *s, DockEdge edge, DockGap *g)
+{
+    if (!dock_gap_moving(g)) return 0;
+    /* Out-of-range levels cannot animate: show the target, never stall. */
+    if (!dock_settings_valid(s) || g->shown.level < 0 || g->shown.level >= s->levels ||
+        g->target.level < 0 || g->target.level >= s->levels) {
+        g->shown = g->target;
+        return 1;
+    }
+    return dock_edge_animate(s, edge, &g->animation, &g->shown, &g->target, 1);
+}
+
+DockRect dock_gap_rect(const DockGap *g)
+{
+    DockRect r = {0, 0, 0, 0};
+    if (g && g->slot >= 0)
+        r = (DockRect){g->shown.x, g->shown.y, g->shown.x+g->shown.size, g->shown.y+g->shown.size};
+    return r;
 }

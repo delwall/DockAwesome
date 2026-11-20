@@ -962,9 +962,67 @@ working on 2026-11-10.
   frames), receiver armed late on the drag image (arms=2 / 1), presses
   unarmed (2 / 1), and no AppMessage at all (messages=0): Directory Opus
   did not deliver the drop to the receiver window.
-- [ ] Find what changed since 2026-11-10 (screen depth? DOpus settings?) and
-      whether lister drops still work. Agent input does not reach the dock
-      on AmiKit: each try needs the user's drag.
+- [x] Cause (2026-11-19, from DOpus 5 source): DOpus holds LockLayers for
+      the whole drag and delivers to the window WhichLayer finds at release,
+      so the late-armed receiver was never there. Fix (branch after-1.0b3):
+      the receiver is armed in advance whenever the pointer is over the DOpus
+      desktop, stays armed through clicks and drops, waits 1/4 s before
+      re-arming, and the catch box and insertion gap exclude the label strip.
+- [x] Verified on AmiKit (user drags, profile): Workbench drops messages=2
+      added=2, receiver arms=3 disarms=2 over a 10-hour session.
+- [x] User video (IMG_2580): icons above/beside the dock not selectable, half
+      a moved icon left behind, fragments while dragging. Cause: the resting
+      receiver covered the whole catch box. Fix (built 19:08): resting on the
+      DOpus desktop it covers only the resting plate; Workbench hover arms
+      and shapes keep the full box and the 1.0b3 cancel (other systems as
+      before). Drop positions now follow the receiver's window.
+- [x] Follow-ups from user videos IMG_2581-2586, each fixed and confirmed
+      by the user on AmiKit (build 19:46):
+      - DOpus lister icons armed the whole box: leaving it made DOpus redraw
+        every desktop icon there. Once DOpus is the desktop, every arm rests
+        on the plate.
+      - A lister under the dock took the drop and its redraw read as drag
+        image: the resting receiver lies in front of other programs' windows
+        on the plate (MoveWindowInFrontOf), behind the dock's own; it re-arms
+        when one comes in front.
+      - Stray dot at the plate's corner: ChangeWindowBox carried the 1x1
+        window's pixel; repainted from the copy once moved.
+      - Icon cut at the grown plate's end: the rest rect covers the plate as
+        it grows while making room.
+      - Ghost image trailing along the plate's edge, then a line across it:
+        the drag image is painted where the dock is opaque and inside the
+        receiver, never on clear parts outside it.
+      - Shell pin "Could not open": the 3.2 Shell is Shell.info alone; the
+        launcher passes drawer and name for icon-only projects.
+      Profiles: drops messages=6 added=2 reordered=1, receiver arms=1
+      disarms=0 over the session; drag image painted (438 frames).
+- [ ] Regression on Coffin, 3.2.3 and ApolloOS (Workbench drops, the gap,
+      the drag image, clicks beside the dock): shared changes are the label
+      strip exclusion, drop positions from the receiver's window, the corner
+      repaint, and painting the drag image only where opaque or inside the
+      receiver.
+- [x] Lister drops on AmiKit: confirmed in IMG_2582/2583 (drops from a
+      lister pinned).
+- Crash dropping the GlobalTrash AppIcon (and likely the earlier hang):
+  Directory Opus sends an AppIcon with no lock, and accept_drops passed the
+  zero lock to NameFromLock. Lockless arguments are now skipped as bad paths
+  (build 19:50). [ ] User check: drop GlobalTrash, no crash, nothing pinned.
+- [x] Installed on AmiKit: build 503 (ca64844) in place of 1.0b3 at
+      SYS:WBStartup/DockAwesome, started from the Shell (WBRun needs
+      Workbench). RAM: test files removed. ApolloExplorerSrv left running.
+- [x] ApolloOS R9.5 (2026-11-19): build 503 installed at SYS:WBStartup (the
+      locked old file moved to Disabled/DockAwesome-locked-delete, delete it
+      after the next boot; the two older locked files deleted). Agent drags:
+      desktop icon dropped mid-dock pinned at the middle slot (messages=1
+      added=1), drag image painted (5 frames), drop on the desktop and a
+      click on a desktop icon pinned nothing. Config restored, test files
+      removed, dock restarted with WBRun.
+- [ ] Coffin and AmigaOS 3.2.3 still to re-run.
+- [ ] Old bug (also in 1.0b3, reproduced twice): a second dock started while
+      one runs fails with "PiP2 is already in use" and crashes the machine
+      after OK, while exiting. No more crash tests on AmiKit (user). Plan:
+      detect the running dock at startup and exit quietly before opening
+      anything; find the crashing exit step on another system with logging.
 - Cleaned: config restored, test files removed from RAM:, installed dock
   running (started by the user from a lister). A C:ApolloExplorerSrv that I
   started (none ran at boot) stays until the next reboot.
@@ -1327,3 +1385,144 @@ to the same slot (inverted offset test, store attributes required).
       the reboot; 479 locked, Disabled/DockAwesome-locked-delete until the
       next reboot). Label in the dock's image, sweep 0 late frames,
       damage-check 399 clean. RAM: cleaned.
+
+## Release 1.0 beta 3 (2026-11-18)
+
+- [x] PR #11 (review-fixes) merged into main (d7c396e); tag v1.0b3; GitHub
+      prerelease "DockAwesome 1.0 beta 3" with DockAwesome-1.0b3.lha
+      (167,265 bytes, SHA-256 40c7a442...0fd77bf97), packed with LhA 2.15 on
+      ApolloOS; lha t passes and all five files match build/release.
+- [x] Release binary (DockAwesome 1.0 (2026-11-18) beta 3) installed on
+      ApolloOS. Disabled/DockAwesome-locked-delete and -locked-delete-482:
+      delete after the next reboot.
+
+## ApolloOS: left dock alignment and drag flicker (2026-11-19)
+
+- [x] Left dock: windows under the plate showed shifted a few px. SAGA
+      cannot start a PiP at x 0; the overlay now starts at x 3 (negative
+      edge_padding), the plate stays on the same pixels. pip-dump matched;
+      user: "Nu är det rätt!".
+- [x] Drag of a desktop icon: the window border under the plate flipped
+      from dark to light grey as the drag neared the dock. The press made
+      the window inactive (border 128 -> 168 grey); the capture stopped at
+      the press but the receiver's copy was used only near the dock. Now it
+      is used from the press. User: "Perfekt!".
+- [x] Drag on 3.2.3: the press redrew the window under the dock inactive
+      and that border was drawn over the icons as drag image; the reference
+      is now read from the screen as the gesture starts. User: "inga band".
+- [x] Drop on 3.2.3: a disk dropped on the plate over a drawer was copied
+      into it. The receiver without shapes arms over the plate in front of
+      other programs' windows; it steps back while the wheel scrolls a
+      window under the plate. User: "Nu ser det ut att fungera bra".
+- [x] Reorder: dragged out and back, the gap opened where the pin last
+      left the row (IMG_2593). Off the row the slot follows the pointer
+      (dock_edge_row_slot). User: "Bra".
+- [x] Reorder at the row ends: far more empty plate than in the middle
+      (IMG_2594). The plate reaches the gap by the padding instead of
+      mirroring the row. User: "Bättre".
+- [x] Reorder (IMG_2595): at an end the plate jumped out in one frame while
+      the icons slid, and the gap opened ~135 px left of the plate. The gap
+      now animates like an icon (DockGap, also for drop previews) and
+      "near" is measured against the row and plate as shown, not the row
+      frozen at the press. Host tests: plate end monotonic, first step at
+      most half, both ends and all edges alike; outside exactly 24 px from
+      the drawn plate on every side. User: "Nu verkar allt fungera".
+- [x] Desktop drop on ApolloOS (IMG_2599): a drawer's icons above the plate
+      blinked out at every drop on the desktop. The shaped receiver covered
+      the whole box while a desktop icon was held, and Workbench redrew
+      what it had covered. It now catches over the plate alone, as without
+      shapes (rest_plate for every system). Installed. Agent-tested: a
+      desktop drop moves the icon, a drop on the plate pins at the centre
+      slot (removed again), Ctrl-C quits cleanly. IMG_2600 (right dock):
+      the same blink, because a rebuilt surface (another edge) gave the
+      shaped receiver no rest_plate; every new receiver now gets one.
+      Agent-tested on the right dock: a drop beside the plate lands on the
+      desktop, a drop on the plate pins (removed again).
+- [x] Still a blink at every desktop drop, beside the dock and in the glass
+      (user, same build). Giving up the shape at each release made
+      Workbench redraw what it uncovered (simple refresh: Layers always
+      adds damage). The shaped receiver now rests on the plate (rest_armed,
+      as on the DOpus desktop) and steps back only when a window on the
+      plate changes or the wheel scrolls one. A left press on the resting
+      receiver between icons is consumed with its release (no focus
+      change). Agent-tested on ApolloOS: desktop drop and drop beside the
+      plate land on the desktop; a drop on the plate pins (removed again),
+      also after a window opened and closed over the plate (no stale band);
+      a click on the plate keeps the active window; Ctrl-C quits cleanly.
+- [x] User: a window dragged under the dock showed only after the release
+      (the resting receiver hid it; stamp checks ran only with the buttons
+      up). Now, while a press that is not a Workbench drag is held, the
+      receiver steps back as soon as the windows on the plate change, and
+      arms again half a second after the release. Agent-tested on the left
+      dock: a drop on the plate pins (removed again). User: window drag
+      works.
+- [x] User: a window scrolled behind the dock did not update there. A
+      scroll keeps the layer, and the ApolloOS wheel may scroll without an
+      input event. The layer stamp now also covers the scrollers' knobs of
+      the windows on the plate, and the shaped receiver arms only once that
+      stamp has been still for half a second. Agent-tested (bottom dock):
+      dragging Personal's scroller redrew its icons under the plate live
+      (the receiver stepped back); a drop on the plate then pinned (removed
+      again). User: "Nu är det bra!".
+- [ ] Unexplained hang, ApolloOS 2026-11-20: the dock (W 240,612 800x108,
+      the pre-install size) ignored drops and presses, and after Ctrl-C
+      waited on one signal (wait 04000000, Ctrl-C received). Possibly the
+      previous build stuck in remove_input (held/right_held/close_held set
+      without their release). Gone after the user's reboot; not reproduced.
+- [ ] Personal:1234-5678 (partial copy from the drop bug): ask the user
+      before deleting.
+- [ ] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete{,2,3,4} after
+      the next ApolloOS reboot, and -locked-delete{,2,3,4} after the next
+      3.2.3 boot; RAM:BreakTask and RAM:TaskList when testing is done.
+- [ ] ApolloOS: recheck the drag (reference now read from the screen).
+- [ ] Quick look at bottom and right docks on Coffin and 3.2.3 before the
+      push (edge_padding and drag reference change apply everywhere).
+- [x] Remove label (user: "samma som alla andra"): on ApolloOS the shaped
+      drag preview drew Remove as a flat box in the screen's pens with
+      plain text, over a dark matte; elsewhere it was a flat pill. Every
+      path now builds the dragged picture with the hover labels' own
+      dock_ui_label_image (glass, rim, AA text; the flat pill only as a
+      fallback), and the preview window shows that picture over a
+      save-under in both modes, reopening when Remove arms or disarms.
+      Agent screenshot mid-drag on ApolloOS: rounded glass pill with AA
+      text under the icon; prefs unchanged. User: "Ser kanon ut!".
+- [x] AmigaOS 3.2.3 (no shapes), build of a4a3555, 2026-11-20, agent:
+      Remove under a held pin is the hover labels' glass pill (BOB path,
+      screenshot); a desktop drop moves the icon; a disk icon dropped on
+      the plate pinned "1234-5678:" (removed again; prefs unchanged);
+      Ctrl-C quits cleanly and WBRun starts again. AppIcons (Stop
+      ApolloExplorer) are not sent to AppWindows by Workbench, as before.
+- [x] Coffin (AmigaOS 3.9, no shapes), build of a4a3555, 2026-11-20, agent:
+      Remove under a held pin is the glass pill (screenshot); the disk
+      icon dropped on the plate pinned at the centre slot (removed again;
+      prefs unchanged); a desktop drop moves the icon (moved back); Ctrl-C
+      quits cleanly and WBRun starts again. -locked-delete (the previous
+      build) is in use: delete after the next Coffin boot.
+- [x] Coffin (IMG_2601): the plate's glass over a drawer under the dock
+      showed noise for a second or two after the drawer was dragged.
+      Cause (measured): the screen itself held the noise, in the receiver
+      over the drawer, as the receiver armed again after the drag. It grew
+      behind the drawer (the press had brought the drawer in front), and
+      Layers filled that hidden part in an offscreen bitmap, then copied it
+      to the screen once the receiver came in front. The backfill hook
+      painted only the screen's bitmap and left that one with old memory
+      (instrumented: one foreign-bitmap call, 346x28 at layer offset 210,0,
+      exactly the drawer's overlap). The hook now paints any bitmap, placed
+      by the message's layer-relative offset. Agent repro (input events:
+      hover an icon, press the title bar, drag 150 px, twice): noise in the
+      screen capture before, clean after (three runs, installed build).
+      Ruled out on the way: the drag image (0 frames), PiP conversion and
+      composition (damage check 0 mismatches), the capture. An earlier
+      guess (armed press counted only in the client area) was reverted.
+      User on Coffin: "Ser ut att funka nu".
+- [x] AmigaOS 3.1.4.1 (no shapes), build of 4c6b0d3, 2026-11-21, agent:
+      the disk icon dropped on the plate pinned at slot 7 and dragged out
+      again (prefs as before; the obsolete "snapshot" key is dropped on
+      save, by design since 2270e5a); a desktop drop moves the icon (moved
+      back); the Personal drawer dragged under the plate (Intuition's
+      outline drag), then the pointer on its icons: the armed receiver
+      shows the drawer cleanly, twice. -locked-delete (the 10 Nov build)
+      is in use: delete after the next boot.
+- [x] AmiKit XE: new build installed (started with Run: WBRun reports no
+      memory under the Directory Opus desktop); agent drags do not move
+      Directory Opus icons, so the user looked: "Amikit såg ok ut".

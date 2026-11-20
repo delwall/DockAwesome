@@ -1,5 +1,44 @@
 # Release notes
 
+## 1.0 beta 4
+
+Changes since 1.0 beta 3.
+
+**Dropping icons on the dock**
+- An icon dropped on the dock where a drawer lies under it goes to the
+  dock, not into the drawer (AmigaOS 3.2.3 started copying a dropped disk
+  into the drawer).
+- Dropping an icon on the desktop no longer makes icons beside the dock
+  and in its glass blink (ApolloOS).
+- Clicking the dock between icons leaves your window active.
+- AmiKit: icons dropped from the Directory Opus desktop are caught without
+  disturbing the desktop, and an AppIcon such as GlobalTrash dropped on
+  the dock no longer crashes the machine.
+- No stray window border is painted over the dock's icons while you drag
+  a desktop icon (AmigaOS 3.2.3), and no border under the dock flips
+  colour at the press (ApolloOS).
+
+**Windows under the dock**
+- ApolloOS: a window dragged or scrolled under the dock shows through the
+  glass as it moves.
+- A drawer scrolled with the wheel under the dock shows its new icons
+  there at once (AmigaOS 3.2.3).
+- No noise in the glass over a window under the dock after it was moved
+  (AmigaOS 3.9).
+
+**Rearranging pins**
+- The gap follows the pointer also off the row, and opens and closes with
+  the same slide as the icons; the end of the plate moves with it instead
+  of jumping.
+- The gap opens where the dock is drawn, not up to about 77 px past it
+  with large magnification.
+- The Remove label under a pin dragged off the dock is the same glass
+  label as the name labels, on every system.
+
+**Fixes**
+- ApolloOS: a dock on the left edge lines up with the screen; windows
+  under it looked shifted a few pixels.
+
 ## 1.0 beta 3
 
 Changes since 1.0 beta 2.

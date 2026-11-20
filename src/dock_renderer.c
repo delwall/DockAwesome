@@ -236,7 +236,7 @@ void dock_renderer_draw(DockRenderer *r, DockImage *canvas,
        the canvas is unchanged and the next draw starts over. */
     if (!canvas || !canvas->pixels || canvas->width < 1 || canvas->height < 1 ||
         !dock_settings_valid(s) || count < 0 || count > DOCK_MAX_ITEMS || (count && (!icons || !p)) ||
-        !dock_render_panel(s, r->edge, p, count, canvas->width, canvas->height, r->center_panel,
+        !dock_render_panel(s, r->edge, p, count, canvas->width, canvas->height, &r->panel_include,
             &panel, &radius)) { o->valid = 0; return; }
     width = canvas->width; height = canvas->height;
     bottom = r->edge == DOCK_EDGE_BOTTOM;
@@ -245,7 +245,7 @@ void dock_renderer_draw(DockRenderer *r, DockImage *canvas,
     if (!o->valid || o->canvas != canvas->pixels || o->width != width || o->height != height ||
         o->backdrop != back ||
         o->coverage != r->coverage || o->pixels != (const void *)r->pixels ||
-        o->edge != (int)r->edge || o->center_panel != r->center_panel || o->count != count ||
+        o->edge != (int)r->edge || o->count != count ||
         !same_settings(&o->settings, s) || o->radius != radius ||
         (bottom ? o->panel.top != panel.top || o->panel.bottom != panel.bottom :
                   o->panel.left != panel.left || o->panel.right != panel.right) ||
@@ -296,14 +296,14 @@ void dock_renderer_draw(DockRenderer *r, DockImage *canvas,
     n = d->full ? 1 : d->count;
     for (i = 0; i < n; ++i)
         dock_render_oriented_clip(canvas, backdrop, icons, p, count, s, r->pixels->mix_half,
-            &r->panel, r->coverage, r->pressed_item, r->edge, r->center_panel, glass,
+            &r->panel, r->coverage, r->pressed_item, r->edge, &r->panel_include, glass,
             overlays, overlay_count, d->full ? &full : &d->rect[i]);
     /* Keep this frame's inputs for the next comparison. */
     o->valid = overlay_count <= DOCK_MAX_OVERLAYS;
     o->canvas = canvas->pixels; o->width = width; o->height = height;
     o->backdrop = back;
     o->coverage = r->coverage; o->pixels = r->pixels;
-    o->edge = r->edge; o->center_panel = r->center_panel; o->count = count;
+    o->edge = r->edge; o->count = count;
     o->settings = *s; o->panel = panel; o->radius = radius;
     for (i = 0; i < count; ++i) {
         const DockImage *image = level_image(icons[i], p[i].level);

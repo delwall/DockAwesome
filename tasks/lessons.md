@@ -341,6 +341,62 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
 - Measure before the next guess: a per-frame count of painted drag pixels
   (all 1561 or 0, never partial) showed whole reads between Directory Opus's
   erase and redraw, where the "keep half-torn reads" guess had made it worse.
+- Read the other program's source before theorising about it (2026-11-19).
+  Directory Opus 5 (opus_magellan) takes LockLayers at the first drag move and
+  holds it until release, then asks WhichLayer at the release point; a foreign
+  window gets the drop only when it is frontmost there and in DOpus's own
+  AppWindow list (it patches AddAppWindowA). So the receiver must already lie
+  over the dock before the press: arming on the drag image or on the first
+  move lands after the release (messages=0), and moving a window during the
+  drag ends it (the icon stuck or vanished). Three wrong theories (late arm by
+  press point, timing gap, "DOpus keeps its drag when a window moves") each
+  cost the user a test before I read the code.
+- Every window move over the DOpus desktop makes DOpus redraw under it; a
+  copy taken before that redraw shows a stale rectangle through PiP. Keep the
+  receiver in place across clicks and drops, and wait before re-arming.
+- Shrinking a region changes every consumer of it: the catch box lost the
+  label strip, and the drag-image baseline (read from the receiver's copy
+  as if it covered the whole canvas) failed silently, so the dragged icon
+  vanished under the dock (frames=0). The first fix read the strip from the
+  last capture, which can be stale, and painted fragments. Grep every user
+  of a buffer before resizing it, and give a baseline only where it is exact.
+- A window that rests armed must cover only what the dock itself covers
+  (2026-11-19): resting on the whole catch box (651 rows, zoom headroom) it
+  took clicks on desktop icons above and beside the dock and froze DOpus's
+  redraws there (half an icon left behind, video IMG_2580). Ask what else a
+  permanent window hides before making one permanent.
+- Cover every path to the same window, not only the one in the report: the
+  plate rule was tied to the desktop arm, so a DOpus lister icon still armed
+  the whole box, and leaving it made DOpus erase and redraw every desktop
+  icon there (IMG_2581, 18.5 s). Step through the video frame by frame
+  (ffmpeg fps=15 tiles) to see what moves, not the 1 fps overview.
+- Test with windows lying under the dock (IMG_2582): a receiver behind the
+  other windows loses the drop to a lister under the dock, and the lister
+  redrawn by the press reads as drag image. Where the dock covers, the
+  receiver must lie in front of other programs' windows, behind the dock's
+  own. Ask the user to include overlapping windows in each drag test.
+- A screenshot shows the real screen without PiP: use it to tell a stray
+  pixel on the screen from one in the dock's picture (break the dock, look
+  again). ChangeWindowBox from 1x1 carries the window's old pixel to its new
+  corner; the backfill hook only fills what the move uncovered (2026-11-19).
+- A catch area must cover the plate as it grows while making room, not only
+  at rest: the drag image is drawn only inside it.
+- Clip a drawn copy by what hides the original, not by a nearby rectangle:
+  the drag image belongs wherever the dock is opaque (the native one is
+  hidden there) and nowhere on clear parts outside the receiver (the native
+  one shows). Clipped to the receiver, the plate's edge row crossed the image
+  as a line (IMG_2586).
+- A drop can carry no lock: Directory Opus sends an AppIcon (GlobalTrash,
+  "Stop Apollo Explorer") as its name alone. NameFromLock on a zero lock
+  crashed AmiKit twice before I looked; check every WBArg field from another
+  program before using it, and read its source for what it sends.
+- A Workbench project can be its icon alone (AmigaOS 3.2 Shell: Shell.info,
+  tool SYS:System/CLI, no Shell file). A launcher that replaces Workbench
+  must pass drawer + name without locking the file. Read the requester text
+  with an enlarged screenshot crop when VisualPrefs patterns garble it.
+- A diagnostic that needs a semaphore another program holds records nothing:
+  AttemptSemaphore failed while DOpus held LayerInfo. Record unconditionally,
+  resolve later.
 
 - A dock started from WBStartup has no CLI number for Break. Stop it with a
   small tool that does FindTask("DockAwesome") and Signal(SIGBREAKF_CTRL_C)
@@ -417,3 +473,47 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
   library at all) and make it work everywhere instead.
 - On AmigaOS 3.9 (Coffin) a Run'd command's task is not named after the
   command: stop it with Break <process number> from Status.
+- LhA 2.15 keeps a folder in the archive only with a base directory
+  argument: `LhA -r -x a RAM:X.lha RAM:pkg/ DockAwesome/#?` stores
+  DockAwesome/...; `CD RAM:pkg` + `DockAwesome/` drops the folder.
+- Check the generated release body before publishing (a sed error left
+  only the install line; fixed with gh release edit).
+- An alignment probe at one position does not prove alignment at a screen
+  edge: test where the overlay actually lies (a left dock at x 0 was off
+  by a few pixels while the centre was exact), and check that the probe's
+  arguments take effect (X Y were ignored when W H were given).
+- When the user names a spot that flickers ("fönstrets underkant bakom
+  dockan"), measure exactly that spot frame by frame before theorising;
+  then check what the OS itself changes there (a window border is drawn
+  darker when active) and when the dock's copy of it is taken.
+- A drop target that waits behind other windows hands drops to them: a
+  disk dropped on the plate over a drawer started copying into it (3.2.3).
+  Weigh such a trade-off with the user up front; then cover its side
+  effect where it shows (the wheel scrolling a window hidden under the
+  receiver).
+- Check what the machine is (Version, volumes) before naming the system in
+  reports, and take the user's word for which boot it is.
+- A shape that bounds the plate must move the way the row does. A value set
+  at once (the gap's reach) jumped where only animated icons bounded the
+  plate before; animate it with the row's own animator and test the
+  plate's end per tick on both ends and every edge, so symmetry is proven
+  on the host instead of by the user.
+- Hit tests (near/outside) must use the geometry on screen, not a copy
+  kept from the press: the frozen zoomed row made "near" reach ~77 px past
+  the plate the user saw.
+
+## A receiver fix for one OS family reaches the other (2026-11-20)
+- The no-shapes receiver was narrowed to the plate (Coffin, AmiKit, 3.2.3) because covering the box made Workbench redraw windows in the headroom. The shaped (ApolloOS) receiver kept covering the whole box, and the same redraw showed there: a drawer's icons above the plate blinked out at every desktop drop (IMG_2599).
+- Rule: when a cause is found on one caps branch (shaped / no shapes), check whether the other branch does the same thing, and fix both in one path.
+
+## Giving up a cover makes simple windows redraw (2026-11-20)
+- The shaped receiver took the plate at each press and gave it up at each release. Layers always damages what a shrinking layer uncovers on a simple-refresh window, so Workbench redrew there after every drop, even one far from the dock (IMG_2600). Narrowing the cover only moved the blink.
+- Rule: a receiver that must be in place before a gesture should rest there and step back only when what it covers changes. Do not toggle a cover per gesture.
+
+## Reproduce with real input before guessing (2026-11-20)
+- IMG_2601 took several wrong fixes, each argued from code. What found it: a tool that injects input events (pointer, press, relative moves) so PowerWindowsNG drags a window like a user, records the screen per step, and stops the dock with Ctrl-C (--pip-dump) at chosen moments; the user only confirmed which runs glitched. The screen capture then showed the noise directly, and one counter in the backfill hook named the cause.
+- Rule: when the user says a fix changed nothing, stop theorising; build a repro that drives the real input path, capture frames, and instrument the suspect before the next change.
+
+## Layer hooks get offscreen bitmaps (2026-11-20)
+- A backfill hook that paints only when the RastPort's bitmap is the screen's leaves the parts Layers fills offscreen (a layer growing or moving behind another, AmigaOS 3.x) as uninitialised memory, shown once the layer comes in front.
+- Rule: a backfill hook must paint whatever bitmap it is given; place the source by the message's layer-relative offset there, not by the bounds.

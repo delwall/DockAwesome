@@ -74,6 +74,22 @@ static void exchange_stack(App *app, int index, Item *replacement)
     *replacement = previous;
 }
 
+/* The gap in slot opens from the shown row's icon there (past the end, the
+   last): hidden under it at first, it slides out as the row parts. */
+static void open_gap(App *app, int slot, const DockPlacement *gap,
+    const DockPlacement *row, int count)
+{
+    dock_gap_open(&app->gap, slot, gap, &row[slot < count ? slot : count-1]);
+    show_gap(app);
+}
+
+/* Close the gap into its neighbour in the new target row. */
+static void close_gap(App *app, int count)
+{
+    dock_gap_close(&app->gap, app->target, count);
+    show_gap(app);
+}
+
 static void finish_move(App *app, int slot, const DockGestureInput *release)
 {
     if (!app->moving_item) return;
@@ -85,7 +101,7 @@ static void finish_move(App *app, int slot, const DockGestureInput *release)
     memcpy(app->placement+slot+1, app->moving_placement+slot,
         (app->count-slot-1)*sizeof(*app->placement));
     app->moving_item = 0;
-    app->renderer.center_panel = 0;
+    end_gap(app);
     dock_animation_reset(&app->animation);
 }
 
@@ -560,6 +576,7 @@ int animation_needed(const App *app)
 {
     if (morph_due(app,dock_ui_folder_progress(app->ui))) return 1;
     return (app->moving_item && app->held_icon.level != app->held_target.level) ||
+        dock_gap_moving(&app->gap) ||
         memcmp(row_placement(app), app->target, sizeof(*app->placement)*row_count(app)) != 0;
 }
 
@@ -729,6 +746,10 @@ static int animate_row(App *app)
     if (app->moving_item && app->held_icon.level != app->held_target.level)
         changed |= dock_animate_step(&app->settings, &app->held_animation,
             &app->held_icon, &app->held_target, 1);
+    if (dock_gap_step(&app->settings, app->edge, &app->gap)) {
+        show_gap(app);
+        changed = 1;
+    }
     return changed;
 }
 
@@ -742,24 +763,23 @@ static void update_target(App *app)
         DockGesture *gesture = &app->gesture;
         int count = row_count(app), zoom = !gesture->remove_armed;
         int slot = app->gesture.target_slot;
-        int centered = 0;
         if (app->moving_item && zoom) {
             DockPlacement gap;
             if (slot < 0) slot = app->moving_item-1;
             if (dock_edge_gap_layout(&app->settings, app->edge, count, app->width, app->height,
                     slot, gesture->x, gesture->y, zoom, app->target, &gap)) {
                 app->held_target = (DockPlacement){0, app->settings.max_size-gap.size, gap.size, gap.level};
-                centered = slot == 0 || slot == count;
+                open_gap(app, slot, &gap, app->moving_placement, count);
             }
         } else {
             dock_edge_layout(&app->settings, app->edge, count, app->width, app->height,
                 gesture->x, gesture->y, zoom, app->target);
-            if (app->moving_item)
+            if (app->moving_item) {
                 app->held_target = (DockPlacement){0, app->settings.max_size-app->settings.base_size,
                     app->settings.base_size, 0};
+                close_gap(app, count);
+            }
         }
-        if (app->renderer.center_panel != centered) app->gesture_redraw = 1;
-        app->renderer.center_panel = centered;
         app->hovered = -1;
         return;
     }
@@ -769,16 +789,19 @@ static void update_target(App *app)
             return;
         app->snap_wait_motion = 0;
     }
-    if (catching || app->renderer.center_panel) {
+    if (catching || panel_reaching(app)) {
         /* Keep the shown gap while the AppWindow message is in flight. */
         if (catching && !app->input_context.external_held && app->drop_preview_slot >= 0) return;
-        if (catching && app->input_context.external_held && app->input_context.external_dragged) {
+        /* Room only where the drop is caught: not over the label strip. */
+        if (catching && app->input_context.external_held && app->input_context.external_dragged &&
+            amiga_drop_catcher_contains(app->drop_catcher, app->screen->MouseX, app->screen->MouseY)) {
             int slot = dock_edge_insertion_slot(&app->settings, app->edge, app->count,
                 app->width, app->height, app->screen->MouseX-app->left, app->screen->MouseY-app->top);
+            DockPlacement gap;
             if (slot > stack_index(app)) slot = stack_index(app);
-            if (dock_edge_insertion_layout(&app->settings, app->edge, app->count,
-                    app->width, app->height, slot, app->target)) {
-                app->renderer.center_panel = 1;
+            if (dock_edge_gap_layout(&app->settings, app->edge, app->count,
+                    app->width, app->height, slot, 0, 0, 0, app->target, &gap)) {
+                open_gap(app, slot, &gap, app->placement, app->count);
                 app->drop_preview_slot = slot;
                 app->hovered = -1;
                 return;
@@ -788,11 +811,10 @@ static void update_target(App *app)
         dock_edge_layout(&app->settings, app->edge, app->count, app->width, app->height,
             0, 0, 0, app->target);
         app->hovered = -1;
+        /* The gap closes into its neighbour as the row closes up. */
+        close_gap(app, app->count);
         if (animation_needed(app)) return;
-        if (app->renderer.center_panel) {
-            app->renderer.center_panel = 0;
-            app->gesture_redraw = 1;
-        }
+        end_gap(app);
         if (catching) return;
     }
     inside = pointer_inside(app, &x, &y);
@@ -990,12 +1012,25 @@ static void drop_catcher_flags(App *app, unsigned int flags)
        the PiP frame. Changes to the insertion slot or drag mask redraw it. */
 }
 
+/* Where the armed receiver lies, for the input handler (empty without). */
+static void publish_receiver(App *app)
+{
+    int left = 0, top = 0, right = 0, bottom = 0;
+    if (amiga_drop_catcher_armed(app->drop_catcher))
+        amiga_drop_catcher_rect(app->drop_catcher, &left, &top, &right, &bottom);
+    Disable();
+    app->input_context.receiver_left = left; app->input_context.receiver_top = top;
+    app->input_context.receiver_right = right; app->input_context.receiver_bottom = bottom;
+    Enable();
+}
+
 static void update_drop_catcher(App *app)
 {
     struct Screen *screen;
-    ULONG serial;
+    ULONG serial, wheel;
     int x, y, held, dragged, cancelled, up_x, up_y, up_known;
     unsigned int flags;
+    publish_receiver(app);
     if (!app->drop_catcher) return;
     Disable();
     serial = app->input_context.external_serial;
@@ -1006,12 +1041,21 @@ static void update_drop_catcher(App *app)
     cancelled = app->input_context.external_cancelled;
     up_known = app->input_context.external_up_known;
     up_x = app->input_context.external_up_x; up_y = app->input_context.external_up_y;
+    wheel = app->input_context.wheel_serial;
     Enable();
     if (cancelled || app->gesture.active || app->input_context.held || dock_ui_busy(app->ui))
         flags = amiga_drop_catcher_cancel(app->drop_catcher);
-    else flags = amiga_drop_catcher_update(app->drop_catcher, serial, screen, x, y, held, dragged,
-        up_known, up_x, up_y, PeekQualifier(), profile_clock(), app->clock_hz);
+    else {
+        uint64_t now = profile_clock();
+        flags = 0;
+        if (wheel != app->wheel_seen && !held)
+            flags = amiga_drop_catcher_wheel(app->drop_catcher, now, app->clock_hz);
+        flags |= amiga_drop_catcher_update(app->drop_catcher, serial, screen, x, y, held, dragged,
+            up_known, up_x, up_y, PeekQualifier(), now, app->clock_hz);
+    }
+    app->wheel_seen = wheel;
     drop_catcher_flags(app, flags);
+    publish_receiver(app);
 }
 
 /* A UI requester (ASL) blocks the main loop: hide PiP and let input pass
@@ -1553,7 +1597,7 @@ static void draw(App *app)
         /* A second renderer that starts over every frame is the reference. */
         DockRenderer *check = &app->check_renderer;
         check->pressed_item = app->renderer.pressed_item;
-        check->center_panel = app->renderer.center_panel;
+        check->panel_include = app->renderer.panel_include;
         check->edge = app->renderer.edge;
         check->overlays = overlays; check->overlay_count = overlay_count;
         dock_renderer_backdrop_changed(check);
@@ -1650,7 +1694,7 @@ int rest_after_pin_change(App *app, int before)
     }
     if (!dock_edge_layout(&app->settings, app->edge, app->count,
             app->width, app->height, 0, 0, 0, app->target)) return 0;
-    app->renderer.center_panel = 0;
+    end_gap(app);
     dock_animation_reset(&app->animation);
     return 1;
 }
@@ -1660,7 +1704,13 @@ static __attribute__((noinline)) int accept_drops(App *app, int *recreate)
     struct AppMessage *msg;
     int changed = 0;
     while ((msg = (struct AppMessage *)GetMsg(app->drop_port))) {
-        int slot = dock_edge_insertion_slot(&app->settings, app->edge, app->count,
+        int slot;
+        /* Relative to the receiver, wherever it lay (without shapes it
+           moves), unless held across a surface rebuild (screen). */
+        if (app->held_drops) --app->held_drops;
+        else { msg->am_MouseX += app->window->LeftEdge; msg->am_MouseY += app->window->TopEdge; }
+        msg->am_MouseX -= app->left; msg->am_MouseY -= app->top;
+        slot = dock_edge_insertion_slot(&app->settings, app->edge, app->count,
             app->width, app->height, msg->am_MouseX, msg->am_MouseY);
         int i, in_slot = slot >= 0;
         int snap = in_slot && amiga_drop_catcher_active(app->drop_catcher);
@@ -1673,7 +1723,10 @@ static __attribute__((noinline)) int accept_drops(App *app, int *recreate)
             const struct WBArg *arg = &msg->am_ArgList[i];
             char path[PATH_CAP];
             ++app->stats.drop_arguments;
-            if (NameFromLock(arg->wa_Lock, (STRPTR)path, sizeof(path)) &&
+            /* No lock: an AppIcon (Directory Opus sends its name alone, as
+               for the GlobalTrash icon on AmiKit). It names no file, and
+               NameFromLock on a zero lock took the machine down. */
+            if (arg->wa_Lock && NameFromLock(arg->wa_Lock, (STRPTR)path, sizeof(path)) &&
                 (!arg->wa_Name || !arg->wa_Name[0] || AddPart((STRPTR)path, arg->wa_Name, sizeof(path)))) {
                 int before = app->count, index = pin_path(app,path,1)-1;
                 int added = app->count != before;
@@ -1738,9 +1791,22 @@ static DockGestureInput gesture_point(App *app, int kind, uint32_t token,
             in.target_slot = dock_edge_insertion_slot(&app->settings, app->edge, app->count-1,
                 app->width, app->height, x, y);
         if (in.target_slot >= stack_index(app)) in.target_slot = stack_index(app)-1;
+        /* Near what is shown: the row as it moves and the plate over the
+           gap. The frozen row from the press, zoomed there, reached ~77 px
+           past the plate a removal shows, so a pin far off the left end
+           already opened a gap (IMG_2595). */
         in.outside = in.target_slot < 0 &&
-            dock_edge_outside(&app->settings, app->edge, app->placement, app->count,
-            app->width, app->height, x, y, 24);
+            dock_edge_outside(&app->settings, app->edge, row_placement(app), row_count(app),
+            app->width, app->height, &app->renderer.panel_include, x, y, 24);
+        /* Not a removal, but off the row (above the plate where the zoomed
+           icons reach, or past an end): the slot still follows the pointer.
+           Kept from the row, the gap and the drop went to where the pin
+           last left it (ApolloOS, IMG_2593). */
+        if (!in.outside && in.target_slot < 0 && app->count > 1) {
+            in.target_slot = dock_edge_row_slot(&app->settings, app->edge, app->count-1,
+                app->width, app->height, x, y);
+            if (in.target_slot >= stack_index(app)) in.target_slot = stack_index(app)-1;
+        }
     }
     return in;
 }
@@ -1884,6 +1950,10 @@ static void apply_gesture(App *app, const DockGestureInput *in, int *redraw, int
         app->held_icon.y = app->settings.max_size-app->held_icon.size;
         app->held_target = app->held_icon;
         dock_animation_reset(&app->held_animation);
+        /* The gap starts as the pin, where it was: the first frame stays. */
+        dock_gap_reset(&app->gap);
+        dock_gap_open(&app->gap, index, &app->placement[index], &app->placement[index]);
+        show_gap(app);
         app->moving_item = index+1;
         app->snap_wait_motion = 0;
     }
@@ -1930,15 +2000,16 @@ static void apply_gesture(App *app, const DockGestureInput *in, int *redraw, int
     }
 }
 
-/* The dragged pin in PiP1: the icon, with the Remove pill under it once
-   armed. Returns 0 when PiP1 is not available. */
-/* The dragged pin's picture: the icon, with the Remove pill under it once
-   armed (*remove is cleared without a pill). The caller frees it. */
+/* The dragged pin's picture: the icon, with the Remove label under it once
+   armed (*remove is cleared without a label). The label is the hover
+   labels' own: drawn apart, on ApolloOS it was a flat box in the screen's
+   pens with plain text. The caller frees it. */
 static int drag_picture(App *app, const DockImage *icon, int *remove, DockImage *image)
 {
     DockImage pill = {0};
     int width, height, row;
-    if (*remove && !dock_ui_pill_image(app->ui,"Remove",&pill)) *remove = 0;
+    if (*remove && !dock_ui_label_image(app->ui,"Remove",app->screen->Width/2,0,-1,&pill) &&
+        !dock_ui_pill_image(app->ui,"Remove",&pill)) *remove = 0;
     width = *remove && pill.width > icon->width ? pill.width : icon->width;
     height = icon->height+(*remove ? 4+pill.height : 0);
     *image = (DockImage){width,height,calloc((size_t)width*height,4)};
@@ -2146,22 +2217,24 @@ static int update_drag_preview(App *app)
         int bob = update_drag_bob(app,icon,x,y);
         if (bob >= 0) return bob;
     }
-    /* A shaped window cannot change its shape: it reopens when Remove
-       arms or disarms, not on each size change (that flickered). */
-    if (!icon || (app->drag_preview && shaped && app->drag_preview_remove != gesture->remove_armed)) {
+    /* The window shows one picture: it reopens when Remove arms or
+       disarms, not on each size change (that flickered). */
+    if (!icon || (app->drag_preview && app->drag_preview_remove != gesture->remove_armed)) {
         int closed = app->drag_preview != NULL;
         app->preview_attempt = 0;
         amiga_drag_preview_close(app->drag_preview); app->drag_preview = NULL;
         if (!icon) return closed;
     }
-    if (app->drag_preview) {
-        int moved = amiga_drag_preview_move(app->drag_preview,x,y);
-        amiga_drag_preview_set_remove(app->drag_preview,gesture->remove_armed);
-        return moved;
-    }
+    if (app->drag_preview) return amiga_drag_preview_move(app->drag_preview,x,y);
     if (app->preview_attempt == gesture->token) return 0;
     app->preview_attempt = gesture->token;
-    app->drag_preview = amiga_drag_preview_open(app->screen,icon,shaped,gesture->remove_armed,x,y);
+    {
+        int remove = gesture->remove_armed;
+        DockImage picture;
+        if (!drag_picture(app,icon,&remove,&picture)) return 0;
+        app->drag_preview = amiga_drag_preview_open(app->screen,icon,&picture,shaped,x,y);
+        free(picture.pixels);
+    }
     app->drag_preview_remove = gesture->remove_armed;
     return app->drag_preview != NULL;
 }
@@ -2741,6 +2814,7 @@ int main(int argc, char **argv)
     dock_apollo_bit();
 #endif
     app->settings = dock_settings_default(); app->input_bit = app->vblank_bit = -1;
+    dock_gap_reset(&app->gap);
     app->reset.bit = -1;
     {
         /* The icon cache may use a quarter of the free memory, at least the

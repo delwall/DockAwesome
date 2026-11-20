@@ -17,6 +17,9 @@ typedef struct {
     int base_size, max_size, levels, gap, padding;
     size_t cache_limit;
     int end_gap; /* Extra space before the last icon in a row of two or more. */
+    /* Canvas columns past the screen edge the dock rests on; negative (down
+       to -DOCK_DESKTOP_GAP) when the canvas starts inside it. The plate keeps
+       DOCK_DESKTOP_GAP from the screen edge either way. */
     int edge_padding;
 } DockSettings;
 typedef struct {

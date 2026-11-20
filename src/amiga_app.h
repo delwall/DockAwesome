@@ -124,11 +124,18 @@ typedef struct {
     volatile ULONG external_serial;
     volatile int external_held;
     volatile int external_dragged, external_cancelled;
+    volatile ULONG wheel_serial; /* counts wheel events */
     volatile int right_held, menu_cancelled, ui_busy, popup_open, popup_dismiss;
     /* The Folder Stack's close button in screen coordinates, while it is
        shown: a press there closes the stack and the pair is consumed. */
     volatile int close_valid, close_held;
     volatile int close_left, close_top, close_right, close_bottom;
+    /* The armed drop receiver over the plate in screen coordinates,
+       half-open (empty when not armed): a left press there between icons
+       is consumed with its release, or it activated the receiver and the
+       user's window lost focus. */
+    volatile int receiver_held;
+    volatile int receiver_left, receiver_top, receiver_right, receiver_bottom;
     volatile ULONG menu_serial;
     uint32_t menu_pin_id;
     int menu_x, menu_y;
@@ -359,6 +366,7 @@ typedef struct App {
        mask is painted moved with the pointer since. */
     int drag_pointer_x, drag_pointer_y;
     DockRect drag_box; /* bounds every nonzero drag_mask pixel */
+    DockRect drag_clip; /* where the receiver lies (canvas): the image is painted only there */
     uint64_t front_requested;
     uint64_t settle_started;
     int settling;
@@ -401,6 +409,8 @@ typedef struct App {
     DockPlacement moving_placement[DOCK_MAX_ITEMS];
     DockPlacement held_icon, held_target;
     DockAnimation animation, held_animation;
+    /* A drag's or a drop preview's empty slot; the plate reaches over it. */
+    DockGap gap;
     DockGesture gesture;
     int moving_item; /* One-based. */
     AmigaDragPreview *drag_preview;
@@ -474,6 +484,10 @@ typedef struct App {
        drawn that way (a colour font, or taller than 32 px): no labels.
        label_slot: the pictures, one per pin, made while the dock is idle. */
     int label_max_width;
+    int label_room; /* rows (bottom) or columns (sides) the canvas grew for it */
+    /* app->count when the receiver's resting plate was last set. */
+    int rest_count;
+    ULONG wheel_seen; /* input_context.wheel_serial when last handled */
     LabelSlot label_slot[DOCK_MAX_ITEMS];
     unsigned long label_stamp;
     /* The close button that replaces the Folder Stack pin while it is
@@ -619,11 +633,33 @@ int reset_watch_open(App *app);
 ULONG reset_watch_mask(const App *app);
 void reset_watch_done(App *app);
 void reset_watch_close(App *app);
+/* The canvas columns past the screen's right edge (a right dock's keyed
+   tail). A negative edge_padding is a left canvas starting inside the screen. */
+static inline int pip_right_padding(const App *app)
+{
+    return app->settings.edge_padding > 0 ? app->settings.edge_padding : 0;
+}
 /* PiP's columns that show the dock: the last ones of each row are a keyed
    tail (the right edge's past the screen, a left dock's on its far side). */
 static inline int pip_visible_width(const App *app)
 {
-    return app->width-app->settings.edge_padding-app->pip_tail;
+    return app->width-pip_right_padding(app)-app->pip_tail;
+}
+/* The plate reaches over an empty slot: a drag's gap or a drop preview. */
+static inline int panel_reaching(const App *app)
+{
+    return app->gap.slot >= 0;
+}
+/* The plate as drawn reaches over the shown gap. */
+static inline void show_gap(App *app)
+{
+    app->renderer.panel_include = dock_gap_rect(&app->gap);
+}
+/* The gap is filled, or the row rebuilt: no more reach. */
+static inline void end_gap(App *app)
+{
+    dock_gap_reset(&app->gap);
+    show_gap(app);
 }
 void stack_button_build(App *app);
 void ui_blocking(void *context, int blocking);

@@ -259,22 +259,11 @@ static void background_span(unsigned char *pixels, const unsigned char *backdrop
 static const unsigned char dock_panel_background[4] = {20, 24, 32, 255};
 
 int dock_render_panel(const DockSettings *s, int edge, const DockPlacement *p, int count,
-                      int width, int height, int center_panel, DockRect *out, int *out_radius)
+                      int width, int height, const DockRect *include, DockRect *out, int *out_radius)
 {
     DockRect rect;
     int radius;
-    if (!dock_edge_panel_rect(s, (DockEdge)edge, p, count, width, height, &rect)) return 0;
-    if (center_panel) {
-        /* End slots have no artwork to extend that side of the panel.
-           Mirror the farther edge of the animated row about its center. */
-        if (edge == DOCK_EDGE_BOTTOM) {
-            if (rect.left > width-rect.right) rect.left = width-rect.right;
-            else rect.right = width-rect.left;
-        } else {
-            if (rect.top > height-rect.bottom) rect.top = height-rect.bottom;
-            else rect.bottom = height-rect.top;
-        }
-    }
+    if (!dock_edge_panel_reach(s, (DockEdge)edge, p, count, width, height, include, &rect)) return 0;
     if (rect.right <= rect.left || rect.bottom <= rect.top) rect = (DockRect){0,0,0,0};
     radius = (edge == DOCK_EDGE_BOTTOM ? rect.bottom-rect.top : rect.right-rect.left)/4;
     if (radius > (rect.right - rect.left) / 2) radius = (rect.right - rect.left) / 2;
@@ -312,7 +301,7 @@ static void background_rows(unsigned char *pixels, unsigned char *coverage, cons
 void dock_render_oriented_clip(DockImage *canvas, const DockImage *backdrop,
                  const DockCache *const *icons, const DockPlacement *p, int count,
                  const DockSettings *s, DockMixHalf mix_half, DockPanelShape *shape,
-                 unsigned char *coverage, int pressed_item, int edge, int center_panel,
+                 unsigned char *coverage, int pressed_item, int edge, const DockRect *panel_include,
                  DockGlass *glass, const DockOverlay *overlays, int overlay_count,
                  const DockRect *clip)
 {
@@ -333,7 +322,7 @@ void dock_render_oriented_clip(DockImage *canvas, const DockImage *backdrop,
     c.right = clip->right < width ? clip->right : width;
     c.bottom = clip->bottom < height ? clip->bottom : height;
     if (c.left >= c.right || c.top >= c.bottom) return;
-    if (!dock_render_panel(s, edge, p, count, width, height, center_panel, &rect, &radius)) return;
+    if (!dock_render_panel(s, edge, p, count, width, height, panel_include, &rect, &radius)) return;
     captured = backdrop && backdrop->pixels && backdrop->width == width && backdrop->height == height;
     if (!captured || !glass || !glass->image.pixels || !glass->ready ||
         glass->image.width != width || glass->image.height != height) glass = NULL;
@@ -426,12 +415,12 @@ void dock_render_oriented_clip(DockImage *canvas, const DockImage *backdrop,
 void dock_render_oriented_mask(DockImage *canvas, const DockImage *backdrop,
                  const DockCache *const *icons, const DockPlacement *p, int count,
                  const DockSettings *s, DockMixHalf mix_half, DockPanelShape *shape,
-                 unsigned char *coverage, int pressed_item, int edge, int center_panel,
+                 unsigned char *coverage, int pressed_item, int edge, const DockRect *panel_include,
                  DockGlass *glass)
 {
     DockRect full;
     if (!canvas) return;
     full = (DockRect){0, 0, canvas->width, canvas->height};
     dock_render_oriented_clip(canvas, backdrop, icons, p, count, s, mix_half, shape, coverage,
-                              pressed_item, edge, center_panel, glass, NULL, 0, &full);
+                              pressed_item, edge, panel_include, glass, NULL, 0, &full);
 }

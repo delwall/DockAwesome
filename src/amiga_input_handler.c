@@ -4,6 +4,17 @@
    handler (dispatch_shell_close). The main task publishes hit snapshots
    (input_publish) and reads the queued button pairs (input_pop). */
 #include "amiga_app.h"
+#include <libraries/keymap.h>
+
+/* NewMouse drivers send the wheel as raw keys, some also in this class. */
+#define DOCK_IECLASS_NEWMOUSE 0x16
+
+static int wheel_event(const struct InputEvent *e)
+{
+    UWORD code = e->ie_Code & ~IECODE_UP_PREFIX;
+    return e->ie_Class == DOCK_IECLASS_NEWMOUSE ||
+        (e->ie_Class == IECLASS_RAWKEY && code >= RAWKEY_WHEEL_UP && code <= RAWKEY_WHEEL_RIGHT);
+}
 
 static int snapshot_hit(const InputSnapshot *s, int x, int y)
 {
@@ -40,8 +51,8 @@ void input_publish(App *app)
     s = c->active == &c->snapshots[0] ? &c->snapshots[1] : &c->snapshots[0];
     s->screen = app->screen; s->left = app->left; s->top = app->top;
     s->count = row_count(app); s->generation = app->input_generation;
-    dock_edge_panel_rect(&app->settings,app->edge,row,s->count,
-        app->width,app->height,&s->panel);
+    dock_edge_panel_reach(&app->settings,app->edge,row,s->count,
+        app->width,app->height,&app->renderer.panel_include,&s->panel);
     s->panel_radius = app->renderer.panel.radius;
     for (i = 0; i < s->count; ++i) {
         int item = row_item(app,i);
@@ -114,7 +125,7 @@ struct InputEvent *dock_input_observe(struct InputEvent *events, void *context)
     InputContext *c = context;
     int moved = 0, notify = 0;
     /* A held, external or right-button state can end on another screen. */
-    int engaged = c->held || c->external_held || c->right_held || c->close_held;
+    int engaged = c->held || c->external_held || c->right_held || c->close_held || c->receiver_held;
     for (e = events; e; e = e->ie_NextEvent) {
         if (e->ie_Class == IECLASS_NULL && c->shell_close &&
             e->ie_EventAddress == c->shell_close) {
@@ -169,6 +180,9 @@ struct InputEvent *dock_input_observe(struct InputEvent *events, void *context)
             }
             if (e->ie_Code == SELECTUP && c->close_held) {
                 c->close_held = 0; e->ie_Class = IECLASS_NULL; continue;
+            }
+            if (e->ie_Code == SELECTUP && c->receiver_held) {
+                c->receiver_held = 0; e->ie_Class = IECLASS_NULL; continue;
             }
             if (e->ie_Code == SELECTDOWN && clean && c->close_valid && !c->held &&
                 c->dock_screen && IntuitionBase->FirstScreen == c->dock_screen &&
@@ -247,6 +261,17 @@ struct InputEvent *dock_input_observe(struct InputEvent *events, void *context)
                     c->held = 1; ++c->downs; e->ie_Class = IECLASS_NULL; captured = 1;
                 }
             }
+            if (e->ie_Code == SELECTDOWN && !captured && !already_external && clean &&
+                !c->right_held && !c->popup_open && c->dock_screen &&
+                IntuitionBase->FirstScreen == c->dock_screen && !(e->ie_Qualifier & IEQUALIFIER_RBUTTON) &&
+                c->dock_screen->MouseX >= c->receiver_left && c->dock_screen->MouseX < c->receiver_right &&
+                c->dock_screen->MouseY >= c->receiver_top && c->dock_screen->MouseY < c->receiver_bottom) {
+                /* The plate between icons, where the armed receiver rests:
+                   the press would activate it. An open Folder Stack still
+                   gets it, to close as it loses focus. */
+                c->receiver_held = 1;
+                e->ie_Class = IECLASS_NULL; continue;
+            }
             if (e->ie_Code == SELECTDOWN && !captured && !already_external) {
                 c->external_held = 0;
                 /* Physical USB mouse presses may include motion. The clean
@@ -265,11 +290,14 @@ struct InputEvent *dock_input_observe(struct InputEvent *events, void *context)
             /* Intuition applies acceleration later. Injected move/button chains
                must not use guessed button coordinates. Their owned UP cancels. */
             if (e->ie_Code == IECODE_NOBUTTON || (!relative_left && (e->ie_X || e->ie_Y))) moved = 1;
-        } else if (e->ie_Class != IECLASS_NULL) moved = 1;
+        } else if (e->ie_Class != IECLASS_NULL) {
+            moved = 1;
+            if (wheel_event(e)) { ++c->wheel_serial; notify = 1; }
+        }
     }
     /* Pointer motion on another screen cannot change the dock. The live
        timer still notices when the dock screen returns to the front. */
-    if (notify && (engaged || c->held || c->external_held || c->right_held || c->close_held ||
+    if (notify && (engaged || c->held || c->external_held || c->right_held || c->close_held || c->receiver_held ||
         (c->dock_screen && IntuitionBase->FirstScreen == c->dock_screen))) Signal(c->task, c->signal);
     return events;
 }
@@ -329,7 +357,8 @@ void remove_input(App *app)
         /* The application owns the swallowed DOWN until its physical UP.
            Wait without spinning; never leak an unmatched release to another app. */
         Disable(); app->input_context.close_valid = 0; Enable();
-        while (app->input_context.held || app->input_context.right_held || app->input_context.close_held)
+        while (app->input_context.held || app->input_context.right_held || app->input_context.close_held ||
+               app->input_context.receiver_held)
             Wait(app->input_context.signal);
         app->input_io->io_Command = IND_REMHANDLER;
         app->input_io->io_Data = &app->input_handler;

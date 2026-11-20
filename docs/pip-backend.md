@@ -48,9 +48,19 @@ desktop icon bounds between gestures.
 
 Copy the clean desktop to a reusable bitmap before expanding the receiver.
 Backfill the exposed regions from that bitmap. Skip normal layer and
-background reads while the gesture is active. An unlayered read compares
-the primary plane with the saved pixels. The source key then shows the
-native drag image over the dock.
+background reads while the gesture is active. As it starts, an unlayered
+read takes the screen under the box as the reference (after the press has
+redrawn the window it deactivated); later reads compare the screen with
+it. The source key then shows the native drag image over the dock.
+
+Without window shapes (AmigaOS 3.x) the receiver is a plain window that
+must lie on the dock before the press. While the pointer is on a Workbench
+icon or drawer (on the Directory Opus desktop, always) it covers the plate,
+grown for a drop, in front of other programs' windows and behind the dock's
+own: a drop on the plate reaches the dock even where a window lies under
+it. That window shows under the plate as it was when the receiver armed
+until it steps back; it steps back while the wheel scrolls a window that
+lies under the plate and arms again 250 ms after the wheel stops.
 
 Keep the insertion gap through the AppMessage handoff. Save the release
 coordinates before later motion can overwrite them. Restore the idle
@@ -110,7 +120,11 @@ buffers, and release the lease. Keep window regions alive until close.
 - `make ammx-probe` checks pixel kernels and measures RAM throughput.
 - `make pip-probe` checks source integrity on a private screen.
 - `make pip-align-probe` checks alignment. Arrows move by 1 px. Shift-arrow
-  moves by 8 px. Escape or Return prints the offsets.
+  moves by 8 px. Escape or Return prints the offsets. With
+  `--reserved-pip2 [X Y [W H]] [KEY]` it opens the overlay at screen
+  position X Y with size W H (W at least 64 in 32 px steps, H at least 32),
+  and KEY fills the right third with the colour key. Test where the dock's
+  overlay actually lies: alignment can differ by position.
 - `make pip-coexist-probe` checks the lease and screen changes with the dock running.
 
 Stop the dock before running the standalone PiP and alignment probes.
