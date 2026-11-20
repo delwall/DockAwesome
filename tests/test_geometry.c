@@ -1,4 +1,5 @@
 #include "dock_geometry.h"
+#include "dock_compose.h"
 #include "dock_interaction.h"
 #include <assert.h>
 #include <limits.h>
@@ -254,12 +255,34 @@ static void test_zoomed_reorder_gap(void)
             int center = (LONG-span)/2+slot*(s.base_size+s.gap)+s.base_size/2;
             actual_point((DockEdge)edge,center,CROSS-s.padding-s.base_size/2,&x,&y);
             assert(dock_edge_insertion_slot(&s,(DockEdge)edge,N-1,w,h,x,y) == slot);
+            assert(dock_edge_row_slot(&s,(DockEdge)edge,N-1,w,h,x,y) == slot);
+            /* Above the plate, off the drop band: the same slot along the row. */
+            actual_point((DockEdge)edge,center,0,&x,&y);
+            assert(dock_edge_insertion_slot(&s,(DockEdge)edge,N-1,w,h,x,y) == -1);
+            assert(dock_edge_row_slot(&s,(DockEdge)edge,N-1,w,h,x,y) == slot);
+            actual_point((DockEdge)edge,center,CROSS-s.padding-s.base_size/2,&x,&y);
             assert(dock_edge_layout(&s,(DockEdge)edge,N,w,h,x,y,1,full));
             assert(dock_edge_gap_layout(&s,(DockEdge)edge,N-1,w,h,slot,x,y,1,neighbors,&gap));
             assert(gap.level > 0 && !memcmp(&gap,&full[slot],sizeof(gap)));
             for (i = 0; i < N-1; ++i)
                 assert(!memcmp(&neighbors[i],&full[i+(i >= slot)],sizeof(*neighbors)));
+            {
+                /* The plate reaches over the gap with the icons' padding and
+                   no further, at the ends as in the middle (IMG_2594). */
+                DockRect include = {gap.x, gap.y, gap.x+gap.size, gap.y+gap.size}, panel;
+                int radius, side = edge != DOCK_EDGE_BOTTOM;
+                int start = side ? full[0].y : full[0].x;
+                int end = (side ? full[N-1].y : full[N-1].x)+full[N-1].size;
+                assert(dock_render_panel(&s,edge,neighbors,N-1,w,h,&include,&panel,&radius));
+                assert((side ? panel.top : panel.left) == start-s.padding);
+                assert((side ? panel.bottom : panel.right) == end+s.padding);
+            }
         }
+        /* Past either end, even off the canvas: the end slots. */
+        actual_point((DockEdge)edge,-50,0,&x,&y);
+        assert(dock_edge_row_slot(&s,(DockEdge)edge,N-1,w,h,x,y) == 0);
+        actual_point((DockEdge)edge,LONG+50,CROSS+20,&x,&y);
+        assert(dock_edge_row_slot(&s,(DockEdge)edge,N-1,w,h,x,y) == N-1);
     }
 }
 

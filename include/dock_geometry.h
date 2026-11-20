@@ -37,6 +37,10 @@ int dock_edge_hover(const DockSettings *settings, DockEdge edge,
    current animation. Returns 0..count, or -1 outside the drop band. */
 int dock_edge_insertion_slot(const DockSettings *settings, DockEdge edge,
     int count, int width, int height, int x, int y);
+/* The same slot from the position along the row alone, for any point:
+   0 before the first centre, count past the last; -1 on invalid input. */
+int dock_edge_row_slot(const DockSettings *settings, DockEdge edge,
+    int count, int width, int height, int x, int y);
 int dock_edge_insertion_layout(const DockSettings *settings, DockEdge edge,
     int count, int width, int height, int slot, DockPlacement *out);
 /* Lay out the complete row, then return the neighbors and the vacant slot

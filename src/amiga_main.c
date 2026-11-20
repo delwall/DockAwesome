@@ -85,7 +85,7 @@ static void finish_move(App *app, int slot, const DockGestureInput *release)
     memcpy(app->placement+slot+1, app->moving_placement+slot,
         (app->count-slot-1)*sizeof(*app->placement));
     app->moving_item = 0;
-    app->renderer.center_panel = 0;
+    app->renderer.panel_include = (DockRect){0,0,0,0};
     dock_animation_reset(&app->animation);
 }
 
@@ -742,14 +742,14 @@ static void update_target(App *app)
         DockGesture *gesture = &app->gesture;
         int count = row_count(app), zoom = !gesture->remove_armed;
         int slot = app->gesture.target_slot;
-        int centered = 0;
+        DockRect include = {0,0,0,0};
         if (app->moving_item && zoom) {
             DockPlacement gap;
             if (slot < 0) slot = app->moving_item-1;
             if (dock_edge_gap_layout(&app->settings, app->edge, count, app->width, app->height,
                     slot, gesture->x, gesture->y, zoom, app->target, &gap)) {
                 app->held_target = (DockPlacement){0, app->settings.max_size-gap.size, gap.size, gap.level};
-                centered = slot == 0 || slot == count;
+                include = (DockRect){gap.x, gap.y, gap.x+gap.size, gap.y+gap.size};
             }
         } else {
             dock_edge_layout(&app->settings, app->edge, count, app->width, app->height,
@@ -758,8 +758,8 @@ static void update_target(App *app)
                 app->held_target = (DockPlacement){0, app->settings.max_size-app->settings.base_size,
                     app->settings.base_size, 0};
         }
-        if (app->renderer.center_panel != centered) app->gesture_redraw = 1;
-        app->renderer.center_panel = centered;
+        if (memcmp(&app->renderer.panel_include, &include, sizeof(include))) app->gesture_redraw = 1;
+        app->renderer.panel_include = include;
         app->hovered = -1;
         return;
     }
@@ -769,7 +769,7 @@ static void update_target(App *app)
             return;
         app->snap_wait_motion = 0;
     }
-    if (catching || app->renderer.center_panel) {
+    if (catching || panel_reaching(app)) {
         /* Keep the shown gap while the AppWindow message is in flight. */
         if (catching && !app->input_context.external_held && app->drop_preview_slot >= 0) return;
         /* Room only where the drop is caught: not over the label strip. */
@@ -777,10 +777,11 @@ static void update_target(App *app)
             amiga_drop_catcher_contains(app->drop_catcher, app->screen->MouseX, app->screen->MouseY)) {
             int slot = dock_edge_insertion_slot(&app->settings, app->edge, app->count,
                 app->width, app->height, app->screen->MouseX-app->left, app->screen->MouseY-app->top);
+            DockPlacement gap;
             if (slot > stack_index(app)) slot = stack_index(app);
-            if (dock_edge_insertion_layout(&app->settings, app->edge, app->count,
-                    app->width, app->height, slot, app->target)) {
-                app->renderer.center_panel = 1;
+            if (dock_edge_gap_layout(&app->settings, app->edge, app->count,
+                    app->width, app->height, slot, 0, 0, 0, app->target, &gap)) {
+                app->renderer.panel_include = (DockRect){gap.x, gap.y, gap.x+gap.size, gap.y+gap.size};
                 app->drop_preview_slot = slot;
                 app->hovered = -1;
                 return;
@@ -791,8 +792,8 @@ static void update_target(App *app)
             0, 0, 0, app->target);
         app->hovered = -1;
         if (animation_needed(app)) return;
-        if (app->renderer.center_panel) {
-            app->renderer.center_panel = 0;
+        if (panel_reaching(app)) {
+            app->renderer.panel_include = (DockRect){0,0,0,0};
             app->gesture_redraw = 1;
         }
         if (catching) return;
@@ -1563,7 +1564,7 @@ static void draw(App *app)
         /* A second renderer that starts over every frame is the reference. */
         DockRenderer *check = &app->check_renderer;
         check->pressed_item = app->renderer.pressed_item;
-        check->center_panel = app->renderer.center_panel;
+        check->panel_include = app->renderer.panel_include;
         check->edge = app->renderer.edge;
         check->overlays = overlays; check->overlay_count = overlay_count;
         dock_renderer_backdrop_changed(check);
@@ -1660,7 +1661,7 @@ int rest_after_pin_change(App *app, int before)
     }
     if (!dock_edge_layout(&app->settings, app->edge, app->count,
             app->width, app->height, 0, 0, 0, app->target)) return 0;
-    app->renderer.center_panel = 0;
+    app->renderer.panel_include = (DockRect){0,0,0,0};
     dock_animation_reset(&app->animation);
     return 1;
 }
@@ -1760,6 +1761,15 @@ static DockGestureInput gesture_point(App *app, int kind, uint32_t token,
         in.outside = in.target_slot < 0 &&
             dock_edge_outside(&app->settings, app->edge, app->placement, app->count,
             app->width, app->height, x, y, 24);
+        /* Not a removal, but off the row (above the plate where the zoomed
+           icons reach, or past an end): the slot still follows the pointer.
+           Kept from the row, the gap and the drop went to where the pin
+           last left it (ApolloOS, IMG_2593). */
+        if (!in.outside && in.target_slot < 0 && app->count > 1) {
+            in.target_slot = dock_edge_row_slot(&app->settings, app->edge, app->count-1,
+                app->width, app->height, x, y);
+            if (in.target_slot >= stack_index(app)) in.target_slot = stack_index(app)-1;
+        }
     }
     return in;
 }

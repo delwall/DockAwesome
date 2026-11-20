@@ -140,29 +140,44 @@ int dock_edge_outside(const DockSettings *s, DockEdge edge, const DockPlacement 
     return dock_interaction_outside(s, virtual, count, height, width, vx, vy, margin);
 }
 
-int dock_edge_insertion_slot(const DockSettings *s, DockEdge edge,
-    int count, int width, int height, int x, int y)
+/* anywhere: the slot from the position along the row alone, for every
+   point (no drop band, row ends or canvas bounds). */
+static int insertion_slot(const DockSettings *s, DockEdge edge,
+    int count, int width, int height, int x, int y, int anywhere)
 {
     int pitch, start, span, expanded_start, slot, inner, outer;
     if (!dock_settings_valid(s) || count < 0 || count > DOCK_MAX_ITEMS ||
-        (edge != DOCK_EDGE_BOTTOM && !side_edge(edge)) ||
-        x < 0 || x >= width || y < 0 || y >= height) return -1;
+        (edge != DOCK_EDGE_BOTTOM && !side_edge(edge)) || width < 1 || height < 1 ||
+        (!anywhere && (x < 0 || x >= width || y < 0 || y >= height))) return -1;
     if (side_edge(edge)) {
         int vx, vy, swap = width;
         pointer_virtual(edge, width, x, y, &vx, &vy);
         x = vx; y = vy; width = height; height = swap;
     }
     dock_panel_cross_bounds(s,height,&inner,&outer);
-    if (y < inner || y >= outer) return -1;
-    if (!count) return x >= s->padding && x < width-s->padding ? 0 : -1;
+    if (!anywhere && (y < inner || y >= outer)) return -1;
+    if (!count) return anywhere || (x >= s->padding && x < width-s->padding) ? 0 : -1;
     pitch = s->base_size+s->gap;
     span = dock_row_length(s,count);
     expanded_start = (width-span-pitch)/2;
-    if (x < expanded_start-s->padding || x >= expanded_start+span+pitch+s->padding) return -1;
+    if (!anywhere && (x < expanded_start-s->padding || x >= expanded_start+span+pitch+s->padding))
+        return -1;
     start = (width-span)/2;
     for (slot = 0; slot < count; ++slot)
         if (x < start+slot*pitch+s->base_size/2+(slot && slot == count-1 ? s->end_gap : 0)) break;
     return slot;
+}
+
+int dock_edge_insertion_slot(const DockSettings *s, DockEdge edge,
+    int count, int width, int height, int x, int y)
+{
+    return insertion_slot(s, edge, count, width, height, x, y, 0);
+}
+
+int dock_edge_row_slot(const DockSettings *s, DockEdge edge,
+    int count, int width, int height, int x, int y)
+{
+    return insertion_slot(s, edge, count, width, height, x, y, 1);
 }
 
 int dock_edge_gap_layout(const DockSettings *s, DockEdge edge,

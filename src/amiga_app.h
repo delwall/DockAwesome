@@ -637,6 +637,12 @@ static inline int pip_visible_width(const App *app)
 {
     return app->width-pip_right_padding(app)-app->pip_tail;
 }
+/* The plate reaches over an empty slot: a drag's gap or a drop preview. */
+static inline int panel_reaching(const App *app)
+{
+    const DockRect *r = &app->renderer.panel_include;
+    return r->left < r->right && r->top < r->bottom;
+}
 void stack_button_build(App *app);
 void ui_blocking(void *context, int blocking);
 int ui_fit(void *context, const DockUIPrefs *draft);

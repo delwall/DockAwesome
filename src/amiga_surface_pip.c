@@ -47,17 +47,19 @@ static DockRect drop_box(const App *app)
    passed the receiver: it seemed to go through the last pin (AmiKit). */
 static void rest_plate(App *app)
 {
-    DockPlacement rest[DOCK_MAX_ITEMS];
-    DockRect plate, grown;
+    DockPlacement rest[DOCK_MAX_ITEMS], gap;
+    DockRect plate, grown, room;
     int radius;
     app->rest_count = app->count;
     if (app->caps.shaped_windows ||
         !dock_edge_layout(&app->settings,app->edge,app->count,app->width,app->height,0,0,0,rest) ||
         !dock_edge_panel_rect(&app->settings,app->edge,rest,app->count,app->width,app->height,&plate))
         return;
-    if (dock_edge_insertion_layout(&app->settings,app->edge,app->count,app->width,app->height,
-            app->count/2,rest) &&
-        dock_render_panel(&app->settings,app->edge,rest,app->count,app->width,app->height,1,&grown,&radius) &&
+    if (!dock_edge_gap_layout(&app->settings,app->edge,app->count,app->width,app->height,
+            app->count/2,0,0,0,rest,&gap)) gap.size = 0;
+    room = (DockRect){gap.x,gap.y,gap.x+gap.size,gap.y+gap.size};
+    if (gap.size &&
+        dock_render_panel(&app->settings,app->edge,rest,app->count,app->width,app->height,&room,&grown,&radius) &&
         grown.right > grown.left && grown.bottom > grown.top) {
         if (grown.left < plate.left) plate.left = grown.left;
         if (grown.top < plate.top) plate.top = grown.top;
@@ -193,7 +195,7 @@ static int frame_check(const App *app, DockRect *out)
     int i, low, high, limit, bottom = app->edge == DOCK_EDGE_BOTTOM;
     int visible = pip_visible_width(app);
     DockRect plate;
-    if (app->moving_item || app->gesture.active || app->renderer.center_panel ||
+    if (app->moving_item || app->gesture.active || panel_reaching(app) ||
         !dock_edge_panel_rect(&app->settings,app->edge,app->placement,app->count,
             app->width,app->height,&plate)) return 0;
     low = bottom ? plate.left : plate.top;

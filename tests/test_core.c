@@ -1375,73 +1375,83 @@ static const int fixture_running[FIX_COUNT] = {1,0,0,1,0};
    full-frame renderer before damage rendering existed. A change here is a
    rendering regression, never a table update. The hover scenarios also
    depend on dock_layout: they were regenerated once when the zoom wave
-   changed to the macOS profile, with the rest scenarios unchanged. */
+   changed to the macOS profile, with the rest scenarios unchanged. The
+   centre scenarios were regenerated once when the mirrored plate became a
+   plate that reaches over a gap (fixture_gap); all others were unchanged. */
 static const uint32_t render_goldens[FIX_SCENARIOS] = {
     0x1d1a8288, 0xe3a6c983, 0x84b7daf1, 0xbaeb2950, 0x8ccc2510, 0xcca2f0fb,
-    0x3e66c599, 0x46d84034, 0x0494c9de, 0xe5d3f233, 0x0c206437, 0xb20c6a56,
-    0x91e50f12, 0xae3aeeeb, 0x99765f1b, 0x4241c58e, 0x52a4e958, 0xa8cfd5a4,
+    0x3e66c599, 0x46d84034, 0x65d50368, 0x21535213, 0x8c4ef5f9, 0xf4efe522,
+    0x560de330, 0x3a6741cb, 0x3a0ff17b, 0x211810ea, 0x52a4e958, 0xa8cfd5a4,
     0xb9e8109e, 0xbca8bb10, 0x8943428c, 0x376ba5e0, 0x4c6588e6, 0x83bbf6f8,
-    0x5081cad2, 0x04727c54, 0x32bbbd4c, 0xe18bec82, 0x2c88ea52, 0x519c8610,
-    0x32aa8ef8, 0x0e23d1ae, 0x1d1a8288, 0xe3a6c983, 0x84b7daf1, 0xbaeb2950,
-    0x8ccc2510, 0xcca2f0fb, 0x3e66c599, 0x46d84034, 0x0494c9de, 0xe5d3f233,
-    0x0c206437, 0xb20c6a56, 0x91e50f12, 0xae3aeeeb, 0x99765f1b, 0x4241c58e,
+    0x769834d8, 0xd4ae74b4, 0xbedd932e, 0x388694a2, 0x5eb4554c, 0x69867670,
+    0x7e54b330, 0xbd9d2a0e, 0x1d1a8288, 0xe3a6c983, 0x84b7daf1, 0xbaeb2950,
+    0x8ccc2510, 0xcca2f0fb, 0x3e66c599, 0x46d84034, 0x65d50368, 0x21535213,
+    0x8c4ef5f9, 0xf4efe522, 0x560de330, 0x3a6741cb, 0x3a0ff17b, 0x211810ea,
     0x52a4e958, 0xa8cfd5a4, 0xb9e8109e, 0xbca8bb10, 0x8943428c, 0x376ba5e0,
-    0x4c6588e6, 0x83bbf6f8, 0x5081cad2, 0x04727c54, 0x32bbbd4c, 0xe18bec82,
-    0x2c88ea52, 0x519c8610, 0x32aa8ef8, 0x0e23d1ae, 0xf6243960, 0x4ffb78f7,
+    0x4c6588e6, 0x83bbf6f8, 0x769834d8, 0xd4ae74b4, 0xbedd932e, 0x388694a2,
+    0x5eb4554c, 0x69867670, 0x7e54b330, 0xbd9d2a0e, 0xf6243960, 0x4ffb78f7,
     0x1faf51cf, 0x4dbc7131, 0x65808cc1, 0xc647c92b, 0x03e48aef, 0xa1c61264,
-    0x5bc4096a, 0x92fe1fa2, 0xbf0af790, 0x51893a64, 0x40bc840a, 0xdf4d7791,
-    0x8fe19980, 0x29df4611, 0x6da0b0ef, 0xf072c23e, 0xff4e1a8e, 0xdfcde28a,
-    0x2af548bc, 0x923eca85, 0xa5cdd355, 0x33123961, 0x2f103d81, 0xb0cdf107,
-    0x2a07ef21, 0x0e9f515f, 0x15229b6f, 0xe2d7b4af, 0x1c4c0aaa, 0x865fe12c,
+    0xe33040b3, 0x6b77f68b, 0x674632a2, 0x272378cd, 0x7816552b, 0x9a215cae,
+    0x7f2df722, 0x3c04e787, 0x6da0b0ef, 0xf072c23e, 0xff4e1a8e, 0xdfcde28a,
+    0x2af548bc, 0x923eca85, 0xa5cdd355, 0x33123961, 0x541335f8, 0x3bf3eef6,
+    0x79787b8f, 0xa9279f62, 0x2a4f11aa, 0x02e13ac0, 0xa47bed24, 0xa4f64632,
     0xf6243960, 0x4ffb78f7, 0x1faf51cf, 0x4dbc7131, 0x65808cc1, 0xc647c92b,
-    0x03e48aef, 0xa1c61264, 0x5bc4096a, 0x92fe1fa2, 0xbf0af790, 0x51893a64,
-    0x40bc840a, 0xdf4d7791, 0x8fe19980, 0x29df4611, 0x6da0b0ef, 0xf072c23e,
+    0x03e48aef, 0xa1c61264, 0xe33040b3, 0x6b77f68b, 0x674632a2, 0x272378cd,
+    0x7816552b, 0x9a215cae, 0x7f2df722, 0x3c04e787, 0x6da0b0ef, 0xf072c23e,
     0xff4e1a8e, 0xdfcde28a, 0x2af548bc, 0x923eca85, 0xa5cdd355, 0x33123961,
-    0x2f103d81, 0xb0cdf107, 0x2a07ef21, 0x0e9f515f, 0x15229b6f, 0xe2d7b4af,
-    0x1c4c0aaa, 0x865fe12c, 0xa09a8da0, 0xd47b6ced, 0xc5ce8c5c, 0x8ed46511,
-    0x855f4a7c, 0x6b019cf9, 0xc6a3ec74, 0x710286d5, 0xe8f48812, 0x8a099f3d,
-    0xa6cdcc9e, 0x1627b0fb, 0xa543c7ee, 0x6474a7c9, 0xf7ad8b3a, 0xcf086f5f,
+    0x541335f8, 0x3bf3eef6, 0x79787b8f, 0xa9279f62, 0x2a4f11aa, 0x02e13ac0,
+    0xa47bed24, 0xa4f64632, 0xa09a8da0, 0xd47b6ced, 0xc5ce8c5c, 0x8ed46511,
+    0x855f4a7c, 0x6b019cf9, 0xc6a3ec74, 0x710286d5, 0x1715d130, 0x6fdccb9d,
+    0xa7236948, 0x9b47556f, 0x3557128c, 0x8f9ef029, 0x479fc852, 0x5e7a2bb3,
     0xf3060da0, 0xbe504041, 0x44276c8b, 0x41b04c11, 0xcc3aca7c, 0x83b7b7ad,
-    0x106959f3, 0x96c94dd5, 0x3b600812, 0xa177b211, 0x40e4e1f5, 0xc90397fb,
-    0xec1f47ee, 0xac77e5fd, 0xdf74d131, 0xf4cf365f, 0xa09a8da0, 0xd47b6ced,
+    0x106959f3, 0x96c94dd5, 0x670a5d70, 0x291fa4f1, 0x1b210fd7, 0x1916692f,
+    0xb667a8cc, 0x38af38dd, 0xbe283409, 0x1dd20273, 0xa09a8da0, 0xd47b6ced,
     0xc5ce8c5c, 0x8ed46511, 0x855f4a7c, 0x6b019cf9, 0xc6a3ec74, 0x710286d5,
-    0xe8f48812, 0x8a099f3d, 0xa6cdcc9e, 0x1627b0fb, 0xa543c7ee, 0x6474a7c9,
-    0xf7ad8b3a, 0xcf086f5f, 0xf3060da0, 0xbe504041, 0x44276c8b, 0x41b04c11,
-    0xcc3aca7c, 0x83b7b7ad, 0x106959f3, 0x96c94dd5, 0x3b600812, 0xa177b211,
-    0x40e4e1f5, 0xc90397fb, 0xec1f47ee, 0xac77e5fd, 0xdf74d131, 0xf4cf365f,
+    0x1715d130, 0x6fdccb9d, 0xa7236948, 0x9b47556f, 0x3557128c, 0x8f9ef029,
+    0x479fc852, 0x5e7a2bb3, 0xf3060da0, 0xbe504041, 0x44276c8b, 0x41b04c11,
+    0xcc3aca7c, 0x83b7b7ad, 0x106959f3, 0x96c94dd5, 0x670a5d70, 0x291fa4f1,
+    0x1b210fd7, 0x1916692f, 0xb667a8cc, 0x38af38dd, 0xbe283409, 0x1dd20273,
     0x34f1533f, 0xf9000c98, 0xed44f88f, 0x67a56abd, 0xe5c27c6c, 0x3e8f1cf2,
-    0xaf32b392, 0x4a1ec3bb, 0xc09e7def, 0x25f78b99, 0xed234cfc, 0xa6e09849,
-    0x671b8c23, 0x97bcb0eb, 0x042122c6, 0x40ea8372, 0x08498ab7, 0x21ff5f4c,
+    0xaf32b392, 0x4a1ec3bb, 0xba9f8581, 0xbcd3995c, 0x68dfd3ea, 0x43b2258c,
+    0xeeaa4b32, 0x9e8aebc6, 0x88a406f8, 0xfcc05a52, 0x08498ab7, 0x21ff5f4c,
     0xd38bba85, 0x83844abd, 0x45b411b4, 0xe81275b6, 0xf5dd8336, 0x5399a3bb,
-    0xcf85cf27, 0xfd06c7bd, 0x02cd73a2, 0xc2bf7849, 0x67726a4b, 0x92b6e1bf,
-    0x1cb80b62, 0x4a656372, 0x34f1533f, 0xf9000c98, 0xed44f88f, 0x67a56abd,
-    0xe5c27c6c, 0x3e8f1cf2, 0xaf32b392, 0x4a1ec3bb, 0xc09e7def, 0x25f78b99,
-    0xed234cfc, 0xa6e09849, 0x671b8c23, 0x97bcb0eb, 0x042122c6, 0x40ea8372,
+    0xad779551, 0x3704c3a0, 0x2691dd98, 0xc42cebc8, 0x91406202, 0x57e554ca,
+    0x57f57b84, 0x76af3836, 0x34f1533f, 0xf9000c98, 0xed44f88f, 0x67a56abd,
+    0xe5c27c6c, 0x3e8f1cf2, 0xaf32b392, 0x4a1ec3bb, 0xba9f8581, 0xbcd3995c,
+    0x68dfd3ea, 0x43b2258c, 0xeeaa4b32, 0x9e8aebc6, 0x88a406f8, 0xfcc05a52,
     0x08498ab7, 0x21ff5f4c, 0xd38bba85, 0x83844abd, 0x45b411b4, 0xe81275b6,
-    0xf5dd8336, 0x5399a3bb, 0xcf85cf27, 0xfd06c7bd, 0x02cd73a2, 0xc2bf7849,
-    0x67726a4b, 0x92b6e1bf, 0x1cb80b62, 0x4a656372, 0xa251c330, 0x05326d1c,
+    0xf5dd8336, 0x5399a3bb, 0xad779551, 0x3704c3a0, 0x2691dd98, 0xc42cebc8,
+    0x91406202, 0x57e554ca, 0x57f57b84, 0x76af3836, 0xa251c330, 0x05326d1c,
     0x760bb050, 0x99ffcaf8, 0x4171878c, 0xf473a078, 0xdc4a2188, 0x5b3c5494,
-    0xac482ba2, 0xf414c58c, 0x5e274d22, 0xd149bf9a, 0x3882933e, 0xef564ee8,
-    0x5b0cfb6e, 0x2b013916, 0x73bff1b0, 0x71e10b6b, 0x65453aef, 0xc47b59b8,
-    0xd828740c, 0x0e42d207, 0x45332407, 0x9d70cf54, 0x8cb82222, 0x354f9e9b,
-    0xac2a2ee9, 0xac3d4a5a, 0x647c93be, 0x13ae2337, 0xe600a6c5, 0x572e37d6,
+    0x18d6cb40, 0x32fa87ac, 0x5751a6a4, 0xf2e0ca86, 0xb31d761c, 0xce4a5b08,
+    0x517d508a, 0x2b4657e2, 0x73bff1b0, 0x71e10b6b, 0x65453aef, 0xc47b59b8,
+    0xd828740c, 0x0e42d207, 0x45332407, 0x9d70cf54, 0xa76e1000, 0xcf1df23b,
+    0xc621a3c3, 0x9f191a46, 0xe9de40dc, 0x092411d7, 0x64f46481, 0xe3a84da2,
     0xa251c330, 0x05326d1c, 0x760bb050, 0x99ffcaf8, 0x4171878c, 0xf473a078,
-    0xdc4a2188, 0x5b3c5494, 0xac482ba2, 0xf414c58c, 0x5e274d22, 0xd149bf9a,
-    0x3882933e, 0xef564ee8, 0x5b0cfb6e, 0x2b013916, 0x73bff1b0, 0x71e10b6b,
+    0xdc4a2188, 0x5b3c5494, 0x18d6cb40, 0x32fa87ac, 0x5751a6a4, 0xf2e0ca86,
+    0xb31d761c, 0xce4a5b08, 0x517d508a, 0x2b4657e2, 0x73bff1b0, 0x71e10b6b,
     0x65453aef, 0xc47b59b8, 0xd828740c, 0x0e42d207, 0x45332407, 0x9d70cf54,
-    0x8cb82222, 0x354f9e9b, 0xac2a2ee9, 0xac3d4a5a, 0x647c93be, 0x13ae2337,
-    0xe600a6c5, 0x572e37d6, 0xa46d6f02, 0x1dcdf89c, 0x1eb00470, 0xa33c58ad,
-    0xc755d1c0, 0x9ca18a67, 0x96ccf9ca, 0xbb5fe2a7, 0x442acffe, 0x7d616f32,
-    0x1586f67b, 0xc47b94fc, 0xb5f122a2, 0x0f3a9f49, 0x7b80cd07, 0xb3deb339,
+    0xa76e1000, 0xcf1df23b, 0xc621a3c3, 0x9f191a46, 0xe9de40dc, 0x092411d7,
+    0x64f46481, 0xe3a84da2, 0xa46d6f02, 0x1dcdf89c, 0x1eb00470, 0xa33c58ad,
+    0xc755d1c0, 0x9ca18a67, 0x96ccf9ca, 0xbb5fe2a7, 0x2cff5ed7, 0x61c306c3,
+    0x6fac6e0d, 0x180dcdca, 0x50625949, 0x76d73ed0, 0x6c32ccf1, 0xc998a68c,
     0x0785f749, 0xdfc6bfe0, 0xb971d18f, 0x8c2e2049, 0xd0a2b297, 0x2dfdd6db,
-    0x1f2ebc42, 0xa187254b, 0x6c542211, 0xc4b62c52, 0x5d3bed00, 0xd11b3af0,
-    0x55211ad1, 0xe4758c69, 0xc22143ef, 0x3d048ef5, 0xa46d6f02, 0x1dcdf89c,
+    0x1f2ebc42, 0xa187254b, 0x0d11fb88, 0x8a6d3ea7, 0x73413582, 0xc8c725ee,
+    0xe1cb319a, 0x60c52fc4, 0xcbd7ca2d, 0xb8cead48, 0xa46d6f02, 0x1dcdf89c,
     0x1eb00470, 0xa33c58ad, 0xc755d1c0, 0x9ca18a67, 0x96ccf9ca, 0xbb5fe2a7,
-    0x442acffe, 0x7d616f32, 0x1586f67b, 0xc47b94fc, 0xb5f122a2, 0x0f3a9f49,
-    0x7b80cd07, 0xb3deb339, 0x0785f749, 0xdfc6bfe0, 0xb971d18f, 0x8c2e2049,
-    0xd0a2b297, 0x2dfdd6db, 0x1f2ebc42, 0xa187254b, 0x6c542211, 0xc4b62c52,
-    0x5d3bed00, 0xd11b3af0, 0x55211ad1, 0xe4758c69, 0xc22143ef, 0x3d048ef5
+    0x2cff5ed7, 0x61c306c3, 0x6fac6e0d, 0x180dcdca, 0x50625949, 0x76d73ed0,
+    0x6c32ccf1, 0xc998a68c, 0x0785f749, 0xdfc6bfe0, 0xb971d18f, 0x8c2e2049,
+    0xd0a2b297, 0x2dfdd6db, 0x1f2ebc42, 0xa187254b, 0x0d11fb88, 0x8a6d3ea7,
+    0x73413582, 0xc8c725ee, 0xe1cb319a, 0x60c52fc4, 0xcbd7ca2d, 0xb8cead48
 };
+
+/* An empty slot just before the first icon: a drag's gap at the row start. */
+static DockRect fixture_gap(int edge, const DockPlacement *p)
+{
+    int size = p[0].size;
+    return edge == DOCK_EDGE_BOTTOM ? (DockRect){p[0].x-size-8, p[0].y, p[0].x-8, p[0].y+size} :
+        (DockRect){p[0].x, p[0].y-size-8, p[0].x+size, p[0].y-8};
+}
 
 static int fixture_scenario(int edge, int captured, int glass, int pressed, int center,
                             int end_gap, int pointer)
@@ -1475,7 +1485,11 @@ static void test_render_goldens(int as_overlays)
                 const DockCache *icons[FIX_COUNT];
                 DockOverlay dots[FIX_COUNT];
                 int dot_count = 0;
+                DockRect gap;
+                const DockRect *include;
                 fixture_layout(&f,pointer,p);
+                gap = fixture_gap(edge,p);
+                include = center ? &gap : NULL;
                 for (i = 0; i < FIX_COUNT; ++i) if (fixture_running[i]) {
                     dots[dot_count].image = &fixture_dot;
                     fixture_dot_position(&f,&p[i],&dots[dot_count].x,&dots[dot_count].y);
@@ -1488,16 +1502,17 @@ static void test_render_goldens(int as_overlays)
                     DockRenderer r;
                     memset(&r,0,sizeof(r));
                     r.pixels = dock_backend_portable(); r.coverage = f.coverage;
-                    r.pressed_item = pressed ? 2 : 0; r.center_panel = center; r.edge = (DockEdge)edge;
+                    r.pressed_item = pressed ? 2 : 0; r.edge = (DockEdge)edge;
+                    if (include) r.panel_include = *include;
                     if (as_overlays) { r.overlays = dots; r.overlay_count = dot_count; }
                     dock_renderer_draw(&r,&f.canvas,captured ? &f.backdrop : NULL,icons,p,FIX_COUNT,&f.s);
                     dock_renderer_release(&r);
                 } else if (as_overlays) {
                     DockRect full = {0,0,f.width,f.height};
                     dock_render_oriented_clip(&f.canvas,captured ? &f.backdrop : NULL,icons,p,FIX_COUNT,
-                        &f.s,NULL,shape,f.coverage,pressed ? 2 : 0,edge,center,NULL,dots,dot_count,&full);
+                        &f.s,NULL,shape,f.coverage,pressed ? 2 : 0,edge,include,NULL,dots,dot_count,&full);
                 } else dock_render_oriented_mask(&f.canvas,captured ? &f.backdrop : NULL,icons,p,FIX_COUNT,
-                    &f.s,NULL,shape,f.coverage,pressed ? 2 : 0,edge,center,NULL);
+                    &f.s,NULL,shape,f.coverage,pressed ? 2 : 0,edge,include,NULL);
                 if (!as_overlays) for (i = 0; i < dot_count; ++i)
                     dock_blend_masked(&f.canvas,dots[i].image,dots[i].x,dots[i].y,f.coverage);
                 sums[fixture_scenario(edge,captured,glass,pressed,center,end_gap,pointer)] = fixture_checksum(&f);
@@ -2092,7 +2107,8 @@ static void test_damage_fuzz(void)
                     ++overlay_count;
                 }
                 if (drag) overlays[overlay_count++] = (DockOverlay){&f.cache[1].image[drag_level],drag_x,drag_y,0};
-                r.pressed_item = pressed; r.center_panel = center;
+                r.pressed_item = pressed;
+                r.panel_include = center && count ? fixture_gap(edge,current) : (DockRect){0,0,0,0};
                 r.overlays = overlays; r.overlay_count = overlay_count;
                 dock_renderer_draw(&r,&f.canvas,captured ? &f.backdrop : NULL,row,current,count,&f.s);
                 if (r.damage.full) { ++full_frames; damaged += (uint64_t)size; }
@@ -2107,12 +2123,12 @@ static void test_damage_fuzz(void)
                     int n = r.damage.full ? 1 : r.damage.count;
                     for (i = 0; i < n; ++i)
                         dock_render_oriented_clip(&b,captured ? &f.backdrop : NULL,row,current,count,&f.s,NULL,
-                            shape_b,b_cov,pressed,edge,center,NULL,overlays,overlay_count,
+                            shape_b,b_cov,pressed,edge,&r.panel_include,NULL,overlays,overlay_count,
                             r.damage.full ? &whole : &r.damage.rect[i]);
                 }
                 memset(ref.pixels,0xa5,(size_t)size*4); memset(ref_cov,0x5a,(size_t)size);
                 dock_render_oriented_mask(&ref,captured ? &f.backdrop : NULL,row,current,count,&f.s,NULL,
-                    shape_ref,ref_cov,pressed,edge,center,NULL);
+                    shape_ref,ref_cov,pressed,edge,&r.panel_include,NULL);
                 for (i = 0; i < overlay_count; ++i)
                     dock_blend_masked(&ref,overlays[i].image,overlays[i].x,overlays[i].y,ref_cov);
                 if (memcmp(ref.pixels,f.canvas.pixels,(size_t)size*4) || memcmp(ref_cov,f.coverage,(size_t)size))

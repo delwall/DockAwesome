@@ -259,20 +259,22 @@ static void background_span(unsigned char *pixels, const unsigned char *backdrop
 static const unsigned char dock_panel_background[4] = {20, 24, 32, 255};
 
 int dock_render_panel(const DockSettings *s, int edge, const DockPlacement *p, int count,
-                      int width, int height, int center_panel, DockRect *out, int *out_radius)
+                      int width, int height, const DockRect *include, DockRect *out, int *out_radius)
 {
     DockRect rect;
     int radius;
     if (!dock_edge_panel_rect(s, (DockEdge)edge, p, count, width, height, &rect)) return 0;
-    if (center_panel) {
-        /* End slots have no artwork to extend that side of the panel.
-           Mirror the farther edge of the animated row about its center. */
+    if (include && include->left < include->right && include->top < include->bottom) {
+        /* An empty slot (the gap of a drag) has no artwork to extend the
+           panel: reach it with the padding the icons get. Mirroring the
+           row instead overshot where the zoomed row is not centred: far
+           more room at the ends than in the middle (IMG_2594). */
         if (edge == DOCK_EDGE_BOTTOM) {
-            if (rect.left > width-rect.right) rect.left = width-rect.right;
-            else rect.right = width-rect.left;
+            rect.left = dock_clamp(include->left-s->padding < rect.left ? include->left-s->padding : rect.left, 0, width);
+            rect.right = dock_clamp(include->right+s->padding > rect.right ? include->right+s->padding : rect.right, 0, width);
         } else {
-            if (rect.top > height-rect.bottom) rect.top = height-rect.bottom;
-            else rect.bottom = height-rect.top;
+            rect.top = dock_clamp(include->top-s->padding < rect.top ? include->top-s->padding : rect.top, 0, height);
+            rect.bottom = dock_clamp(include->bottom+s->padding > rect.bottom ? include->bottom+s->padding : rect.bottom, 0, height);
         }
     }
     if (rect.right <= rect.left || rect.bottom <= rect.top) rect = (DockRect){0,0,0,0};
@@ -312,7 +314,7 @@ static void background_rows(unsigned char *pixels, unsigned char *coverage, cons
 void dock_render_oriented_clip(DockImage *canvas, const DockImage *backdrop,
                  const DockCache *const *icons, const DockPlacement *p, int count,
                  const DockSettings *s, DockMixHalf mix_half, DockPanelShape *shape,
-                 unsigned char *coverage, int pressed_item, int edge, int center_panel,
+                 unsigned char *coverage, int pressed_item, int edge, const DockRect *panel_include,
                  DockGlass *glass, const DockOverlay *overlays, int overlay_count,
                  const DockRect *clip)
 {
@@ -333,7 +335,7 @@ void dock_render_oriented_clip(DockImage *canvas, const DockImage *backdrop,
     c.right = clip->right < width ? clip->right : width;
     c.bottom = clip->bottom < height ? clip->bottom : height;
     if (c.left >= c.right || c.top >= c.bottom) return;
-    if (!dock_render_panel(s, edge, p, count, width, height, center_panel, &rect, &radius)) return;
+    if (!dock_render_panel(s, edge, p, count, width, height, panel_include, &rect, &radius)) return;
     captured = backdrop && backdrop->pixels && backdrop->width == width && backdrop->height == height;
     if (!captured || !glass || !glass->image.pixels || !glass->ready ||
         glass->image.width != width || glass->image.height != height) glass = NULL;
@@ -426,12 +428,12 @@ void dock_render_oriented_clip(DockImage *canvas, const DockImage *backdrop,
 void dock_render_oriented_mask(DockImage *canvas, const DockImage *backdrop,
                  const DockCache *const *icons, const DockPlacement *p, int count,
                  const DockSettings *s, DockMixHalf mix_half, DockPanelShape *shape,
-                 unsigned char *coverage, int pressed_item, int edge, int center_panel,
+                 unsigned char *coverage, int pressed_item, int edge, const DockRect *panel_include,
                  DockGlass *glass)
 {
     DockRect full;
     if (!canvas) return;
     full = (DockRect){0, 0, canvas->width, canvas->height};
     dock_render_oriented_clip(canvas, backdrop, icons, p, count, s, mix_half, shape, coverage,
-                              pressed_item, edge, center_panel, glass, NULL, 0, &full);
+                              pressed_item, edge, panel_include, glass, NULL, 0, &full);
 }

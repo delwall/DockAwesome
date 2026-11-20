@@ -54,7 +54,7 @@ typedef struct {
     int valid;
     const unsigned char *canvas, *backdrop, *coverage; /* backdrop: NULL when not captured. */
     const void *pixels;
-    int width, height, edge, center_panel, count, radius, overlay_count;
+    int width, height, edge, count, radius, overlay_count;
     DockSettings settings;
     DockRect panel; /* Empty plates are stored as {0,0,0,0}. */
     DockPlacement placement[DOCK_MAX_ITEMS];
@@ -74,7 +74,9 @@ typedef struct {
     DockPanelShape panel; /* Zero-initialize the renderer before first draw. */
     unsigned char *coverage; /* Optional caller-owned width*height transport mask. */
     int pressed_item; /* One-based pressed item; zero means none. */
-    int center_panel; /* Keep the panel around an empty end slot during a drag. */
+    /* An empty slot the panel reaches over (the gap of a drag), canvas
+       coordinates; empty for none. Its effect shows in the panel compare. */
+    DockRect panel_include;
     DockEdge edge;
     /* Set before each draw, like pressed_item; the array must stay valid
        until dock_renderer_draw returns. */
