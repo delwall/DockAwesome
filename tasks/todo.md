@@ -1486,3 +1486,32 @@ to the same slot (inverted offset test, store attributes required).
       save-under in both modes, reopening when Remove arms or disarms.
       Agent screenshot mid-drag on ApolloOS: rounded glass pill with AA
       text under the icon; prefs unchanged. User: "Ser kanon ut!".
+- [x] AmigaOS 3.2.3 (no shapes), build of a4a3555, 2026-11-20, agent:
+      Remove under a held pin is the hover labels' glass pill (BOB path,
+      screenshot); a desktop drop moves the icon; a disk icon dropped on
+      the plate pinned "1234-5678:" (removed again; prefs unchanged);
+      Ctrl-C quits cleanly and WBRun starts again. AppIcons (Stop
+      ApolloExplorer) are not sent to AppWindows by Workbench, as before.
+- [x] Coffin (AmigaOS 3.9, no shapes), build of a4a3555, 2026-11-20, agent:
+      Remove under a held pin is the glass pill (screenshot); the disk
+      icon dropped on the plate pinned at the centre slot (removed again;
+      prefs unchanged); a desktop drop moves the icon (moved back); Ctrl-C
+      quits cleanly and WBRun starts again. -locked-delete (the previous
+      build) is in use: delete after the next Coffin boot.
+- [x] Coffin (IMG_2601): the plate's glass over a drawer under the dock
+      showed noise for a second or two after the drawer was dragged.
+      Cause (measured): the screen itself held the noise, in the receiver
+      over the drawer, as the receiver armed again after the drag. It grew
+      behind the drawer (the press had brought the drawer in front), and
+      Layers filled that hidden part in an offscreen bitmap, then copied it
+      to the screen once the receiver came in front. The backfill hook
+      painted only the screen's bitmap and left that one with old memory
+      (instrumented: one foreign-bitmap call, 346x28 at layer offset 210,0,
+      exactly the drawer's overlap). The hook now paints any bitmap, placed
+      by the message's layer-relative offset. Agent repro (input events:
+      hover an icon, press the title bar, drag 150 px, twice): noise in the
+      screen capture before, clean after (three runs, installed build).
+      Ruled out on the way: the drag image (0 frames), PiP conversion and
+      composition (damage check 0 mismatches), the capture. An earlier
+      guess (armed press counted only in the client area) was reverted.
+      User on Coffin: "Ser ut att funka nu".

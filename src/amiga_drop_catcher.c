@@ -120,7 +120,7 @@ static int rect_contains(const struct Rectangle *r, int x, int y)
 /* The first two fields are the public backfill message prefix. Bounds are
    bitmap coordinates and already clipped by Layers. Don't lock a layer or
    use a layer-aware RastPort operation from its own callback. */
-struct DockBackfillMessage { struct Layer *layer; struct Rectangle bounds; };
+struct DockBackfillMessage { struct Layer *layer; struct Rectangle bounds; LONG offset_x, offset_y; };
 
 ULONG dock_backfill_paint(struct Hook *hook, struct RastPort *port,
                          const struct DockBackfillMessage *msg)
@@ -129,7 +129,16 @@ ULONG dock_backfill_paint(struct Hook *hook, struct RastPort *port,
     int x = msg->bounds.MinX, y = msg->bounds.MinY;
     int sx = x-c->left, sy = y-c->top;
     int w = msg->bounds.MaxX-x+1, h = msg->bounds.MaxY-y+1;
-    if (!c->backing_valid || port->BitMap != c->screen->RastPort.BitMap ||
+    /* Where the window grows or moves behind another, Layers (AmigaOS 3.x)
+       fills that part in a bitmap of its own and copies it to the screen
+       once it comes in front. The offset places it, relative to the layer.
+       Left unpainted, that bitmap's old memory showed as noise over the
+       window the receiver armed behind (Coffin, IMG_2601). */
+    if (port->BitMap != c->screen->RastPort.BitMap) {
+        sx = msg->layer->bounds.MinX+(int)msg->offset_x-c->left;
+        sy = msg->layer->bounds.MinY+(int)msg->offset_y-c->top;
+    }
+    if (!c->backing_valid ||
         sx < 0 || sy < 0 || sx+w > c->width || sy+h > c->height || w <= 0 || h <= 0) return 0;
     BltBitMap(c->backing,sx,sy,port->BitMap,x,y,w,h,0xc0,0xff,NULL);
     return 0;

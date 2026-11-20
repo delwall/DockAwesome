@@ -509,3 +509,11 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
 ## Giving up a cover makes simple windows redraw (2026-11-20)
 - The shaped receiver took the plate at each press and gave it up at each release. Layers always damages what a shrinking layer uncovers on a simple-refresh window, so Workbench redrew there after every drop, even one far from the dock (IMG_2600). Narrowing the cover only moved the blink.
 - Rule: a receiver that must be in place before a gesture should rest there and step back only when what it covers changes. Do not toggle a cover per gesture.
+
+## Reproduce with real input before guessing (2026-11-20)
+- IMG_2601 took several wrong fixes, each argued from code. What found it: a tool that injects input events (pointer, press, relative moves) so PowerWindowsNG drags a window like a user, records the screen per step, and stops the dock with Ctrl-C (--pip-dump) at chosen moments; the user only confirmed which runs glitched. The screen capture then showed the noise directly, and one counter in the backfill hook named the cause.
+- Rule: when the user says a fix changed nothing, stop theorising; build a repro that drives the real input path, capture frames, and instrument the suspect before the next change.
+
+## Layer hooks get offscreen bitmaps (2026-11-20)
+- A backfill hook that paints only when the RastPort's bitmap is the screen's leaves the parts Layers fills offscreen (a layer growing or moving behind another, AmigaOS 3.x) as uninitialised memory, shown once the layer comes in front.
+- Rule: a backfill hook must paint whatever bitmap it is given; place the source by the message's layer-relative offset there, not by the bounds.
