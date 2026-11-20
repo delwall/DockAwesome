@@ -1515,3 +1515,14 @@ to the same slot (inverted offset test, store attributes required).
       composition (damage check 0 mismatches), the capture. An earlier
       guess (armed press counted only in the client area) was reverted.
       User on Coffin: "Ser ut att funka nu".
+- [x] AmigaOS 3.1.4.1 (no shapes), build of 4c6b0d3, 2026-11-21, agent:
+      the disk icon dropped on the plate pinned at slot 7 and dragged out
+      again (prefs as before; the obsolete "snapshot" key is dropped on
+      save, by design since 2270e5a); a desktop drop moves the icon (moved
+      back); the Personal drawer dragged under the plate (Intuition's
+      outline drag), then the pointer on its icons: the armed receiver
+      shows the drawer cleanly, twice. -locked-delete (the 10 Nov build)
+      is in use: delete after the next boot.
+- [x] AmiKit XE: new build installed (started with Run: WBRun reports no
+      memory under the Directory Opus desktop); agent drags do not move
+      Directory Opus icons, so the user looked: "Amikit såg ok ut".
