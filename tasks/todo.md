@@ -1477,3 +1477,12 @@ to the same slot (inverted offset test, store attributes required).
 - [ ] ApolloOS: recheck the drag (reference now read from the screen).
 - [ ] Quick look at bottom and right docks on Coffin and 3.2.3 before the
       push (edge_padding and drag reference change apply everywhere).
+- [x] Remove label (user: "samma som alla andra"): on ApolloOS the shaped
+      drag preview drew Remove as a flat box in the screen's pens with
+      plain text, over a dark matte; elsewhere it was a flat pill. Every
+      path now builds the dragged picture with the hover labels' own
+      dock_ui_label_image (glass, rim, AA text; the flat pill only as a
+      fallback), and the preview window shows that picture over a
+      save-under in both modes, reopening when Remove arms or disarms.
+      Agent screenshot mid-drag on ApolloOS: rounded glass pill with AA
+      text under the icon; prefs unchanged. User: "Ser kanon ut!".

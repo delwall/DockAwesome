@@ -2000,15 +2000,16 @@ static void apply_gesture(App *app, const DockGestureInput *in, int *redraw, int
     }
 }
 
-/* The dragged pin in PiP1: the icon, with the Remove pill under it once
-   armed. Returns 0 when PiP1 is not available. */
-/* The dragged pin's picture: the icon, with the Remove pill under it once
-   armed (*remove is cleared without a pill). The caller frees it. */
+/* The dragged pin's picture: the icon, with the Remove label under it once
+   armed (*remove is cleared without a label). The label is the hover
+   labels' own: drawn apart, on ApolloOS it was a flat box in the screen's
+   pens with plain text. The caller frees it. */
 static int drag_picture(App *app, const DockImage *icon, int *remove, DockImage *image)
 {
     DockImage pill = {0};
     int width, height, row;
-    if (*remove && !dock_ui_pill_image(app->ui,"Remove",&pill)) *remove = 0;
+    if (*remove && !dock_ui_label_image(app->ui,"Remove",app->screen->Width/2,0,-1,&pill) &&
+        !dock_ui_pill_image(app->ui,"Remove",&pill)) *remove = 0;
     width = *remove && pill.width > icon->width ? pill.width : icon->width;
     height = icon->height+(*remove ? 4+pill.height : 0);
     *image = (DockImage){width,height,calloc((size_t)width*height,4)};
@@ -2216,22 +2217,24 @@ static int update_drag_preview(App *app)
         int bob = update_drag_bob(app,icon,x,y);
         if (bob >= 0) return bob;
     }
-    /* A shaped window cannot change its shape: it reopens when Remove
-       arms or disarms, not on each size change (that flickered). */
-    if (!icon || (app->drag_preview && shaped && app->drag_preview_remove != gesture->remove_armed)) {
+    /* The window shows one picture: it reopens when Remove arms or
+       disarms, not on each size change (that flickered). */
+    if (!icon || (app->drag_preview && app->drag_preview_remove != gesture->remove_armed)) {
         int closed = app->drag_preview != NULL;
         app->preview_attempt = 0;
         amiga_drag_preview_close(app->drag_preview); app->drag_preview = NULL;
         if (!icon) return closed;
     }
-    if (app->drag_preview) {
-        int moved = amiga_drag_preview_move(app->drag_preview,x,y);
-        amiga_drag_preview_set_remove(app->drag_preview,gesture->remove_armed);
-        return moved;
-    }
+    if (app->drag_preview) return amiga_drag_preview_move(app->drag_preview,x,y);
     if (app->preview_attempt == gesture->token) return 0;
     app->preview_attempt = gesture->token;
-    app->drag_preview = amiga_drag_preview_open(app->screen,icon,shaped,gesture->remove_armed,x,y);
+    {
+        int remove = gesture->remove_armed;
+        DockImage picture;
+        if (!drag_picture(app,icon,&remove,&picture)) return 0;
+        app->drag_preview = amiga_drag_preview_open(app->screen,icon,&picture,shaped,x,y);
+        free(picture.pixels);
+    }
     app->drag_preview_remove = gesture->remove_armed;
     return app->drag_preview != NULL;
 }
