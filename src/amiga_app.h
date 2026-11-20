@@ -130,6 +130,12 @@ typedef struct {
        shown: a press there closes the stack and the pair is consumed. */
     volatile int close_valid, close_held;
     volatile int close_left, close_top, close_right, close_bottom;
+    /* The armed drop receiver over the plate in screen coordinates,
+       half-open (empty when not armed): a left press there between icons
+       is consumed with its release, or it activated the receiver and the
+       user's window lost focus. */
+    volatile int receiver_held;
+    volatile int receiver_left, receiver_top, receiver_right, receiver_bottom;
     volatile ULONG menu_serial;
     uint32_t menu_pin_id;
     int menu_x, menu_y;

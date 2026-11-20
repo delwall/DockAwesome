@@ -125,7 +125,7 @@ struct InputEvent *dock_input_observe(struct InputEvent *events, void *context)
     InputContext *c = context;
     int moved = 0, notify = 0;
     /* A held, external or right-button state can end on another screen. */
-    int engaged = c->held || c->external_held || c->right_held || c->close_held;
+    int engaged = c->held || c->external_held || c->right_held || c->close_held || c->receiver_held;
     for (e = events; e; e = e->ie_NextEvent) {
         if (e->ie_Class == IECLASS_NULL && c->shell_close &&
             e->ie_EventAddress == c->shell_close) {
@@ -180,6 +180,9 @@ struct InputEvent *dock_input_observe(struct InputEvent *events, void *context)
             }
             if (e->ie_Code == SELECTUP && c->close_held) {
                 c->close_held = 0; e->ie_Class = IECLASS_NULL; continue;
+            }
+            if (e->ie_Code == SELECTUP && c->receiver_held) {
+                c->receiver_held = 0; e->ie_Class = IECLASS_NULL; continue;
             }
             if (e->ie_Code == SELECTDOWN && clean && c->close_valid && !c->held &&
                 c->dock_screen && IntuitionBase->FirstScreen == c->dock_screen &&
@@ -258,6 +261,17 @@ struct InputEvent *dock_input_observe(struct InputEvent *events, void *context)
                     c->held = 1; ++c->downs; e->ie_Class = IECLASS_NULL; captured = 1;
                 }
             }
+            if (e->ie_Code == SELECTDOWN && !captured && !already_external && clean &&
+                !c->right_held && !c->popup_open && c->dock_screen &&
+                IntuitionBase->FirstScreen == c->dock_screen && !(e->ie_Qualifier & IEQUALIFIER_RBUTTON) &&
+                c->dock_screen->MouseX >= c->receiver_left && c->dock_screen->MouseX < c->receiver_right &&
+                c->dock_screen->MouseY >= c->receiver_top && c->dock_screen->MouseY < c->receiver_bottom) {
+                /* The plate between icons, where the armed receiver rests:
+                   the press would activate it. An open Folder Stack still
+                   gets it, to close as it loses focus. */
+                c->receiver_held = 1;
+                e->ie_Class = IECLASS_NULL; continue;
+            }
             if (e->ie_Code == SELECTDOWN && !captured && !already_external) {
                 c->external_held = 0;
                 /* Physical USB mouse presses may include motion. The clean
@@ -283,7 +297,7 @@ struct InputEvent *dock_input_observe(struct InputEvent *events, void *context)
     }
     /* Pointer motion on another screen cannot change the dock. The live
        timer still notices when the dock screen returns to the front. */
-    if (notify && (engaged || c->held || c->external_held || c->right_held || c->close_held ||
+    if (notify && (engaged || c->held || c->external_held || c->right_held || c->close_held || c->receiver_held ||
         (c->dock_screen && IntuitionBase->FirstScreen == c->dock_screen))) Signal(c->task, c->signal);
     return events;
 }
@@ -343,7 +357,8 @@ void remove_input(App *app)
         /* The application owns the swallowed DOWN until its physical UP.
            Wait without spinning; never leak an unmatched release to another app. */
         Disable(); app->input_context.close_valid = 0; Enable();
-        while (app->input_context.held || app->input_context.right_held || app->input_context.close_held)
+        while (app->input_context.held || app->input_context.right_held || app->input_context.close_held ||
+               app->input_context.receiver_held)
             Wait(app->input_context.signal);
         app->input_io->io_Command = IND_REMHANDLER;
         app->input_io->io_Data = &app->input_handler;

@@ -6,8 +6,8 @@ struct Window;
 struct Region;
 struct BitMap;
 typedef struct AmigaDropCatcher AmigaDropCatcher;
-/* --profile: without shapes, how often the receiver armed and disarmed and
-   whether Workbench presses found it armed. */
+/* --profile: how often the receiver armed and disarmed and whether
+   Workbench presses found it armed. */
 typedef struct { unsigned long arms, disarms, presses_armed, presses_unarmed; } AmigaDropCatcherStats;
 AmigaDropCatcherStats amiga_drop_catcher_stats(const AmigaDropCatcher *catcher);
 
@@ -24,9 +24,9 @@ enum {
    state: background/lasso gestures can also qualify. Titlebar/border starts
    are excluded. No original input events are consumed or replayed. */
 /* left, top, width and height are the dock's box. With a normal_shape the
-   window lies on that box and catches by changing its shape; with NULL
-   (no window shapes, AmigaOS 3.x) it rests elsewhere at 1x1 and catches by
-   moving onto the box with ChangeWindowBox. */
+   window lies on that box and arms by changing its shape to the plate,
+   where it rests; with NULL (no window shapes, AmigaOS 3.x) it lies
+   elsewhere at 1x1 and arms by moving onto the plate with ChangeWindowBox. */
 AmigaDropCatcher *amiga_drop_catcher_init(struct Screen *screen,
     struct Window *window, struct Region *normal_shape, int left, int top, int width, int height);
 unsigned int amiga_drop_catcher_update(AmigaDropCatcher *catcher,
@@ -39,21 +39,23 @@ unsigned int amiga_drop_catcher_update(AmigaDropCatcher *catcher,
    with ambiguous coordinates retains the catcher until acceptance or a 300ms
    deadline. Keep servicing the existing timer during that grace. */
 unsigned int amiga_drop_catcher_accepted(AmigaDropCatcher *catcher);
-/* Without shapes: a wheel event arrived. Over a window that lies under the
+/* A wheel event arrived. Over a window that lies under the
    plate the receiver steps back and arms again only once the wheel has been
    still a moment. Returns flags as update does. */
 unsigned int amiga_drop_catcher_wheel(AmigaDropCatcher *catcher, uint64_t now, uint32_t frequency);
 unsigned int amiga_drop_catcher_cancel(AmigaDropCatcher *catcher);
 int amiga_drop_catcher_active(const AmigaDropCatcher *catcher);
+/* Nonzero while the window covers the plate (amiga_drop_catcher_rect). */
+int amiga_drop_catcher_armed(const AmigaDropCatcher *catcher);
 /* Nonzero when the screen point (x, y) lies where drops are caught now. */
 int amiga_drop_catcher_contains(const AmigaDropCatcher *catcher, int x, int y);
-/* Where drops are caught now, half-open, in screen coordinates: without
-   shapes where the armed window lies, else the whole box. */
+/* Where drops are caught now, half-open, in screen coordinates: where the
+   armed window lies, else the whole box. */
 void amiga_drop_catcher_rect(const AmigaDropCatcher *catcher,
     int *left, int *top, int *right, int *bottom);
-/* Without shapes: the part of the box the window covers while armed (the
-   dock's resting plate, grown for a drop), clipped to the box. It moves
-   there on a later pass once the pointer is off the dock. */
+/* The part of the box the window covers while armed (the dock's resting
+   plate, grown for a drop), clipped to the box. It moves there on a later
+   pass (without shapes once the pointer is off the dock). */
 void amiga_drop_catcher_set_rest(AmigaDropCatcher *catcher, int left, int top, int width, int height);
 /* The dock's own windows (popups, menus, the dragged pin): the armed
    window lies in front of every other program's window on the plate, but

@@ -1427,6 +1427,48 @@ to the same slot (inverted offset test, store attributes required).
       frozen at the press. Host tests: plate end monotonic, first step at
       most half, both ends and all edges alike; outside exactly 24 px from
       the drawn plate on every side. User: "Nu verkar allt fungera".
+- [x] Desktop drop on ApolloOS (IMG_2599): a drawer's icons above the plate
+      blinked out at every drop on the desktop. The shaped receiver covered
+      the whole box while a desktop icon was held, and Workbench redrew
+      what it had covered. It now catches over the plate alone, as without
+      shapes (rest_plate for every system). Installed. Agent-tested: a
+      desktop drop moves the icon, a drop on the plate pins at the centre
+      slot (removed again), Ctrl-C quits cleanly. IMG_2600 (right dock):
+      the same blink, because a rebuilt surface (another edge) gave the
+      shaped receiver no rest_plate; every new receiver now gets one.
+      Agent-tested on the right dock: a drop beside the plate lands on the
+      desktop, a drop on the plate pins (removed again).
+- [x] Still a blink at every desktop drop, beside the dock and in the glass
+      (user, same build). Giving up the shape at each release made
+      Workbench redraw what it uncovered (simple refresh: Layers always
+      adds damage). The shaped receiver now rests on the plate (rest_armed,
+      as on the DOpus desktop) and steps back only when a window on the
+      plate changes or the wheel scrolls one. A left press on the resting
+      receiver between icons is consumed with its release (no focus
+      change). Agent-tested on ApolloOS: desktop drop and drop beside the
+      plate land on the desktop; a drop on the plate pins (removed again),
+      also after a window opened and closed over the plate (no stale band);
+      a click on the plate keeps the active window; Ctrl-C quits cleanly.
+- [x] User: a window dragged under the dock showed only after the release
+      (the resting receiver hid it; stamp checks ran only with the buttons
+      up). Now, while a press that is not a Workbench drag is held, the
+      receiver steps back as soon as the windows on the plate change, and
+      arms again half a second after the release. Agent-tested on the left
+      dock: a drop on the plate pins (removed again). User: window drag
+      works.
+- [x] User: a window scrolled behind the dock did not update there. A
+      scroll keeps the layer, and the ApolloOS wheel may scroll without an
+      input event. The layer stamp now also covers the scrollers' knobs of
+      the windows on the plate, and the shaped receiver arms only once that
+      stamp has been still for half a second. Agent-tested (bottom dock):
+      dragging Personal's scroller redrew its icons under the plate live
+      (the receiver stepped back); a drop on the plate then pinned (removed
+      again). User: "Nu är det bra!".
+- [ ] Unexplained hang, ApolloOS 2026-11-20: the dock (W 240,612 800x108,
+      the pre-install size) ignored drops and presses, and after Ctrl-C
+      waited on one signal (wait 04000000, Ctrl-C received). Possibly the
+      previous build stuck in remove_input (held/right_held/close_held set
+      without their release). Gone after the user's reboot; not reproduced.
 - [ ] Personal:1234-5678 (partial copy from the drop bug): ask the user
       before deleting.
 - [ ] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete{,2,3,4} after

@@ -501,3 +501,11 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
 - Hit tests (near/outside) must use the geometry on screen, not a copy
   kept from the press: the frozen zoomed row made "near" reach ~77 px past
   the plate the user saw.
+
+## A receiver fix for one OS family reaches the other (2026-11-20)
+- The no-shapes receiver was narrowed to the plate (Coffin, AmiKit, 3.2.3) because covering the box made Workbench redraw windows in the headroom. The shaped (ApolloOS) receiver kept covering the whole box, and the same redraw showed there: a drawer's icons above the plate blinked out at every desktop drop (IMG_2599).
+- Rule: when a cause is found on one caps branch (shaped / no shapes), check whether the other branch does the same thing, and fix both in one path.
+
+## Giving up a cover makes simple windows redraw (2026-11-20)
+- The shaped receiver took the plate at each press and gave it up at each release. Layers always damages what a shrinking layer uncovers on a simple-refresh window, so Workbench redrew there after every drop, even one far from the dock (IMG_2600). Narrowing the cover only moved the blink.
+- Rule: a receiver that must be in place before a gesture should rest there and step back only when what it covers changes. Do not toggle a cover per gesture.

@@ -41,18 +41,18 @@ static DockRect drop_box(const App *app)
     return box;
 }
 
-/* Without shapes the armed receiver lies over the plate alone: at rest,
-   and as it grows while it makes room for a drop (an external drag does not
-   zoom). Without the room, the dragged icon was cut where the grown plate
-   passed the receiver: it seemed to go through the last pin (AmiKit). */
+/* The receiver catches over the plate alone, with shapes or without: at
+   rest, and as it grows while it makes room for a drop (an external drag
+   does not zoom). Without the room, the dragged icon was cut where the
+   grown plate passed the receiver: it seemed to go through the last pin
+   (AmiKit). */
 static void rest_plate(App *app)
 {
     DockPlacement rest[DOCK_MAX_ITEMS], gap;
     DockRect plate, grown, room;
     int radius;
     app->rest_count = app->count;
-    if (app->caps.shaped_windows ||
-        !dock_edge_layout(&app->settings,app->edge,app->count,app->width,app->height,0,0,0,rest) ||
+    if (!dock_edge_layout(&app->settings,app->edge,app->count,app->width,app->height,0,0,0,rest) ||
         !dock_edge_panel_rect(&app->settings,app->edge,rest,app->count,app->width,app->height,&plate))
         return;
     if (!dock_edge_gap_layout(&app->settings,app->edge,app->count,app->width,app->height,
@@ -603,6 +603,10 @@ static int pip_open(App *app)
         app->drop_catcher = amiga_drop_catcher_init(app->screen, app->window,
             app->shape, box.left, box.top, box.right-box.left, box.bottom-box.top);
     }
+    /* Each new receiver rests on the plate. pip_poll only follows count:
+       after a rebuild (another edge) this one caught over the whole box
+       and the windows in the headroom blinked (IMG_2600). */
+    if (app->drop_catcher) rest_plate(app);
     return app->drop_catcher != NULL;
 }
 

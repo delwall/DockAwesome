@@ -1012,12 +1012,25 @@ static void drop_catcher_flags(App *app, unsigned int flags)
        the PiP frame. Changes to the insertion slot or drag mask redraw it. */
 }
 
+/* Where the armed receiver lies, for the input handler (empty without). */
+static void publish_receiver(App *app)
+{
+    int left = 0, top = 0, right = 0, bottom = 0;
+    if (amiga_drop_catcher_armed(app->drop_catcher))
+        amiga_drop_catcher_rect(app->drop_catcher, &left, &top, &right, &bottom);
+    Disable();
+    app->input_context.receiver_left = left; app->input_context.receiver_top = top;
+    app->input_context.receiver_right = right; app->input_context.receiver_bottom = bottom;
+    Enable();
+}
+
 static void update_drop_catcher(App *app)
 {
     struct Screen *screen;
     ULONG serial, wheel;
     int x, y, held, dragged, cancelled, up_x, up_y, up_known;
     unsigned int flags;
+    publish_receiver(app);
     if (!app->drop_catcher) return;
     Disable();
     serial = app->input_context.external_serial;
@@ -1042,6 +1055,7 @@ static void update_drop_catcher(App *app)
     }
     app->wheel_seen = wheel;
     drop_catcher_flags(app, flags);
+    publish_receiver(app);
 }
 
 /* A UI requester (ASL) blocks the main loop: hide PiP and let input pass

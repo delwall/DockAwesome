@@ -1,5 +1,5 @@
-/* Rare, temporary AppWindow ownership for external Workbench drag candidates.
-   Shape changes and ownership checks run in the application task, never from
+/* AppWindow ownership of the plate for external Workbench drags. Shape
+   changes and ownership checks run in the application task, never from
    the input handler. No per-drag allocation, timer, patch or input replay. */
 #include "amiga_drop_catcher.h"
 #include "amiga_caps.h"
@@ -36,10 +36,11 @@ struct AmigaDropCatcher {
     struct Hook backfill;
     int left, top, width, height;
     int shaped; /* catch by shape (ApolloOS) or by moving the window */
-    int armed;  /* no shapes: the window waits on the dock's box */
-    /* No shapes: where the window lies while armed (screen coordinates,
-       inside the box): the plate (rest). rest_armed: it stays there
-       between gestures (the Directory Opus desktop). */
+    int armed;  /* the window covers armed_at and waits for a press there */
+    /* Where the window catches (screen coordinates, inside the box): the
+       plate (rest), moved to without shapes, shaped to with them.
+       rest_armed: it stays there between gestures (with shapes, and on
+       the Directory Opus desktop). */
     struct Rectangle armed_at, rest;
     int rest_armed;
     int dopus_desktop; /* the pointer has been on a Directory Opus 5 desktop */
@@ -188,8 +189,27 @@ static int workbench_client_start(const AmigaDropCatcher *c, int x, int y)
     return result;
 }
 
+/* A window scrolled under the plate keeps its layer, and the wheel may
+   scroll it without an input event (ApolloOS): its scrollers' knobs tell.
+   The window cannot close while the caller holds the layer list; Forbid
+   keeps its gadget list still. */
+static ULONG window_scrollers(ULONG stamp, const struct Window *w)
+{
+    const struct Gadget *g;
+    int n = 0;
+    Forbid();
+    for (g = w->FirstGadget; g && n < 32; g = g->NextGadget, ++n) {
+        const struct PropInfo *p = g->SpecialInfo;
+        if ((g->GadgetType & GTYP_GTYPEMASK) != GTYP_PROPGADGET || !p) continue;
+        stamp = (stamp ^ (((ULONG)p->HorizPot<<16) | p->VertPot)) * 16777619UL;
+    }
+    Permit();
+    return stamp;
+}
+
 /* The layers that lie on r, other than the receiver's own, as one number:
-   which they are and where. 0 when the layer list is busy. */
+   which they are, where, and how far their windows are scrolled. 0 when
+   the layer list is busy. */
 static ULONG box_windows(const AmigaDropCatcher *c, const struct Rectangle *r)
 {
     struct Layer_Info *info = &c->screen->LayerInfo;
@@ -203,6 +223,7 @@ static ULONG box_windows(const AmigaDropCatcher *c, const struct Rectangle *r)
         stamp = (stamp ^ (ULONG)layer) * 16777619UL;
         stamp = (stamp ^ (((ULONG)(UWORD)b->MinX<<16) | (UWORD)b->MinY)) * 16777619UL;
         stamp = (stamp ^ (((ULONG)(UWORD)b->MaxX<<16) | (UWORD)b->MaxY)) * 16777619UL;
+        if (layer->Window) stamp = window_scrollers(stamp, layer->Window);
     }
     ReleaseSemaphore(&info->Lock);
     return stamp ? stamp : 1;
@@ -266,7 +287,7 @@ static int inside(const AmigaDropCatcher *c, int x, int y)
 /* Where a drop is caught now: where the armed window lies, else the box. */
 static struct Rectangle catch_rect(const AmigaDropCatcher *c)
 {
-    if (!c->shaped && c->armed) return c->armed_at;
+    if (c->armed) return c->armed_at;
     return (struct Rectangle){c->left, c->top, c->left+c->width-1, c->top+c->height-1};
 }
 
@@ -309,13 +330,25 @@ void amiga_drop_catcher_set_rest(AmigaDropCatcher *c, int left, int top, int wid
     c->rest = (struct Rectangle){left, top, right-1, bottom-1};
 }
 
-/* Cover the dock's box (catching) or not. Shapes report the region they
+/* Cover armed_at (catching) or not. Shapes report the region they
    replace, which must be the expected one; ChangeWindowBox and
    WindowToFront are carried out by Intuition shortly after. */
 static int set_catching(AmigaDropCatcher *c, int catching)
 {
     if (c->shaped) {
         struct Region *expected = catching ? c->normal : c->catch_region;
+        /* The plate alone, as without shapes: what the window uncovers
+           Workbench redraws. Over the whole box, a drawer's icons above
+           the plate blinked out at every desktop drop (ApolloOS,
+           IMG_2599). The catch shape is not installed here, so it may
+           change. */
+        if (catching) {
+            const struct Rectangle *r = &c->armed_at;
+            struct Rectangle shape = {r->MinX-c->window->LeftEdge, r->MinY-c->window->TopEdge,
+                r->MaxX-c->window->LeftEdge, r->MaxY-c->window->TopEdge};
+            ClearRegion(c->catch_region);
+            if (!OrRectRegion(c->catch_region, &shape)) return 0;
+        }
         struct Region *previous = amiga_change_window_shape(c->window, catching ? c->catch_region : c->normal);
         return previous == expected || (!catching && previous == c->normal);
     }
@@ -367,36 +400,36 @@ AmigaDropCatcher *amiga_drop_catcher_init(struct Screen *screen,
     return c;
 }
 
-/* End a catch. Without shapes the window stays armed unless disarm is set:
-   it may not move while Workbench starts a drag. */
+/* Armed, and the layers on the plate are no longer those the copy shows. */
+static int windows_changed(const AmigaDropCatcher *c)
+{
+    ULONG windows;
+    if (!c->armed) return 0;
+    windows = box_windows(c, &c->armed_at);
+    return windows && windows != c->windows;
+}
+
+/* End a catch. The window stays armed unless disarm is set: it may not
+   move while Workbench starts a drag, and what it uncovers is redrawn. */
 static unsigned int end_catch(AmigaDropCatcher *c, int disarm)
 {
-    c->waiting = 0;
-    if (!c->shaped) {
-        unsigned int flags = c->active ? AMIGA_DROP_RESTORED : 0;
-        c->active = 0;
-        if (disarm && c->armed) {
-            ++c->stats.disarms;
-            set_catching(c, 0);
+    unsigned int flags = c->active ? AMIGA_DROP_RESTORED : 0;
+    c->waiting = c->active = 0;
+    if (disarm && c->armed) {
+        ++c->stats.disarms;
+        if (!set_catching(c, 0)) c->failed = 1;
+        else {
             c->armed = c->rest_armed = 0;
             c->backing_valid = 0;
             flags |= AMIGA_DROP_RESTORED;
         }
-        return flags;
     }
-    if (!c->active) return c->failed ? AMIGA_DROP_ERROR : 0;
-    if (!set_catching(c, 0)) {
-        c->failed = 1;
-        return AMIGA_DROP_ERROR;
-    }
-    c->active = 0;
-    c->backing_valid = 0;
-    return AMIGA_DROP_RESTORED | (c->failed ? AMIGA_DROP_ERROR : 0);
+    return flags | (c->failed ? AMIGA_DROP_ERROR : 0);
 }
 
-/* Without shapes the window leaves the dock after each gesture, except
-   resting on the Directory Opus desktop: there each move away made the
-   desktop redraw under the dock (a flicker after every click), and only
+/* The window leaves the dock after each gesture unless it rests: with
+   shapes, and on the Directory Opus desktop. There each move away made
+   what it uncovered redraw (a flicker after every click), and only
    arm_for_pointer moves it. */
 unsigned int amiga_drop_catcher_cancel(AmigaDropCatcher *c)
 {
@@ -404,29 +437,32 @@ unsigned int amiga_drop_catcher_cancel(AmigaDropCatcher *c)
     return end_catch(c, !c->rest_armed);
 }
 
-/* Without shapes the window must be on the dock before Workbench starts a
-   drag (AmigaOS 3.9 cancels the drag if windows move). With the buttons up,
-   arm while the pointer is on a Workbench icon or drawer and disarm when it
-   leaves. */
+/* The window must be on the dock before Workbench starts a drag: it holds
+   the layers from the press on, and AmigaOS 3.9 cancels the drag if
+   windows move. Without shapes, with the buttons up, arm while the pointer
+   is on a Workbench icon or drawer and disarm when it leaves. With shapes
+   rest on the plate: taken at each press and given up at each release,
+   the shape made Workbench redraw what it uncovered at every drop, even
+   one far from the dock (icons beside the plate and in its glass blinked,
+   ApolloOS, IMG_2600). */
 static unsigned int arm_for_pointer(AmigaDropCatcher *c, uint64_t now, uint32_t frequency)
 {
     struct Rectangle want;
+    ULONG windows;
     int client;
-    if (c->shaped || c->active || c->waiting) return 0;
-    if (c->armed) {
-        ULONG windows = box_windows(c, &c->armed_at);
-        if (windows && windows != c->windows) {
-            /* A window on the plate closed or moved while the receiver lay
-               there: the copy still shows that window (a band of it stayed
-               on the screen for as long as the pointer rested on the dock,
-               Coffin). Step back so the desktop redraws, and arm again
-               only after it has. */
-            c->rearm_at = now+frequency/2;
-            return end_catch(c, 1);
-        }
+    if (c->active || c->waiting) return 0;
+    if (windows_changed(c)) {
+        /* A window on the plate closed or moved while the receiver lay
+           there: the copy still shows that window (a band of it stayed
+           on the screen for as long as the pointer rested on the dock,
+           Coffin). Step back so the desktop redraws, and arm again only
+           after it has. */
+        c->rearm_at = now+frequency/2;
+        return end_catch(c, 1);
     }
-    if (c->armed && c->repaint) repaint_corner(c);
-    if (c->armed && now >= c->order_check_at) {
+    /* A shape neither moves nor reorders the window. */
+    if (!c->shaped && c->armed && c->repaint) repaint_corner(c);
+    if (!c->shaped && c->armed && now >= c->order_check_at) {
         /* Another program's window came in front of the armed window:
            step back and arm again in front of it. */
         int busy;
@@ -436,6 +472,15 @@ static unsigned int arm_for_pointer(AmigaDropCatcher *c, uint64_t now, uint32_t 
         }
     }
     if (now < c->rearm_at) return 0;
+    if (c->shaped) {
+        want = c->rest;
+        if (!c->armed) goto arm;
+        if (!memcmp(&want, &c->armed_at, sizeof(want))) return 0;
+        /* The plate changed: arm again on it once the uncovered part has
+           redrawn. */
+        c->rearm_at = now+frequency/4;
+        return end_catch(c, 1);
+    }
     /* On the dock itself the pointer is on no drawer: stay as it is. */
     if (inside(c, c->screen->MouseX, c->screen->MouseY)) return 0;
     client = workbench_client_start(c, c->screen->MouseX, c->screen->MouseY);
@@ -463,20 +508,34 @@ static unsigned int arm_for_pointer(AmigaDropCatcher *c, uint64_t now, uint32_t 
         return end_catch(c, 1);
     }
     if (!client) return 0;
+arm:
     /* Taken with the copy: what the copy shows on the box. With the layer
        list busy, arm on a later pass. */
-    if (!(c->windows = box_windows(c, &want))) return 0;
+    if (!(windows = box_windows(c, &want))) return 0;
+    if (c->shaped && windows != c->windows) {
+        /* Resting, the copy stays: take it once the windows on the plate
+           have been still a moment, not while one scrolls or moves. */
+        c->windows = windows;
+        c->rearm_at = now+frequency/2;
+        return 0;
+    }
+    c->windows = windows;
     BltBitMap(c->screen->RastPort.BitMap,want.MinX,want.MinY,
         c->backing,want.MinX-c->left,want.MinY-c->top,
         want.MaxX-want.MinX+1,want.MaxY-want.MinY+1,0xc0,0xff,NULL);
     WaitBlit();
     c->backing_valid = 1;
     c->armed_at = want;
-    c->rest_armed = c->dopus_desktop;
+    c->rest_armed = c->shaped || c->dopus_desktop;
     /* The depth change is deferred: check the order once it is done. */
     c->order_check_at = now+frequency/4;
-    set_catching(c, 1);
-    c->armed = c->repaint = 1;
+    if (!set_catching(c, 1)) {
+        c->backing_valid = 0;
+        c->failed = 1;
+        return AMIGA_DROP_ERROR;
+    }
+    c->armed = 1;
+    c->repaint = !c->shaped;
     ++c->stats.arms;
     return AMIGA_DROP_STARTED;
 }
@@ -490,7 +549,7 @@ unsigned int amiga_drop_catcher_wheel(AmigaDropCatcher *c, uint64_t now, uint32_
     const struct Layer *layer;
     const struct Rectangle *r;
     int under = 0;
-    if (!c || c->shaped || c->active || c->waiting) return 0;
+    if (!c || c->active || c->waiting) return 0;
     if (!AttemptSemaphore(&c->screen->LayerInfo.Lock)) return 0;
     layer = WhichLayer(&c->screen->LayerInfo, c->screen->MouseX, c->screen->MouseY);
     if (layer && layer != c->window->WLayer && layer->Window &&
@@ -545,24 +604,26 @@ unsigned int amiga_drop_catcher_update(AmigaDropCatcher *c,
             if (client < 0) return flags;
         }
         c->serial = external_serial; c->have_serial = 1;
-        if (client && !c->shaped) {
-            /* Only an armed window can catch; moving now cancels the drag. */
-            if (c->armed) { c->active = 1; flags |= AMIGA_DROP_STARTED; }
-        } else if (client) {
-            BltBitMap(c->screen->RastPort.BitMap,c->left,c->top,
-                c->backing,0,0,c->width,c->height,0xc0,0xff,NULL);
-            WaitBlit();
-            c->backing_valid = 1;
-            c->active = 1;
-            if (!set_catching(c, 1)) { c->failed = 1; return flags | AMIGA_DROP_ERROR; }
-            flags |= AMIGA_DROP_STARTED;
-        }
+        /* Only an armed window can catch: moving or shaping it now would
+           wait for Workbench's layers, or cancel the drag. */
+        if (client && c->armed) { c->active = 1; flags |= AMIGA_DROP_STARTED; }
     }
     if (c->waiting) {
         if (now >= c->deadline) flags |= amiga_drop_catcher_cancel(c);
         return flags;
     }
     if (!external_held && !c->active && !c->waiting) flags |= arm_for_pointer(c, now, frequency);
+    else if (c->shaped && external_held && !c->active) {
+        /* A held press that is not a Workbench drag, such as a window
+           dragged by its title bar: the resting receiver hid the window
+           under the plate until the release (ApolloOS). Step back as soon
+           as the windows there change, and arm again only once the press
+           has been over a moment, after they have redrawn. A shape may
+           change now: no Workbench drag holds the layers (box_windows
+           found them free). */
+        if (windows_changed(c)) flags |= end_catch(c, 1);
+        if (!c->armed) c->rearm_at = now+frequency/2;
+    }
     if (!c->active || external_held) return flags;
     if (release_known && (!inside_catch(c, release_x, release_y) ||
         (!external_dragged && release_x == down_x && release_y == down_y)))
@@ -584,6 +645,11 @@ AmigaDropCatcherStats amiga_drop_catcher_stats(const AmigaDropCatcher *c)
 int amiga_drop_catcher_active(const AmigaDropCatcher *c)
 {
     return c && c->active;
+}
+
+int amiga_drop_catcher_armed(const AmigaDropCatcher *c)
+{
+    return c && c->armed;
 }
 
 void amiga_drop_catcher_destroy(AmigaDropCatcher *c)
