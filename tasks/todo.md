@@ -1570,3 +1570,12 @@ to the same slot (inverted offset test, store attributes required).
 - [ ] Not reproducible here: AmiFire and AmiPixelShop are not on this
       AmiKit XE 11.5, and the programs the user tried gave no alert. Need the
       programs, or a hint what they have in common (overlays? packer? language).
+- [x] AN_FileReclosed = 0x0700000E (exec/alerts.h): a file handle closed
+      twice. Our test machine is 3.2.0 (KS 47.96), the reporter's 3.2.3
+      (KS 47.115): newer dos detects it, so it is probably latent here.
+      Hypothesis 2: dos opens NIL: defaults and closes them at exit, and the
+      program's startup code closes them too. Launch now passes
+      NP_Input/NP_Output 0 (as Workbench). Built; DockAwesome-test2.lha in
+      ~/Downloads for the reporter. Not verifiable on 3.2.0.
+- [ ] Reporter result for test2. If still alert: next suspects are
+      UnLoadSeg on the WBStartup reply, and what DOpus passes.
