@@ -319,7 +319,7 @@ int launch_object(App *app, const char *path, LONG *error)
     struct DockLaunched *launch;
     struct DiskObject *icon, *tool_icon = NULL;
     LONG stack, embedded, priority = 0;
-    BPTR tool_dir, old_dir, file, current, home, nil_in, nil_out;
+    BPTR tool_dir, old_dir, file, current, home;
     struct Process *process;
     const char *pri;
     *error = 0;
@@ -395,13 +395,7 @@ int launch_object(App *app, const char *path, LONG *error)
     /* The new process owns both locks and frees them when it ends. */
     current = DupLock(tool_dir);
     home = DupLock(tool_dir);
-    /* Workbench gives a tool NIL: for Input() and Output(); with none, a
-       program that closes or duplicates them meets handle 0 (dos.library
-       8700000E on AmigaOS 3.2.3 when it quits). dos closes both at exit. */
-    nil_in = Open((STRPTR)"NIL:",MODE_OLDFILE);
-    nil_out = Open((STRPTR)"NIL:",MODE_NEWFILE);
-    process = current && home ? CreateNewProcTags(NP_Input,(ULONG)nil_in,
-        NP_CloseInput,TRUE, NP_Output,(ULONG)nil_out, NP_CloseOutput,TRUE,NP_Seglist,(ULONG)launch->startup.sm_Segment,
+    process = current && home ? CreateNewProcTags(NP_Seglist,(ULONG)launch->startup.sm_Segment,
         NP_FreeSeglist,FALSE, NP_StackSize,stack, NP_Priority,priority,
         NP_Name,(ULONG)launch->names[0], NP_CurrentDir,(ULONG)current,
         NP_HomeDir,(ULONG)home, NP_WindowPtr,0, NP_ConsoleTask,0,
@@ -410,8 +404,6 @@ int launch_object(App *app, const char *path, LONG *error)
         *error = IoErr() ? IoErr() : ERROR_NO_FREE_STORE;
         if (current) UnLock(current);
         if (home) UnLock(home);
-        if (nil_in) Close(nil_in);
-        if (nil_out) Close(nil_out);
         goto fail;
     }
     launch->startup.sm_Message.mn_Node.ln_Type = NT_MESSAGE;
