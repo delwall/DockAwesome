@@ -1562,3 +1562,18 @@ to the same slot (inverted offset test, store attributes required).
 - [x] AmigaOS 3.2.3: release binary (1.0 beta 4, from the published LHA)
       installed and running; build 518 is now
       Disabled/DockAwesome-locked-delete: delete after the next 3.2.3 boot.
+
+## AmiKit 3.2.3: alert 8700000E when a dock-launched program quits
+Report: AmiFire, AmiPixelShop start fine from the dock; on quit a
+dos.library alert 8700000E ("Wait for disk activity to finish"). Direct
+start is fine. User suspects a handle closed twice.
+- [x] Cause (by reading, not reproduced): launch_object gave the new
+      process no Input()/Output() (handle 0). Workbench gives NIL:.
+      Changed: NP_Input/NP_Output on NIL: with NP_CloseInput/Output.
+      Builds clean. Amiga was off (amiagent refused 192.168.0.229:7846).
+- [x] Build installed on the user's AmiKit XE (3.2.3, KS 47.96); the user
+      started and quit programs from the dock: no alert. No baseline: the
+      old build was not run there, so the reporter's alert is not shown to
+      be reproduced or gone. Not in release notes until the reporter confirms.
+- [ ] Reporter confirms on their AmiKit. If the alert remains, next suspect: UnLoadSeg on the
+      WBStartup reply while the process is still exiting.
