@@ -517,3 +517,11 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
 ## Layer hooks get offscreen bitmaps (2026-11-20)
 - A backfill hook that paints only when the RastPort's bitmap is the screen's leaves the parts Layers fills offscreen (a layer growing or moving behind another, AmigaOS 3.x) as uninitialised memory, shown once the layer comes in front.
 - Rule: a backfill hook must paint whatever bitmap it is given; place the source by the message's layer-relative offset there, not by the bounds.
+
+## Read the documented default before adding a tag (2026-11-21)
+- I added NP_Input/NP_Output NIL: to CreateNewProcTags as the "fix" for
+  8700000E; dostags.h already says both default to Open("NIL:"). The test
+  build changed nothing and the reporter saw the same alert.
+- Rule: before changing a call's arguments, read the header's default for
+  each argument. And a "no alert" on the dev machine is not evidence without
+  a baseline where the alert shows.

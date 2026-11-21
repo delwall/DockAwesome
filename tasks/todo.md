@@ -1562,3 +1562,11 @@ to the same slot (inverted offset test, store attributes required).
 - [x] AmigaOS 3.2.3: release binary (1.0 beta 4, from the published LHA)
       installed and running; build 518 is now
       Disabled/DockAwesome-locked-delete: delete after the next 3.2.3 boot.
+- [x] NIL: handles did nothing: dostags.h says NP_Input/NP_Output already
+      default to Open("NIL:") with NP_Close* TRUE. The reporter still saw
+      8700000E with the test build. Change reverted. Wrong because I did not
+      read dostags.h defaults before changing; lesson: check the documented
+      default before adding a tag.
+- [ ] Not reproducible here: AmiFire and AmiPixelShop are not on this
+      AmiKit XE 11.5, and the programs the user tried gave no alert. Need the
+      programs, or a hint what they have in common (overlays? packer? language).
