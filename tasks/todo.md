@@ -1584,7 +1584,15 @@ to the same slot (inverted offset test, store attributes required).
 - [x] Reviewed the handoff (Downloads/DockAwesome-AmiKit-Developer-Handoff.zip):
       launch part equals 10ab3e6 (reporter: 8700000E gone); rest applied
       as 8f55e11. Cross-build clean (-Werror), host tests pass.
-- [ ] AmiKit XE (booted 2026-11-24, ApolloExplorerSrv not running): install
-      8f55e11, test drop on the plate and from a lister, hover entering
-      fast, --profile before/after.
+- [x] AmiKit XE (2026-11-24): 8f55e11 (build 0.527) installed in
+      SYS:WBStartup (old binary deleted). --caps: dopus yes, workbench_port
+      no, so the Magellan motion path is active. Idle 28 s, matched
+      baseline (10ab3e6 built the same way): wakeups 266 vs 264, polls
+      262 vs 260, both clean on Ctrl-C. Agent input does not reach the
+      dock here (Input: downs=0), so drops and hover need the user's mouse.
+- [ ] Pre-existing, not from the patch: on AmiKit about one main-loop
+      pass a second takes 20-65 ms in the "polls" phase, equally in the
+      baseline. Find which poll (DOpus/program status?) costs it.
+- [ ] User on AmiKit: drop from the desktop and from a lister, hover
+      entering fast, mouse moved around the desktop; read RAM:user.log.
 - [ ] 3.2.3 and Coffin: plain Workbench behaves as before.
