@@ -1633,8 +1633,12 @@ to the same slot (inverted offset test, store attributes required).
       Coffin, 3.2.3). Ready to push with the branch.
 
 ## Release 1.0 beta 5 (2026-11-24)
-- [ ] PR after-1.0b4 -> main, merge; tag v1.0b5 on the merge commit.
-- [ ] make release RELEASE="1.0 beta 5"; pack DockAwesome-1.0b5.lha with
-      LhA on the Amiga; lha t and compare the files with build/release.
-- [ ] GitHub prerelease "DockAwesome 1.0 beta 5" with the LHA and notes.
-- [ ] Install the release binary on the booted system.
+- [x] PR #13 (after-1.0b4) merged into main (989cfa7); tag v1.0b5; GitHub
+      prerelease "DockAwesome 1.0 beta 5" with DockAwesome-1.0b5.lha
+      (171,903 bytes, SHA-256 79f5d996...63088c0b9), packed with LhA 2.15
+      on AmigaOS 3.2.3; lha t passes and all five files match build/release.
+- [x] AmigaOS 3.2.3: release binary (1.0 beta 5) installed and started with
+      WBRun; both old binaries (1.0b4, 0.527) deleted; RAM: clean.
+- [ ] Install the release binary on AmiKit XE, ApolloOS and Coffin (they run
+      0.527, the same code) at their next boot, and delete the
+      Disabled/DockAwesome-locked-delete left on ApolloOS and Coffin.
