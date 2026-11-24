@@ -82,7 +82,7 @@ typedef struct {
     DockPlacement placement[DOCK_MAX_ITEMS];
     const DockImage *image[DOCK_MAX_ITEMS];
     uint32_t pin_id[DOCK_MAX_ITEMS];
-    DockRect panel;
+    DockRect panel, motion_area;
     int panel_radius;
 } InputSnapshot;
 typedef struct {
@@ -120,6 +120,7 @@ typedef struct {
     uint32_t held_pin_id, held_token, next_token;
     struct Screen *dock_screen, *external_screen;
     int apollo_pointer;
+    int local_motion, motion_was_near;
     int external_x, external_y, external_up_x, external_up_y, external_up_known;
     volatile ULONG external_serial;
     volatile int external_held;
@@ -334,7 +335,8 @@ typedef struct App {
     struct timerequest *timer_io;
     ULONG clock_hz, frames;
     uint64_t started;
-    int live_open, live_pending, live_fast, pip_visible, source_valid, failed;
+    int live_open, live_pending, live_fast, backdrop_moving, pip_visible, source_valid, failed;
+    ULONG live_interval;
     int screen_left, screen_top;
     DockRect dialog_clip;
     int pip_x_offset, pip_y_offset;
@@ -564,6 +566,7 @@ static inline int native_menu_held(const App *app)
 }
 
 #define ANY_BUTTON (IEQUALIFIER_LEFTBUTTON|IEQUALIFIER_RBUTTON|IEQUALIFIER_MIDBUTTON)
+#define DOCK_DRAG_SAMPLE_RADIUS 128
 
 /* A button the dock tracks, or one of mask, is down. */
 static inline int buttons_engaged(const App *app, UWORD mask)

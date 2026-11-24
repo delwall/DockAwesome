@@ -144,14 +144,6 @@ ULONG dock_backfill_paint(struct Hook *hook, struct RastPort *port,
     return 0;
 }
 
-static int screen_is_front(struct Screen *screen)
-{
-    ULONG key = LockIBase(0);
-    int front = IntuitionBase->FirstScreen == screen;
-    UnlockIBase(key);
-    return front;
-}
-
 static APTR signal_port_owner(const struct MsgPort *port)
 {
     return port && (port->mp_Flags & PF_ACTION) == PA_SIGNAL ? port->mp_SigTask : NULL;
@@ -473,8 +465,10 @@ static unsigned int arm_for_pointer(AmigaDropCatcher *c, uint64_t now, uint32_t 
     if (!c->shaped && c->armed && c->repaint) repaint_corner(c);
     if (!c->shaped && c->armed && now >= c->order_check_at) {
         /* Another program's window came in front of the armed window:
-           step back and arm again in front of it. */
+           step back and arm again in front of it. Retry a busy layer
+           list on the same schedule as a successful check. */
         int busy;
+        c->order_check_at = now+frequency/4;
         if (foreign_front(c, &c->armed_at, 1, &busy, NULL) && !busy) {
             c->rearm_at = now+frequency/4;
             return end_catch(c, 1);
@@ -587,7 +581,9 @@ unsigned int amiga_drop_catcher_update(AmigaDropCatcher *c,
     unsigned int flags = 0;
     if (!c) return 0;
     if (c->failed) return AMIGA_DROP_ERROR;
-    if (!screen_is_front(c->screen) || (qualifiers & IEQUALIFIER_RBUTTON)) {
+    /* Compare the pointer without walking Intuition's screen list. The
+       caller keeps our screen open throughout the receiver's lifetime. */
+    if (IntuitionBase->FirstScreen != c->screen || (qualifiers & IEQUALIFIER_RBUTTON)) {
         /* Consume the generation logically so the same held gesture cannot
            rearm after a menu or screen switch. Original events pass through. */
         c->serial = external_serial; c->have_serial = 1;

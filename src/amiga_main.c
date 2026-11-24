@@ -958,21 +958,35 @@ void live_cancel(App *app)
 
 static void live_schedule(App *app)
 {
-    int fast;
+    ULONG interval;
+    int held, fast;
     if (!app->live_open) return;
     /* A button held on another screen (a game's fire button) moves nothing
        behind the dock: the fast rate would only wake the loop 60 times a
        second to find PiP hidden. */
-    fast = animation_needed(app) || (IntuitionBase->FirstScreen == app->screen &&
-        buttons_engaged(app,ANY_BUTTON) && !native_menu_held(app));
-    if (app->live_pending && fast && !app->live_fast) live_cancel(app);
+    held = IntuitionBase->FirstScreen == app->screen &&
+        buttons_engaged(app,ANY_BUTTON) && !native_menu_held(app);
+    fast = animation_needed(app) || (held && !app->input_context.local_motion);
+    /* On Magellan, give a held button the fast capture rate once the
+       backdrop moves or there is dock artwork following the gesture. */
+    if (!fast && held && app->input_context.local_motion) {
+        int radius = DOCK_DRAG_SAMPLE_RADIUS;
+        int x = app->screen->MouseX-app->left, y = app->screen->MouseY-app->top;
+        fast = app->gesture.active || app->backdrop_moving ||
+            (app->input_context.external_held && app->input_context.external_dragged &&
+                x >= -radius && x < app->width+radius && y >= -radius && y < app->height+radius);
+    }
+    if (!held) app->backdrop_moving = 0;
+    interval = fast ? 10000 : held ? 33333 : 100000;
+    if (app->live_pending && interval < app->live_interval) live_cancel(app);
     if (app->live_pending) return;
     app->live_io->tr_node.io_Command = TR_ADDREQUEST;
     app->live_io->tr_node.io_Flags = 0;
     app->live_io->tr_time.tv_secs = 0;
     /* timer.device rounds a request up: 10 ms gave 17 ms between motion
        polls on Coffin (20 ms gave 28.6 ms), close to one field. */
-    app->live_io->tr_time.tv_micro = fast ? 10000 : 100000;
+    app->live_io->tr_time.tv_micro = interval;
+    app->live_interval = interval;
     app->live_fast = fast;
     SendIO((struct IORequest *)app->live_io); app->live_pending = 1;
 }
@@ -1015,12 +1029,15 @@ static void drop_catcher_flags(App *app, unsigned int flags)
 /* Where the armed receiver lies, for the input handler (empty without). */
 static void publish_receiver(App *app)
 {
+    InputContext *input = &app->input_context;
     int left = 0, top = 0, right = 0, bottom = 0;
     if (amiga_drop_catcher_armed(app->drop_catcher))
         amiga_drop_catcher_rect(app->drop_catcher, &left, &top, &right, &bottom);
+    if (input->receiver_left == left && input->receiver_top == top &&
+        input->receiver_right == right && input->receiver_bottom == bottom) return;
     Disable();
-    app->input_context.receiver_left = left; app->input_context.receiver_top = top;
-    app->input_context.receiver_right = right; app->input_context.receiver_bottom = bottom;
+    input->receiver_left = left; input->receiver_top = top;
+    input->receiver_right = right; input->receiver_bottom = bottom;
     Enable();
 }
 
@@ -1297,7 +1314,7 @@ static void profile_report(App *app)
         (unsigned long)(app->stats.source_polls-app->stats.capture_changed),
         ticks_us(app,app->stats.capture_ticks-app->stats.capture_changed_ticks,
             app->stats.source_polls-app->stats.capture_changed));
-    printf("PiP2: polls=%lu source_changes=%lu front_requests=%lu capture_compare_us_avg=%lu decode_us_avg=%lu changed_px_avg=%lu (settled100ms, motion10ms)\n",
+    printf("PiP2: polls=%lu source_changes=%lu front_requests=%lu capture_compare_us_avg=%lu decode_us_avg=%lu changed_px_avg=%lu\n",
         (unsigned long)app->stats.source_polls, (unsigned long)app->stats.source_changes,
         (unsigned long)app->stats.front_requests,
         ticks_us(app,app->stats.capture_ticks,app->stats.source_polls),

@@ -51,6 +51,12 @@ void input_publish(App *app)
     s = c->active == &c->snapshots[0] ? &c->snapshots[1] : &c->snapshots[0];
     s->screen = app->screen; s->left = app->left; s->top = app->top;
     s->count = row_count(app); s->generation = app->input_generation;
+    if (c->local_motion) {
+        /* The observer sees the position before Intuition applies the event. */
+        enum { MOTION_MARGIN = 32 };
+        s->motion_area = (DockRect){app->left-MOTION_MARGIN, app->top-MOTION_MARGIN,
+            app->left+app->width+MOTION_MARGIN, app->top+app->height+MOTION_MARGIN};
+    }
     dock_edge_panel_reach(&app->settings,app->edge,row,s->count,
         app->width,app->height,&app->renderer.panel_include,&s->panel);
     s->panel_radius = app->renderer.panel.radius;
@@ -123,7 +129,7 @@ struct InputEvent *dock_input_observe(struct InputEvent *events, void *context)
 {
     struct InputEvent *e;
     InputContext *c = context;
-    int moved = 0, notify = 0;
+    int moved = 0, notify = 0, motion = 0;
     /* A held, external or right-button state can end on another screen. */
     int engaged = c->held || c->external_held || c->right_held || c->close_held || c->receiver_held;
     for (e = events; e; e = e->ie_NextEvent) {
@@ -162,7 +168,7 @@ struct InputEvent *dock_input_observe(struct InputEvent *events, void *context)
                 y-c->held_down_y > DOCK_DRAG_THRESHOLD || c->held_down_y-y > DOCK_DRAG_THRESHOLD) c->held_dragged = 1;
         }
         if (e->ie_Class == IECLASS_POINTERPOS || e->ie_Class == IECLASS_NEWPOINTERPOS) {
-            moved = notify = 1;
+            moved = motion = 1;
         } else if (e->ie_Class == IECLASS_RAWMOUSE) {
             /* Apollo Intuition takes relative left-button coordinates from
                Screen.MouseX/Y. Only its motion event applies the deltas. */
@@ -171,7 +177,8 @@ struct InputEvent *dock_input_observe(struct InputEvent *events, void *context)
             int clean = !moved && (relative_left || (!e->ie_X && !e->ie_Y));
             int captured = 0;
             int already_external = c->external_held;
-            notify = 1;
+            if (e->ie_Code == IECODE_NOBUTTON) motion = 1;
+            else notify = 1;
             if (e->ie_Code == MENUUP && c->right_held) {
                 c->right_held = 0; e->ie_Class = IECLASS_NULL; continue;
             }
@@ -295,10 +302,22 @@ struct InputEvent *dock_input_observe(struct InputEvent *events, void *context)
             if (wheel_event(e)) { ++c->wheel_serial; notify = 1; }
         }
     }
-    /* Pointer motion on another screen cannot change the dock. The live
-       timer still notices when the dock screen returns to the front. */
-    if (notify && (engaged || c->held || c->external_held || c->right_held || c->close_held || c->receiver_held ||
-        (c->dock_screen && IntuitionBase->FirstScreen == c->dock_screen))) Signal(c->task, c->signal);
+    if (notify || motion) {
+        int front = c->dock_screen && IntuitionBase->FirstScreen == c->dock_screen;
+        int tracking = engaged || c->held || c->external_held || c->right_held ||
+            c->close_held || c->receiver_held;
+        if (front && motion && c->local_motion) {
+            const InputSnapshot *s = c->active;
+            int x = c->dock_screen->MouseX, y = c->dock_screen->MouseY;
+            int near = s && x >= s->motion_area.left && x < s->motion_area.right &&
+                y >= s->motion_area.top && y < s->motion_area.bottom;
+            /* DOpus desktop motion away from the dock can wait for the live
+               timer. A move out of the area must still clear hover. */
+            motion = near || c->motion_was_near;
+            c->motion_was_near = near;
+        }
+        if (tracking || (front && (notify || motion))) Signal(c->task, c->signal);
+    }
     return events;
 }
 
@@ -309,10 +328,13 @@ struct InputEvent *dock_input_observe(struct InputEvent *events, void *context)
 void input_attach_screen(App *app, struct Screen *screen)
 {
     InputContext *c = &app->input_context;
+    int local_motion = screen && app->caps.dopus && !workbench_running();
     Disable();
     if (!screen) c->active = NULL;
     c->dock_screen = screen;
     c->apollo_pointer = app->features.apollo_pointer;
+    c->local_motion = local_motion;
+    c->motion_was_near = 0;
     c->close_valid = 0;
     c->popup_open = 0;
     if (c->held) c->held_cancelled = 1;
