@@ -1631,3 +1631,10 @@ to the same slot (inverted offset test, store attributes required).
       before. Restarted with WBRun; RAM: clean.
 - [x] Patch verified on all four boots it touches (AmiKit, ApolloOS,
       Coffin, 3.2.3). Ready to push with the branch.
+
+## Release 1.0 beta 5 (2026-11-24)
+- [ ] PR after-1.0b4 -> main, merge; tag v1.0b5 on the merge commit.
+- [ ] make release RELEASE="1.0 beta 5"; pack DockAwesome-1.0b5.lha with
+      LhA on the Amiga; lha t and compare the files with build/release.
+- [ ] GitHub prerelease "DockAwesome 1.0 beta 5" with the LHA and notes.
+- [ ] Install the release binary on the booted system.
