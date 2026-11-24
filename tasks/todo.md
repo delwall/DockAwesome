@@ -1579,3 +1579,12 @@ to the same slot (inverted offset test, store attributes required).
       ~/Downloads for the reporter. Not verifiable on 3.2.0.
 - [ ] Reporter result for test2. If still alert: next suspects are
       UnLoadSeg on the WBStartup reply, and what DOpus passes.
+
+## AmiKit user patch (2026-11-24)
+- [x] Reviewed the handoff (Downloads/DockAwesome-AmiKit-Developer-Handoff.zip):
+      launch part equals 10ab3e6 (reporter: 8700000E gone); rest applied
+      as 8f55e11. Cross-build clean (-Werror), host tests pass.
+- [ ] AmiKit XE (booted 2026-11-24, ApolloExplorerSrv not running): install
+      8f55e11, test drop on the plate and from a lister, hover entering
+      fast, --profile before/after.
+- [ ] 3.2.3 and Coffin: plain Workbench behaves as before.
