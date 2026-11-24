@@ -172,10 +172,10 @@ typedef struct {
     DockImage icon;
 } FolderCachedIcon;
 /* dock_ui_prefetch_folder, one per slot: a drawer's first page (for the
-   page size the box would have at edge), and how far it got. */
+   page size the box would have at the anchor edge,x,y), and how far it got. */
 typedef struct {
     char path[DOCK_PREFS_PATH_CAP];
-    int icon_size;
+    int icon_size, x, y;
     DockEdge edge;
     DockFolderEntry *entries;
     size_t count, next;
@@ -2165,7 +2165,8 @@ int dock_ui_prefetch_folder(DockUI *ui, int slot, DockEdge edge, int x, int y,
     if (!ui || slot < 0 || slot >= DOCK_MAX_ITEMS || !path[0] ||
         strlen(path) >= sizeof(ui->prefetch[slot].path)) return 0;
     p = &ui->prefetch[slot];
-    if (strcmp(p->path,path) || p->icon_size != icon_size || p->edge != edge) {
+    /* A moved anchor (another Scale, a reordered pin) can change the page. */
+    if (strcmp(p->path,path) || p->icon_size != icon_size || p->edge != edge || p->x != x || p->y != y) {
         /* The first page the box would show at (edge,x,y): show_folder's
            grid, in its order. */
         FolderView grid = {0};
@@ -2175,6 +2176,7 @@ int dock_ui_prefetch_folder(DockUI *ui, int slot, DockEdge edge, int x, int y,
         strcpy(p->path,path);
         p->icon_size = icon_size;
         p->edge = edge;
+        p->x = x; p->y = y;
         grid.anchor = (FolderAnchor){edge,x,y,icon_size,0,read_icon,context};
         rows = folder_grid(ui,&grid,&max_height,&extra_bottom);
         if (!grid.cols || !rows || !amiga_folder_read(path,&p->entries,&p->count)) {

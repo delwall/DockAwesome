@@ -72,7 +72,7 @@ int dock_ui_folder_loading(const DockUI *ui);
 /* Reads one more icon of path's first page into the icon cache, for a
    Folder Stack that opens with its icons. Call while the dock is idle.
    slot: 0..DOCK_MAX_ITEMS-1, one read-ahead state each; it starts over
-   (and rereads the drawer) when path, icon_size or edge differ.
+   (and rereads the drawer) when path, icon_size or the anchor differ.
    (edge,x,y): the anchor the box would open at, for the real page size.
    1 while icons of the first page remain (or a popup is open); 0 when the
    page is read, the drawer cannot be read, or the cache has no free entry
