@@ -80,10 +80,10 @@ static int owns_window(void *data, struct Window *window)
 
 static int update_drag_mask(App *app, int sample)
 {
-    enum { DRAG_RADIUS = 128 };
+    int radius = DOCK_DRAG_SAMPLE_RADIUS;
     int x = app->screen->MouseX-app->left, y = app->screen->MouseY-app->top;
-    int left = x-DRAG_RADIUS, top = y-DRAG_RADIUS;
-    int right = x+DRAG_RADIUS+1, bottom = y+DRAG_RADIUS+1, row, catching, near, reference_changed = 0;
+    int left = x-radius, top = y-radius;
+    int right = x+radius+1, bottom = y+radius+1, row, catching, near, reference_changed = 0;
     DockRect catch_box = {0,0,0,0};
     /* Only where the receiver lies is the baseline exact (read as the
        gesture starts). Elsewhere the reference keeps the capture, which
@@ -232,6 +232,7 @@ static int live_capture(App *app, int full_compare)
     const DockRect *check = NULL;
     int result, moved, screen_left, screen_top, dialog_moved, force;
     uint64_t started;
+    app->backdrop_moving = 0;
     if (pip_blocked_by_screen(app)) return 0;
     if (native_menu_held(app)) return 0;
     /* Native Workbench can retain layer locks through its drag loop. Do not
@@ -280,6 +281,7 @@ static int live_capture(App *app, int full_compare)
     force = !app->source_valid || !app->pip_visible;
     result = amiga_display_capture565(app->display, app->source565,
         app->left, app->top, force, check, app->renderer.pixels->bytes_equal, &box);
+    app->backdrop_moving = !force && result > 0;
     ++app->stats.source_polls;
     if (app->profile) {
         uint64_t spent = profile_clock()-started;
@@ -631,7 +633,7 @@ static void pip_close(App *app)
     free(app->drag_color); app->drag_color = NULL;
     app->drag_reference = app->drag_mask_live = 0;
     app->drag_box = (DockRect){0,0,0,0};
-    app->source_valid = app->pip_visible = 0;
+    app->source_valid = app->pip_visible = app->backdrop_moving = 0;
     app->front_pending = 0;
 }
 

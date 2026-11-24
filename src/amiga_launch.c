@@ -395,7 +395,12 @@ int launch_object(App *app, const char *path, LONG *error)
     /* The new process owns both locks and frees them when it ends. */
     current = DupLock(tool_dir);
     home = DupLock(tool_dir);
-    process = current && home ? CreateNewProcTags(NP_Seglist,(ULONG)launch->startup.sm_Segment,
+    /* No standard streams, as for a program Workbench starts: dos would
+       otherwise open NIL: for Input() and Output() and close them at exit,
+       and a program whose startup code also closes them closes a handle
+       twice (dos.library 8700000E, AN_FileReclosed, on AmigaOS 3.2.3). */
+    process = current && home ? CreateNewProcTags(NP_Input,0, NP_Output,0,
+        NP_CloseInput,FALSE, NP_CloseOutput,FALSE, NP_Seglist,(ULONG)launch->startup.sm_Segment,
         NP_FreeSeglist,FALSE, NP_StackSize,stack, NP_Priority,priority,
         NP_Name,(ULONG)launch->names[0], NP_CurrentDir,(ULONG)current,
         NP_HomeDir,(ULONG)home, NP_WindowPtr,0, NP_ConsoleTask,0,

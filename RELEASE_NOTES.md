@@ -1,5 +1,18 @@
 # Release notes
 
+## 1.0 beta 5
+
+Changes since 1.0 beta 4.
+
+**Fixes**
+- A program started from the dock no longer brings up a Recoverable Alert
+  8700000E when it quits (AmigaOS 3.2.3, AmiKit XE).
+- AmiKit with Directory Opus Magellan as the desktop: the pointer moves
+  smoothly again while the dock runs.
+
+Thanks to an AmiKit XE user for tracking these down and sending the
+patch.
+
 ## 1.0 beta 4
 
 Changes since 1.0 beta 3.

@@ -517,3 +517,20 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
 ## Layer hooks get offscreen bitmaps (2026-11-20)
 - A backfill hook that paints only when the RastPort's bitmap is the screen's leaves the parts Layers fills offscreen (a layer growing or moving behind another, AmigaOS 3.x) as uninitialised memory, shown once the layer comes in front.
 - Rule: a backfill hook must paint whatever bitmap it is given; place the source by the message's layer-relative offset there, not by the bounds.
+
+## Read the documented default before adding a tag (2026-11-21)
+- I added NP_Input/NP_Output NIL: to CreateNewProcTags as the "fix" for
+  8700000E; dostags.h already says both default to Open("NIL:"). The test
+  build changed nothing and the reporter saw the same alert.
+- Rule: before changing a call's arguments, read the header's default for
+  each argument. And a "no alert" on the dev machine is not evidence without
+  a baseline where the alert shows.
+
+## A failed agent gesture: aim before blaming the build (2026-11-24)
+- On 3.2.3 a drag-out at y 700 did nothing; the same drag on release
+  1.0b4 failed the same way, and at y 680 it worked. The dock's icons sit
+  higher at size 36 than at Coffin's 32, and a press off the icons is not
+  counted (downs=0, no ambiguous/overflow).
+- Rule: when an agent gesture fails, check downs/ambiguous in the profile
+  and rerun it on the previous build before treating it as a regression.
+  Also: the dock writes only ENVARC:DockAwesome.json; ENV: is the boot copy.

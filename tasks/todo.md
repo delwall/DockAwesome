@@ -1526,3 +1526,115 @@ to the same slot (inverted offset test, store attributes required).
 - [x] AmiKit XE: new build installed (started with Run: WBRun reports no
       memory under the Directory Opus desktop); agent drags do not move
       Directory Opus icons, so the user looked: "Amikit såg ok ut".
+
+## Release 1.0 beta 4 (2026-11-20)
+
+- [x] PR #12 (after-1.0b3) merged into main (237c843); tag v1.0b4; GitHub
+      prerelease "DockAwesome 1.0 beta 4" with DockAwesome-1.0b4.lha
+      (171,130 bytes, SHA-256 252bfb43...02dbc8bd), packed with LhA 2.15 on
+      ApolloOS; lha t passes and all five files match build/release. The
+      archive's dates are ApolloOS's clock (18 May 2026).
+- [x] Release binary (DockAwesome 1.0 (20.11.2026) beta 4) installed on
+      ApolloOS; the old -locked-delete copies there are deleted. After
+      the next boot (2026-11-21) the 0.518 -locked-delete is deleted too,
+      and 1.0 beta 4 started from WBStartup by itself.
+- [x] Coffin (2026-11-21): -locked-delete, -2 and -3 deleted; release
+      binary (1.0 beta 4) installed and running; the previous build is now
+      Disabled/DockAwesome-locked-delete: delete after the next boot.
+- [x] 3.1.4.1 (2026-11-21): the 10 Nov -locked-delete deleted; release
+      binary (1.0 beta 4) installed and running; the previous build is now
+      Disabled/DockAwesome-locked-delete: delete after the next boot.
+- [x] AmiKit XE (2026-11-21): release binary (1.0 beta 4) installed over
+      the unlocked previous build (no -locked-delete needed) and running,
+      started with Run.
+- [x] AmigaOS 3.9 (plain, AOS39 boot, 2026-11-21): four old -locked-delete
+      copies deleted; release binary installed over build 509 (now
+      Disabled/DockAwesome-locked-delete: delete after the next boot) and
+      running. Agent: the disk icon dropped on the plate pinned at slot 7
+      and dragged out again; prefs exactly as before. The coloured dots at
+      y 649-652 under the rainbow bar stay after Workbench redraws there:
+      they are in the wallpaper. Release 1.0 beta 4 now runs on all six
+      boots (ApolloOS, 3.2.3, Coffin, 3.1.4.1, AmiKit XE, 3.9).
+- [x] Personal:1234-5678 (partial copy from the drop bug; user: "radera
+      den"): already gone on 2026-11-21. No 1234-5678#? anywhere on
+      Personal (searched ALL), nor in the roots of Archives, AOS32, BOOT.
+      3.2.3 had no -locked-delete files.
+- [x] AmigaOS 3.2.3: release binary (1.0 beta 4, from the published LHA)
+      installed and running; build 518 is now
+      Disabled/DockAwesome-locked-delete: delete after the next 3.2.3 boot.
+- [x] NIL: handles did nothing: dostags.h says NP_Input/NP_Output already
+      default to Open("NIL:") with NP_Close* TRUE. The reporter still saw
+      8700000E with the test build. Change reverted. Wrong because I did not
+      read dostags.h defaults before changing; lesson: check the documented
+      default before adding a tag.
+- [ ] Not reproducible here: AmiFire and AmiPixelShop are not on this
+      AmiKit XE 11.5, and the programs the user tried gave no alert. Need the
+      programs, or a hint what they have in common (overlays? packer? language).
+- [x] AN_FileReclosed = 0x0700000E (exec/alerts.h): a file handle closed
+      twice. Our test machine is 3.2.0 (KS 47.96), the reporter's 3.2.3
+      (KS 47.115): newer dos detects it, so it is probably latent here.
+      Hypothesis 2: dos opens NIL: defaults and closes them at exit, and the
+      program's startup code closes them too. Launch now passes
+      NP_Input/NP_Output 0 (as Workbench). Built; DockAwesome-test2.lha in
+      ~/Downloads for the reporter. Not verifiable on 3.2.0.
+- [ ] Reporter result for test2. If still alert: next suspects are
+      UnLoadSeg on the WBStartup reply, and what DOpus passes.
+
+## AmiKit user patch (2026-11-24)
+- [x] Reviewed the handoff (Downloads/DockAwesome-AmiKit-Developer-Handoff.zip):
+      launch part equals 10ab3e6 (reporter: 8700000E gone); rest applied
+      as 8f55e11. Cross-build clean (-Werror), host tests pass.
+- [x] AmiKit XE (2026-11-24): 8f55e11 (build 0.527) installed in
+      SYS:WBStartup (old binary deleted). --caps: dopus yes, workbench_port
+      no, so the Magellan motion path is active. Idle 28 s, matched
+      baseline (10ab3e6 built the same way): wakeups 266 vs 264, polls
+      262 vs 260, both clean on Ctrl-C. Agent input does not reach the
+      dock here (Input: downs=0), so drops and hover need the user's mouse.
+- [ ] Pre-existing, not from the patch: on AmiKit about one main-loop
+      pass a second takes 20-65 ms in the "polls" phase, equally in the
+      baseline. Find which poll (DOpus/program status?) costs it.
+- [x] User on AmiKit (physical mouse, 77 s): "Tycker det såg bra ut".
+      Profile: downs/ups 6/6, Workbench drops messages=1 added=1 (pin
+      dragged out again, prefs unchanged), receiver presses_armed=2,
+      motion_polls=921 at 26.5 ms avg (the new 10/33 ms mix). Dock
+      restarted with Run (no profile); RAM: test files deleted.
+- [x] ApolloOS (2026-11-24, 16-bit screen, so the 24/32-bit capture
+      change is not exercised): 8f55e11 installed (release 1.0b4 renamed
+      to Disabled/DockAwesome-locked-delete, WBRun binary in use). Agent
+      test with --profile: hover 0 stalled frames, desktop drop pinned
+      RAM Disk at slot 7 (drops added=1) and dragging it out removed it;
+      prefs as before; clean Ctrl-C. Restarted with WBRun; RAM: clean.
+      The idle 20-60 ms polls passes show here too (pre-existing).
+- [ ] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete after the
+      next ApolloOS boot.
+- [x] Coffin (2026-11-24, 24-bit Workbench, so the new capture path runs
+      without the Magellan motion path): the old -locked-delete deleted;
+      8f55e11 installed (release 1.0b4 is the new
+      Disabled/DockAwesome-locked-delete). Agent test with --profile:
+      hover 1 stall in 38 frames, desktop drop pinned Ram Disk (added=1),
+      dragging it out removed it, prefs as before, clean Ctrl-C.
+      Restarted with WBRun; RAM: clean.
+- [ ] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete after the
+      next Coffin boot.
+- [ ] Open (not compared with baseline under hover): during hover
+      animation about every third frame spends ~23 ms in the polls phase
+      (surface->poll, live capture), 109 of 743 frames stalled. The
+      animation rate is 10 ms before and after the patch, so probably
+      pre-existing; an A/B hover run with the user's mouse would settle it.
+- [x] AmigaOS 3.2.3 (2026-11-24, 24-bit Workbench): the old -locked-delete
+      deleted; 8f55e11 installed (release 1.0b4 is the new
+      Disabled/DockAwesome-locked-delete: delete after the next 3.2.3 boot).
+      Agent test with --profile: hover 0 stalled frames, desktop drop pinned
+      RAM Disk at slot 8 (added=1), clean Ctrl-C. Dragging it out failed at
+      y 700 with the patch AND with release 1.0b4 (downs=0: the press was
+      below the icons at size 36); at y 680 it worked (downs=1), prefs as
+      before. Restarted with WBRun; RAM: clean.
+- [x] Patch verified on all four boots it touches (AmiKit, ApolloOS,
+      Coffin, 3.2.3). Ready to push with the branch.
+
+## Release 1.0 beta 5 (2026-11-24)
+- [ ] PR after-1.0b4 -> main, merge; tag v1.0b5 on the merge commit.
+- [ ] make release RELEASE="1.0 beta 5"; pack DockAwesome-1.0b5.lha with
+      LhA on the Amiga; lha t and compare the files with build/release.
+- [ ] GitHub prerelease "DockAwesome 1.0 beta 5" with the LHA and notes.
+- [ ] Install the release binary on the booted system.

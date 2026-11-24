@@ -17,6 +17,8 @@
 #ifndef RECTFMT_RAW
 #define RECTFMT_RAW 5UL
 #endif
+struct CaptureSpan { int left, right; };
+
 struct AmigaDisplay {
     struct Screen *screen;
     struct Library *cyber;
@@ -37,6 +39,9 @@ struct AmigaDisplay {
     unsigned char *raw;
     size_t raw_capacity;
     int raw_valid, raw_bytes;
+    ULONG raw_format;
+    struct CaptureSpan *raw_spans;
+    int raw_span_capacity;
     /* One source row in Fast RAM: video memory is read once, in a burst,
        and compared and converted from here. */
     unsigned char *row;
@@ -162,7 +167,7 @@ void amiga_display_close(AmigaDisplay *d)
     if (!d) return;
     if (d->temp_bitmap) { WaitBlit(); FreeBitMap(d->temp_bitmap); }
     if (d->frame_bitmap) { WaitBlit(); FreeBitMap(d->frame_bitmap); }
-    free_lookup(d); free(d->upload); free(d->raw); free(d->row);
+    free_lookup(d); free(d->upload); free(d->raw); free(d->raw_spans); free(d->row);
     if (d->cyber) CloseLibrary(d->cyber);
     free(d);
 }
@@ -283,15 +288,14 @@ static int read_rect565(AmigaDisplay *d, struct BitMap *bitmap, int x, int y, in
     return 1;
 }
 
-/* The capture of a 24- or 32-bit screen: compare rows in the screen's own
-   format against the raw copy, at rest only the check box, and convert just
-   the changed rows into the RGB565 cache. Returns as capture565 does. */
-static int capture_raw(AmigaDisplay *d, unsigned char *cache, const unsigned char *source,
+/* Copy changed spans into Fast RAM while the screen bitmap is locked.
+   The caller releases the lock before converting the recorded spans. */
+static int capture_raw(AmigaDisplay *d, const unsigned char *source,
     ULONG stride, ULONG bytes, ULONG format, int visible_width, int force,
     const DockRect *check, DockBytesEqual equal, DockRect *box)
 {
     size_t raw_row = (size_t)d->width*bytes, visible_raw = (size_t)visible_width*bytes;
-    size_t row565 = (size_t)d->width*2, needed = raw_row*d->height;
+    size_t needed = raw_row*d->height;
     int row, top = -1, bottom = 0, left = visible_width, right = 0;
     unsigned char *fresh = fast_row(d,raw_row);
     if (!fresh) return -1;
@@ -300,11 +304,11 @@ static int capture_raw(AmigaDisplay *d, unsigned char *cache, const unsigned cha
         if (!raw) return -1;
         free(d->raw); d->raw = raw; d->raw_capacity = needed; d->raw_valid = 0;
     }
-    if (!d->raw_valid || d->raw_bytes != (int)bytes) force = 1;
+    if (!d->raw_valid || d->raw_bytes != (int)bytes || d->raw_format != format) force = 1;
     if (check && (check->left < 0 || check->right > visible_width || check->top < 0 ||
         check->bottom > d->height || check->left >= check->right || check->top >= check->bottom))
         check = NULL;
-    if (box) *box = (DockRect){0,0,0,0};
+    *box = (DockRect){0,0,0,0};
     if (!force && check) {
         for (row = check->top; row < check->bottom; ++row)
             if (!equal(d->raw+(size_t)row*raw_row+(size_t)check->left*bytes,
@@ -312,10 +316,16 @@ static int capture_raw(AmigaDisplay *d, unsigned char *cache, const unsigned cha
                        (unsigned long)(check->right-check->left)*bytes)) break;
         if (row == check->bottom) return 0;
     }
+    if (d->height > d->raw_span_capacity) {
+        struct CaptureSpan *spans = malloc((size_t)d->height*sizeof(*spans));
+        if (!spans) return -1;
+        free(d->raw_spans); d->raw_spans = spans; d->raw_span_capacity = d->height;
+    }
     for (row = 0; row < d->height; ++row) {
         unsigned char *copy = d->raw+(size_t)row*raw_row;
         size_t a = 0, b = visible_raw;
         int l, r;
+        d->raw_spans[row] = (struct CaptureSpan){0,0};
         /* One burst read of video memory; the rest works in Fast RAM.
            Comparing in place first and copying only changed rows measured
            no faster on Coffin (changed polls 7.9 against 8.1 ms). */
@@ -334,18 +344,33 @@ static int capture_raw(AmigaDisplay *d, unsigned char *cache, const unsigned cha
            sideways changes a few. */
         l = (int)(a/bytes); r = (int)((b+bytes-1)/bytes);
         memcpy(copy+(size_t)l*bytes,fresh+(size_t)l*bytes,(size_t)(r-l)*bytes);
-        row_to_rgb565(cache+row*row565+(size_t)l*2,copy+(size_t)l*bytes,r-l,format);
-        if (visible_width < d->width) memset(cache+row*row565+(size_t)visible_width*2,0,row565-(size_t)visible_width*2);
+        d->raw_spans[row] = (struct CaptureSpan){l,r};
         if (top < 0) top = row;
         bottom = row+1;
         if (l < left) left = l;
         if (r > right) right = r;
     }
-    d->raw_valid = 1; d->raw_bytes = (int)bytes;
-    if (force) { if (box) *box = (DockRect){0,0,d->width,d->height}; return 1; }
+    d->raw_valid = 1; d->raw_bytes = (int)bytes; d->raw_format = format;
+    if (force) { *box = (DockRect){0,0,d->width,d->height}; return 1; }
     if (top < 0) return 0;
-    if (box) *box = (DockRect){left,top,right,bottom};
+    *box = (DockRect){left,top,right,bottom};
     return 1;
+}
+
+static void convert_raw(AmigaDisplay *d, unsigned char *cache, int visible_width, const DockRect *box)
+{
+    size_t row565 = (size_t)d->width*2, raw_row = (size_t)d->width*d->raw_bytes;
+    int row;
+    for (row = box->top; row < box->bottom; ++row) {
+        const struct CaptureSpan *span = &d->raw_spans[row];
+        unsigned char *out = cache+(size_t)row*row565;
+        const unsigned char *in = d->raw+(size_t)row*raw_row;
+        if (span->left == span->right) continue;
+        row_to_rgb565(out+(size_t)span->left*2,in+(size_t)span->left*d->raw_bytes,
+            span->right-span->left,d->raw_format);
+        if (visible_width < d->width)
+            memset(out+(size_t)visible_width*2,0,(size_t)(d->width-visible_width)*2);
+    }
 }
 
 int amiga_display_capture565(AmigaDisplay *d, unsigned char *cache,
@@ -365,7 +390,8 @@ int amiga_display_capture565(AmigaDisplay *d, unsigned char *cache,
     if (!equal) equal = dock_bytes_equal_c;
     if (!force && check && d->peek_left > 0 && d->peek_cache == cache &&
         d->peek_x == x && d->peek_y == y && d->peek_width == d->width && d->peek_height == d->height &&
-        (d->peek_format == PIXFMT_RGB16 || (d->raw_valid && d->raw_bytes == (int)d->peek_bytes)) &&
+        (d->peek_format == PIXFMT_RGB16 || (d->raw_valid &&
+            d->raw_bytes == (int)d->peek_bytes && d->raw_format == d->peek_format)) &&
         check->left >= 0 && check->right <= visible_width && check->top >= 0 &&
         check->bottom <= d->height && check->left < check->right && check->top < check->bottom) {
         /* Reading without the lock cannot harm: at worst the pixels are
@@ -403,11 +429,15 @@ int amiga_display_capture565(AmigaDisplay *d, unsigned char *cache,
     row_bytes = (size_t)d->width*2;
     visible_bytes = (size_t)visible_width*2;
     if (format != PIXFMT_RGB16) {
-        int result = capture_raw(d,cache,(const unsigned char *)base+(size_t)y*stride+(size_t)x*bytes,
-            stride,bytes,format,visible_width,force,check,equal,box);
+        DockRect changed_box;
+        int result = capture_raw(d,(const unsigned char *)base+(size_t)y*stride+(size_t)x*bytes,
+            stride,bytes,format,visible_width,force,check,equal,&changed_box);
         UnLockBitMap(lock);
+        if (result > 0) convert_raw(d,cache,visible_width,&changed_box);
+        if (box && result >= 0) *box = changed_box;
         return result;
     }
+    d->raw_valid = 0;
     source = (const unsigned char *)base+(size_t)y*stride+x*2;
     right = visible_width; bottom = d->height;
     if (check && check->left >= 0 && check->right <= right &&
