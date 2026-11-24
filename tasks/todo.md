@@ -1731,3 +1731,10 @@ Plan: tasks/plan-folder-stacks.md (D1-D17). Branch folder-stacks, one PR.
       not run (above) and the owner's decision on A5.
 - [x] Handover (tasks/handover-folder-stacks-pr1.md), release-notes draft.
 - [x] One push; PR opened as a draft, left a draft (blocked on hardware).
+
+### Owner decision A5: missing migrated Folder Stack is dropped (ApolloOS, build 0.534)
+- [x] Code: App.migrated_pin; a pin appended by the migration whose drawer cannot be locked is skipped at start; the first save removes it.
+- [x] make host-test green, make amiga builds without warnings.
+- [x] ApolloOS, --config RAM:ta.json with "folder": "RAM:DoesNotExist": no message, dock runs, file after start has paths ["Personal:Downloads"] and no "folder".
+- [x] Control, "folder": "SYS:Prefs" not in paths: appended last as ApolloOS:Prefs, no "folder" key.
+- [ ] Not run: the other boots, a host test for the missing-drawer case (the skip lives in amiga_main.c).

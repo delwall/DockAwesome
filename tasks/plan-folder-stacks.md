@@ -509,9 +509,8 @@ anything blocking merge?"
   tile has in 1.0 beta 5); it opens a lister there.
 - A4 The stack menu's second row replaces Close; a window opened from a
   stack is closed in the desktop, not from the dock.
-- A5 A migrated Folder Stack whose drawer is missing at start is treated
-  like any missing pin (message, saving blocked until it is back); before,
-  it was skipped silently.
+- A5 (owner decision) A migrated Folder Stack whose drawer is missing at start
+  is dropped silently, as in 1.0 beta 5; the save removes it from the file.
 - A6 The cache holds 512 icons (about 4.7 MB of pixels at Size 48, plus
   0.3 MB of entries); the prefetch stops when it is full rather than evict.
 - A7 The prefetch is armed when a stack is pinned and after Settings

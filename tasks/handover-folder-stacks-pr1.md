@@ -50,9 +50,10 @@ Plan tasks/plan-folder-stacks.md §3, D1-D17:
 
 ## Assumptions
 
-Plan §8 A1-A9 as written. Owner decision still open on A5: a 1.0 beta 5
-Folder Stack whose drawer is missing at start is a missing pin, so every
-save is refused until it is back (1.0 beta 5 skipped it silently).
+Plan §8 A1-A9 as written. A5 was decided by the owner after the first
+report: a migrated Folder Stack whose drawer is missing at start is dropped
+silently (as in 1.0 beta 5) and the save removes it from the file; only a
+pin the migration appended is treated so (App.migrated_pin).
 
 ## Verification
 
@@ -77,8 +78,7 @@ save is refused until it is back (1.0 beta 5 skipped it silently).
 
 ## Reviews
 
-- Opus round 1: no P0/P1; P2 = A5 above, kept as designed (no code change,
-  so no second round).
+- Opus round 1: no P0/P1; P2 = A5, later changed by the owner's decision (see Assumptions).
 - Codex round 1: P2 prefetch slot and anchor, fixed in 3f1fe03. Round 2:
   no findings. Codex wrote its own section into tasks/todo.md (reverted)
   and built in /tmp/dockawesome-review-obj (left there; outside the repo).

@@ -518,6 +518,7 @@ typedef struct App {
        current box has closed (a click on it while another was open). */
     uint32_t open_stack_pin, stack_next_pin;
     int prefs_migrated; /* read_config moved an old Folder Stack into the pins */
+    int migrated_pin;   /* 1-based index of the pin it appended, 0 if none */
     /* Added last so every other field keeps its offset. */
     const SurfaceOps *surface; /* The backend; set with the profile. */
 } App;

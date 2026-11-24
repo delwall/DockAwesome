@@ -427,7 +427,12 @@ static int read_config(App *app)
     UnLock(lock);
     if (!file) return -1;
     if (!dock_prefs_read(file, &app->prefs)) state = -1;
-    else app->prefs_migrated = dock_prefs_migrate(&app->prefs);
+    else {
+        int before = app->prefs.count;
+        app->prefs_migrated = dock_prefs_migrate(&app->prefs);
+        /* 1-based index of a pin the migration appended; 0 when none. */
+        app->migrated_pin = app->prefs.count > before ? app->prefs.count : 0;
+    }
     if (fclose(file)) state = -1;
     return state;
 }
@@ -2983,7 +2988,15 @@ int main(int argc, char **argv)
     }
     if (!canonical_path("SYS:System/CLI",app->shell_launcher_path)) app->shell_launcher_path[0] = 0;
     for (i = 0; i < app->prefs.count; ++i) {
-        int loaded = pin_path(app,app->prefs.paths[i],0);
+        int loaded;
+        if (app->migrated_pin == i+1) {
+            /* The old Folder Stack drawer is gone: drop it, as 1.0 beta 5
+               did, and the save below removes it from the file. */
+            BPTR lock = Lock((STRPTR)app->prefs.paths[i],ACCESS_READ);
+            if (!lock) continue;
+            UnLock(lock);
+        }
+        loaded = pin_path(app,app->prefs.paths[i],0);
         if (loaded < 0) goto done;
         if (!loaded) app->incomplete_pins = 1;
     }
