@@ -534,3 +534,11 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
 - Rule: when an agent gesture fails, check downs/ambiguous in the profile
   and rerun it on the previous build before treating it as a regression.
   Also: the dock writes only ENVARC:DockAwesome.json; ENV: is the boot copy.
+
+## Bound every Amiga listing (2026-11-25)
+- `List Archives: ALL PAT=...` over a large volume ran past the agent's
+  timeout; the first Break went to two processes and could have stopped the
+  test dock. List one drawer level with a pattern instead, and check Status
+  after any Break the agent sends.
+- A Codex review run in the repository follows AGENTS.md and writes its
+  own section into tasks/todo.md: check `git status` after every Codex run.

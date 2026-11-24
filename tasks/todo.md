@@ -1684,8 +1684,48 @@ Plan: tasks/plan-folder-stacks.md (D1-D17). Branch folder-stacks, one PR.
       wrote the file. Profile: prefetch stacks=1 pending=0 reads=63
       cache=63/512 evicted=0; Input downs=7 ups=7. --pip-dump: the first and
       last of 13 icons 492 px apart = 12 x 41 (5 px gaps, no divider).
-- [ ] Opus review rounds until clean; Codex review.
-- [ ] Hardware matrix §4.4 per available boot.
-- [ ] Performance §4.5 old/new/old (first open AmiKit; hover Coffin, AmiKit).
+- [x] Opus round 1: no P0/P1; one P2 (a legacy "folder" that no longer
+      loads blocks saving like any missing pin) is plan assumption A5, kept
+      as designed and listed for the owner. No code change, so no round 2.
+- [x] Codex round 1: P2, a finished prefetch slot kept its old first page
+      after Scale moved the anchor; fixed (slot starts over when the
+      anchor moves, 3f1fe03). Codex round 2: no findings.
+- [x] Hardware matrix §4.4, ApolloOS R9.5 (Kickstart 51.51, core 12856),
+      builds 530 (steps 2-8, smoke run above) and 533 (reviewed):
+      1 --caps of build 533 identical to the 1.0b5 baseline (diff).
+      2 migration passed (smoke run; again in each build-533 run below).
+      3 no divider: 13 icons at a 41 px pitch (--pip-dump, build 530).
+      4-8 passed with build 530 (smoke run). Build 533 differs only in the
+      prefetch slot reset; with it three stacks opened and closed, and the
+      user's real file migrated.
+      9 build 533 installed in place (SYS:WBStartup/DockAwesome), started
+      with WBRun, its Downloads stack opened from the dock; RAM: clean.
+      ENVARC:DockAwesome.json migrated: no "folder", Personal:Downloads
+      last. The old 0.527 binary is SYS:WBStartup/Disabled/
+      DockAwesome-locked-delete (in use until reboot).
+- [x] Performance, ApolloOS (extra; not one of the required boots), build
+      533 against main 989cfa7 built in a worktree, same config (13 pins
+      including Archives:Games and ApolloOS:Prefs, "folder" Downloads),
+      45 s idle with the pointer off the dock before the first click:
+
+      | run | stack | first paint ms | entrance ms |
+      | --- | --- | --- | --- |
+      | old 1 | Downloads | 110.5 | 148.3 |
+      | new | Downloads | 106.3 | 132.2 |
+      | new | Games (30 entries, same box) | 109.9 | 149.9 |
+      | new | Prefs (smaller page) | 70.3 | 153.4 |
+      | old 2 | Downloads | 110.2 | 174.7 |
+
+      New: prefetch stacks=3 pending=0 reads=81 cache=81/512 evicted=0.
+      Pass: every new value is under the old maximum (110.5 / 174.7).
+      Hover, --bench-sweep 8 (synthetic sweep), two old/new/old sets:
+      render_us_avg 6800/6802/6793 and 7091/6967/7106; stalled 0 in all
+      six runs. New lies within the spread of the old runs (6793-7106).
+- [ ] NOT RUN: matrix on Coffin, AmigaOS 3.2.3, 3.9, 3.1.4.1 and AmiKit XE;
+      first-open comparison on AmiKit; hover comparison on Coffin and
+      AmiKit. Only ApolloOS was booted and no user was available for
+      reboots or the AmiKit gestures.
+- [ ] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete after the
+      next ApolloOS boot.
 - [ ] Fable final pass.
 - [ ] Handover, release-notes draft, one push, PR.
