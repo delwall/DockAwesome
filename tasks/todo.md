@@ -1621,4 +1621,13 @@ to the same slot (inverted offset test, store attributes required).
       (surface->poll, live capture), 109 of 743 frames stalled. The
       animation rate is 10 ms before and after the patch, so probably
       pre-existing; an A/B hover run with the user's mouse would settle it.
-- [ ] 3.2.3: plain Workbench behaves as before (Coffin and ApolloOS done).
+- [x] AmigaOS 3.2.3 (2026-11-24, 24-bit Workbench): the old -locked-delete
+      deleted; 8f55e11 installed (release 1.0b4 is the new
+      Disabled/DockAwesome-locked-delete: delete after the next 3.2.3 boot).
+      Agent test with --profile: hover 0 stalled frames, desktop drop pinned
+      RAM Disk at slot 8 (added=1), clean Ctrl-C. Dragging it out failed at
+      y 700 with the patch AND with release 1.0b4 (downs=0: the press was
+      below the icons at size 36); at y 680 it worked (downs=1), prefs as
+      before. Restarted with WBRun; RAM: clean.
+- [x] Patch verified on all four boots it touches (AmiKit, ApolloOS,
+      Coffin, 3.2.3). Ready to push with the branch.

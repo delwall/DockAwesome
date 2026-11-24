@@ -525,3 +525,12 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
 - Rule: before changing a call's arguments, read the header's default for
   each argument. And a "no alert" on the dev machine is not evidence without
   a baseline where the alert shows.
+
+## A failed agent gesture: aim before blaming the build (2026-11-24)
+- On 3.2.3 a drag-out at y 700 did nothing; the same drag on release
+  1.0b4 failed the same way, and at y 680 it worked. The dock's icons sit
+  higher at size 36 than at Coffin's 32, and a press off the icons is not
+  counted (downs=0, no ambiguous/overflow).
+- Rule: when an agent gesture fails, check downs/ambiguous in the profile
+  and rerun it on the previous build before treating it as a regression.
+  Also: the dock writes only ENVARC:DockAwesome.json; ENV: is the boot copy.
