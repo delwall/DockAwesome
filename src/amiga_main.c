@@ -30,23 +30,10 @@ static uint32_t new_pin_id(App *app)
     return app->next_pin_id;
 }
 
-static int stack_index(const App *app)
-{
-    return app->count && app->items[app->count-1].stack ? app->count-1 : app->count;
-}
-
-enum { STACK_DIVIDER_GAP = 12 };
-
 Item *append_item(App *app, const char *path, int kind, DockCache *cache)
 {
-    int index = stack_index(app);
-    Item *item = &app->items[index];
+    Item *item = &app->items[app->count];
     uint32_t pin_id = new_pin_id(app);
-    if (index < app->count) {
-        input_invalidate(app);
-        app->items[index+1] = *item;
-        app->placement[index+1] = app->placement[index];
-    }
     memset(item,0,sizeof(*item));
     strcpy(item->path,path);
     item->pin_id = pin_id;
@@ -55,23 +42,6 @@ Item *append_item(App *app, const char *path, int kind, DockCache *cache)
     memset(cache,0,sizeof(*cache));
     ++app->count;
     return item;
-}
-
-/* Transfer cache ownership both ways so settings can roll back on failure. */
-static void exchange_stack(App *app, int index, Item *replacement)
-{
-    Item previous = {0};
-    if (index < app->count && app->items[index].stack) {
-        previous = app->items[index];
-        memmove(app->items+index,app->items+index+1,(app->count-index-1)*sizeof(Item));
-        --app->count;
-    }
-    if (replacement->stack) {
-        memmove(app->items+index+1,app->items+index,(app->count-index)*sizeof(Item));
-        app->items[index] = *replacement;
-        ++app->count;
-    }
-    *replacement = previous;
 }
 
 /* The gap in slot opens from the shown row's icon there (past the end, the
@@ -358,27 +328,23 @@ static int load_stack_icon(const App *app, const char *path, DockImage *icon)
     return load_icon(app,path,icon,NULL) || load_icon(app,"ENV:Sys/def_drawer",icon,NULL);
 }
 
-static int prepare_stack(App *app, const char *path, const DockSettings *settings, Item *item)
+/* A pinned drawer opens as a Folder Stack: a directory (not a link to
+   one, as read_folder lists it) that is not a volume root. */
+static int drawer_is_stack(const char *path)
 {
-    BPTR lock = Lock((STRPTR)path,ACCESS_READ);
+    size_t n = strlen(path);
+    BPTR lock;
     struct FileInfoBlock *fib;
-    DockImage icon = {0};
     int ok;
+    if (!n || path[n-1] == ':') return 0;
+    lock = Lock((STRPTR)path,ACCESS_READ);
     if (!lock) return 0;
     fib = AllocDosObject(DOS_FIB,NULL);
     ok = fib && Examine(lock,fib) && fib->fib_DirEntryType > 0 &&
-        NameFromLock(lock,(STRPTR)item->path,sizeof(item->path));
+        fib->fib_DirEntryType != ST_SOFTLINK;
     if (fib) FreeDosObject(DOS_FIB,fib);
     UnLock(lock);
-    if (!ok || !load_stack_icon(app,item->path,&icon)) return 0;
-    ok = dock_cache_build(&item->cache,&icon,settings);
-    free(icon.pixels);
-    if (!ok) return 0;
-    item->pin_id = new_pin_id(app);
-    item->kind = PIN_DRAWER;
-    item->stack = 1;
-    app->prefetch_pending = 1;
-    return 1;
+    return ok;
 }
 
 /* A deferred report waits until the caller has replied to its Workbench
@@ -395,7 +361,8 @@ static int pin_path(App *app, const char *path, int defer)
 {
     char clean[PATH_CAP], absolute[PATH_CAP];
     size_t n;
-    int i, kind;
+    int i, kind, stack;
+    Item *item;
     DockImage source = {0};
     DockCache cache = {0};
     if (!path || !*path || strlen(path) >= sizeof(clean)) return 0;
@@ -409,7 +376,11 @@ static int pin_path(App *app, const char *path, int defer)
         return -1;
     }
     kind = is_shell_launcher(app,clean) ? PIN_SHELL : PIN_PROGRAM;
-    if (!load_icon(app, clean, &source,&kind)) {
+    if (load_icon(app, clean, &source,&kind)) stack = kind == PIN_DRAWER && drawer_is_stack(clean);
+    else if (drawer_is_stack(clean) && load_icon(app,"ENV:Sys/def_drawer",&source,NULL)) {
+        /* A drawer without an icon shows the one Workbench gives it. */
+        kind = PIN_DRAWER; stack = 1;
+    } else {
         char error[PATH_CAP+100];
         snprintf(error, sizeof(error), "Cannot read this icon:\n%s\nCheck its .info file and icon.library.", clean);
         pin_report(app,defer,error); return 0;
@@ -420,7 +391,13 @@ static int pin_path(App *app, const char *path, int defer)
         return -1;
     }
     free(source.pixels);
-    return (int)(append_item(app,clean,kind,&cache)-app->items)+1;
+    item = append_item(app,clean,kind,&cache);
+    if (stack) {
+        item->stack = 1;
+        item->prefetch = 1; item->prefetch_turns = 0;
+        app->prefetch_pending = 1;
+    }
+    return (int)(item-app->items)+1;
 }
 
 static int bounded_option(const char *text, int low, int high)
@@ -450,6 +427,7 @@ static int read_config(App *app)
     UnLock(lock);
     if (!file) return -1;
     if (!dock_prefs_read(file, &app->prefs)) state = -1;
+    else app->prefs_migrated = dock_prefs_migrate(&app->prefs);
     if (fclose(file)) state = -1;
     return state;
 }
@@ -478,7 +456,7 @@ static __attribute__((noinline)) int save_config(App *app)
     prefs->pip_y_offset = app->pip_y_offset;
     prefs->count = 0;
     for (i = 0; i < app->count; ++i)
-        if (!app->items[i].temporary && !app->items[i].stack)
+        if (!app->items[i].temporary)
             strcpy(prefs->paths[prefs->count++],app->items[i].path);
     snprintf(temp, sizeof(temp), "%s.new", app->config);
     snprintf(backup, sizeof(backup), "%s.bak", app->config);
@@ -798,7 +776,7 @@ static void update_target(App *app)
             int slot = dock_edge_insertion_slot(&app->settings, app->edge, app->count,
                 app->width, app->height, app->screen->MouseX-app->left, app->screen->MouseY-app->top);
             DockPlacement gap;
-            if (slot > stack_index(app)) slot = stack_index(app);
+            if (slot > app->count) slot = app->count;
             if (dock_edge_gap_layout(&app->settings, app->edge, app->count,
                     app->width, app->height, slot, 0, 0, 0, app->target, &gap)) {
                 open_gap(app, slot, &gap, app->placement, app->count);
@@ -1075,8 +1053,8 @@ static void update_drop_catcher(App *app)
     publish_receiver(app);
 }
 
-/* A UI requester (ASL) blocks the main loop: hide PiP and let input pass
-   through until it returns. The next loop pass presents PiP again. */
+/* The main loop blocks (the status worker is waited for at exit): hide
+   PiP and let input pass through. The next loop pass presents PiP again. */
 void ui_blocking(void *context, int blocking)
 {
     App *app = (App *)context;
@@ -1103,7 +1081,6 @@ static int draft_settings(const App *app, const DockUIPrefs *draft, int size,
     DockSettings next = *previous;
     int percent = draft->scale_percent;
     next.base_size = size;
-    next.end_gap = draft->folder[0] ? STACK_DIVIDER_GAP : 0;
     next.max_size = dock_scaled_size(size,percent);
     if (!app->scale_percent && size == previous->base_size && percent == displayed_scale(app) &&
         next.max_size != previous->max_size) {
@@ -1123,13 +1100,11 @@ static int draft_settings(const App *app, const DockUIPrefs *draft, int size,
 /* Whether the draft's row fits its edge and its cache fits the budget. */
 static int draft_fits(const App *app, const DockUIPrefs *draft, const DockSettings *s)
 {
-    int has_stack = stack_index(app) < app->count;
     return draft->edge >= DOCK_EDGE_BOTTOM && draft->edge <= DOCK_EDGE_RIGHT &&
-        dock_items_fit(s,app->count+!!draft->folder[0]-has_stack,
-            viewport_limit(app,(DockEdge)draft->edge));
+        dock_items_fit(s,app->count,viewport_limit(app,(DockEdge)draft->edge));
 }
 
-/* The largest Size that Save accepts for the draft's Scale, edge and stack. */
+/* The largest Size that Save accepts for the draft's Scale and edge. */
 int ui_fit(void *context, const DockUIPrefs *draft)
 {
     const App *app = (const App *)context;
@@ -1143,8 +1118,7 @@ int ui_fit(void *context, const DockUIPrefs *draft)
 /* The saved preferences as Settings shows them. */
 DockUIPrefs current_ui_prefs(const App *app)
 {
-    DockUIPrefs prefs = {app->settings.base_size,displayed_scale(app),app->edge,{0}};
-    strcpy(prefs.folder,app->prefs.folder);
+    DockUIPrefs prefs = {app->settings.base_size,displayed_scale(app),app->edge};
     return prefs;
 }
 
@@ -1262,6 +1236,16 @@ static void profile_report(App *app)
     printf("Dock frames during Folder Stack motion: %lu, us_avg=%lu\n",
         (unsigned long)app->stats.folder_dock_draws,
         ticks_us(app,app->stats.folder_dock_ticks,app->stats.folder_dock_draws));
+    {
+        int stacks = 0, pending = 0, i;
+        for (i = 0; i < app->count; ++i) if (app->items[i].stack) {
+            ++stacks;
+            pending += app->items[i].prefetch;
+        }
+        printf("Folder Stack prefetch: stacks=%d pending=%d reads=%lu cache=%d/%d evicted=%lu\n",
+            stacks,pending,(unsigned long)app->stats.prefetch_reads,app->stats.cache_used,
+            app->stats.cache_capacity,app->stats.cache_evicted);
+    }
 
     if (app->damage_check)
         printf("Damage check: frames=%lu compose_mismatch=%lu convert_mismatch=%lu\n",
@@ -1394,8 +1378,8 @@ static int in_capsule(int x, int y, int ax, int ay, int bx, int by, int r)
    it zooms and filters like the others. Built with the surface: a 256 px
    source took 2.3 s on the 68080 and stalled the first Folder Stack
    opening. Each surface opening reuses it while the icon sizes, cache
-   limit and edge it was built for are unchanged, and frees it without a
-   stack. */
+   limit and edge it was built for are unchanged, and frees it when no pin
+   is a stack. */
 void stack_button_build(App *app)
 {
     enum { SURFACE = 44, SURFACE_ALPHA = 176, RIM = 132, RIM_ALPHA = 220, MARK = 212 };
@@ -1405,7 +1389,8 @@ void stack_button_build(App *app)
     int ax = 36, ay = 44, bx = 50, by = 58, cx = 64, cy = 44, x, y, ok;
     DockImage source = {n,n,NULL};
     const DockSettings *built = &app->button_settings, *now = &app->settings;
-    if (stack_index(app) >= app->count) { dock_cache_free(&app->stack_button); return; }
+    for (x = 0; x < app->count && !app->items[x].stack; ++x) {}
+    if (x == app->count) { dock_cache_free(&app->stack_button); return; }
     if (app->stack_button.levels && app->button_edge == app->edge &&
         built->base_size == now->base_size && built->max_size == now->max_size &&
         built->levels == now->levels && built->cache_limit == now->cache_limit) return;
@@ -1450,7 +1435,7 @@ void stack_button_build(App *app)
     else { app->button_settings = app->settings; app->button_edge = app->edge; }
 }
 
-/* The stack pin's image t/256 of the way from its icon to the close
+/* The open stack pin's image t/256 of the way from its icon to the close
    button (t a quarter step): alpha weighted, so soft edges do not darken.
    Full progress uses the button. */
 static const DockCache *stack_morph(App *app, const DockCache *icon, int level, int t)
@@ -1529,7 +1514,7 @@ static void publish_close_button(App *app, const DockPlacement *placement, int c
 {
     int i, valid = 0, left = 0, top = 0, right = 0, bottom = 0;
     if (app->stack_button_shown && !app->moving_item)
-        for (i = 0; i < count; ++i) if (app->items[row_item(app,i)].stack) {
+        for (i = 0; i < count; ++i) if (app->items[row_item(app,i)].pin_id == app->open_stack_pin) {
             left = app->left+placement[i].x; top = app->top+placement[i].y;
             right = left+placement[i].size; bottom = top+placement[i].size;
             valid = 1;
@@ -1565,13 +1550,14 @@ static void draw(App *app)
     /* The open stack's tip points at the pin as the row zooms (before this
        frame, so PiP's cut-out for the box follows it too). */
     if (app->stack_button_shown && !app->moving_item)
-        for (i = 0; i < count; ++i) if (app->items[row_item(app,i)].stack)
+        for (i = 0; i < count; ++i) if (app->items[row_item(app,i)].pin_id == app->open_stack_pin)
             dock_ui_point_folder_tip(app->ui,app->left+placement[i].x+placement[i].size/2,
                 app->top+placement[i].y+placement[i].size/2);
     for (i = 0; i < count; ++i) {
         int item = row_item(app,i);
         icons[i] = item == dragged ? NULL : &app->items[item].cache;
-        if (app->items[item].stack && icons[i] && app->stack_button.levels && app->morph)
+        if (app->items[item].pin_id == app->open_stack_pin && icons[i] && app->stack_button.levels &&
+            app->morph)
             icons[i] = stack_morph(app,icons[i],placement[i].level,app->morph);
         if (selected && selected == app->items[item].pin_id) app->renderer.pressed_item = i+1;
     }
@@ -1735,7 +1721,7 @@ static __attribute__((noinline)) int accept_drops(App *app, int *recreate)
             interaction_cancel_for(app, app->gesture.token);
         ++app->stats.drop_messages;
         if (snap && app->displayed_drop_slot >= 0) slot = app->displayed_drop_slot;
-        if (slot < 0 || slot > stack_index(app)) slot = stack_index(app);
+        if (slot < 0 || slot > app->count) slot = app->count;
         for (i = 0; i < msg->am_NumArgs; ++i) {
             const struct WBArg *arg = &msg->am_ArgList[i];
             char path[PATH_CAP];
@@ -1750,7 +1736,7 @@ static __attribute__((noinline)) int accept_drops(App *app, int *recreate)
                 int target = slot;
                 if (index < 0 || (!added && !in_slot)) continue;
                 if (!added && index < target) --target;
-                if (target >= stack_index(app)) target = stack_index(app)-1;
+                if (target >= app->count) target = app->count-1;
                 slot = target+1;
                 if (app->items[index].temporary) {
                     app->items[index].temporary = 0;
@@ -1764,8 +1750,11 @@ static __attribute__((noinline)) int accept_drops(App *app, int *recreate)
                     dock_reorder(app->placement,sizeof(*app->placement),app->count,index,target);
                 } else *recreate = 1;
                 changed = 1;
-                if (added) ++app->stats.drop_added;
-                else ++app->stats.drop_reordered;
+                if (added) {
+                    ++app->stats.drop_added;
+                    /* The first stack needs its close button (else a no-op). */
+                    stack_button_build(app);
+                } else ++app->stats.drop_reordered;
                 if (snap) {
                     app->snap_wait_motion = 1;
                     app->snap_x = app->left+msg->am_MouseX;
@@ -1783,7 +1772,13 @@ static __attribute__((noinline)) int accept_drops(App *app, int *recreate)
 static int remove_pin(App *app, uint32_t pin_id)
 {
     int index = pin_index(app, pin_id);
-    if (index < 0 || app->items[index].temporary || app->items[index].stack) return 0;
+    if (index < 0 || app->items[index].temporary) return 0;
+    app->stack_next_pin = 0;
+    /* The open box goes with its stack. */
+    if (pin_id == app->open_stack_pin && dock_ui_folder_open(app->ui)) {
+        dock_ui_dismiss_popup(app->ui);
+        if (app->timer_failed) dock_ui_finish_folder_motion(app->ui);
+    }
     interaction_cancel(app);
     dock_gesture_reset(&app->gesture);
     erase_item(app,index);
@@ -1798,16 +1793,12 @@ static DockGestureInput gesture_point(App *app, int kind, uint32_t token,
     DockGestureInput in = {0};
     in.kind = kind; in.token = token; in.pin_id = pin_id; in.hit_id = hit_id;
     in.x = x; in.y = y; in.flags = flags; in.target_slot = -1;
-    if (kind == DOCK_GESTURE_DOWN) {
-        int index = pin_index(app,pin_id);
-        if (index >= 0 && app->items[index].stack) in.flags |= DOCK_INPUT_FIXED;
-    }
     if (kind != DOCK_GESTURE_DOWN && (flags & DOCK_INPUT_VALID) == DOCK_INPUT_VALID &&
         !(flags & DOCK_INPUT_CANCELLED)) {
         if (app->count > 1)
             in.target_slot = dock_edge_insertion_slot(&app->settings, app->edge, app->count-1,
                 app->width, app->height, x, y);
-        if (in.target_slot >= stack_index(app)) in.target_slot = stack_index(app)-1;
+        if (in.target_slot >= app->count) in.target_slot = app->count-1;
         /* Near what is shown: the row as it moves and the plate over the
            gap. The frozen row from the press, zoomed there, reached ~77 px
            past the plate a removal shows, so a pin far off the left end
@@ -1822,7 +1813,7 @@ static DockGestureInput gesture_point(App *app, int kind, uint32_t token,
         if (!in.outside && in.target_slot < 0 && app->count > 1) {
             in.target_slot = dock_edge_row_slot(&app->settings, app->edge, app->count-1,
                 app->width, app->height, x, y);
-            if (in.target_slot >= stack_index(app)) in.target_slot = stack_index(app)-1;
+            if (in.target_slot >= app->count) in.target_slot = app->count-1;
         }
     }
     return in;
@@ -1895,28 +1886,69 @@ static int launch_pin(App *app, const char *path, int pinned)
     return opened;
 }
 
-/* dock_ui_prefetch_folder for the stack pin. */
-static int prefetch_stack_icons(App *app)
+/* Where the Folder Stack box of item index opens: its icon's dock side. */
+static void stack_anchor(const App *app, int index, int *x, int *y)
+{
+    DockRect icon = hover_label_anchor(app,index);
+    *x = app->edge == DOCK_EDGE_LEFT ? icon.right : app->edge == DOCK_EDGE_RIGHT ?
+        icon.left : (icon.left+icon.right)/2;
+    *y = app->edge == DOCK_EDGE_BOTTOM ? icon.top : (icon.top+icon.bottom)/2;
+}
+
+/* Read every stack's first page ahead again (a new stack, new settings). */
+static void arm_prefetch(App *app)
 {
     int i;
-    for (i = 0; i < app->count; ++i)
-        if (app->items[i].stack)
-            return dock_ui_prefetch_folder(app->ui,app->items[i].path,app->settings.base_size,
-                read_folder_icon,app);
-    return 0;
+    for (i = 0; i < app->count; ++i) if (app->items[i].stack) {
+        app->items[i].prefetch = 1;
+        app->items[i].prefetch_turns = 0;
+        app->prefetch_pending = 1;
+    }
+}
+
+/* One idle read-ahead step, round robin over the stacks still pending
+   (fewest turns first; ties to the stack nearest the pointer along the
+   dock). 1 while any stack is pending. */
+static int prefetch_stack_icons(App *app)
+{
+    DockPlacement rest[DOCK_MAX_ITEMS];
+    int i, best = -1, best_distance = 0, x, y, pending = 0;
+    int pointer = app->edge == DOCK_EDGE_BOTTOM ? app->screen->MouseX-app->left :
+        app->screen->MouseY-app->top;
+    if (!dock_edge_layout(&app->settings,app->edge,app->count,app->width,app->height,0,0,0,rest))
+        memcpy(rest,app->placement,(size_t)app->count*sizeof(*rest));
+    for (i = 0; i < app->count; ++i) {
+        const Item *item = &app->items[i];
+        int centre, distance;
+        if (!item->stack || !item->prefetch) continue;
+        centre = (app->edge == DOCK_EDGE_BOTTOM ? rest[i].x : rest[i].y)+rest[i].size/2;
+        distance = abs(centre-pointer);
+        if (best < 0 || item->prefetch_turns < app->items[best].prefetch_turns ||
+            (item->prefetch_turns == app->items[best].prefetch_turns && distance < best_distance)) {
+            best = i; best_distance = distance;
+        }
+    }
+    if (best < 0) return 0;
+    stack_anchor(app,best,&x,&y);
+    ++app->items[best].prefetch_turns;
+    ++app->stats.prefetch_reads;
+    if (!dock_ui_prefetch_folder(app->ui,best,app->edge,x,y,app->items[best].path,
+            app->settings.base_size,read_folder_icon,app))
+        app->items[best].prefetch = 0;
+    for (i = 0; i < app->count; ++i) pending += app->items[i].stack && app->items[i].prefetch;
+    return pending > 0;
 }
 
 static void open_stack_view(App *app, int index)
 {
     uint64_t started = app->profile ? profile_clock() : 0;
-    DockRect icon = hover_label_anchor(app,index);
-    int x = app->edge == DOCK_EDGE_LEFT ? icon.right : app->edge == DOCK_EDGE_RIGHT ?
-        icon.left : (icon.left+icon.right)/2;
-    int y = app->edge == DOCK_EDGE_BOTTOM ? icon.top : (icon.top+icon.bottom)/2;
+    int x, y;
+    stack_anchor(app,index,&x,&y);
     reset_hover_label(app);
     interaction_cancel(app);
     if (dock_ui_open_folder(app->ui,app->edge,x,y,app->items[index].path,
             app->settings.base_size,read_folder_icon,app,app->profile)) {
+        app->open_stack_pin = app->items[index].pin_id;
         if (app->timer_failed) dock_ui_finish_folder_motion(app->ui);
         if (app->profile && app->clock_hz) {
             printf("Folder Stack first paint: %lu us\n",
@@ -1945,12 +1977,14 @@ static void apply_gesture(App *app, const DockGestureInput *in, int *redraw, int
        press activates the dock window, which closes the stack, sometimes
        at once (no backdrop) or before the release arrives; the button the
        user pressed is the one last drawn. */
-    if (!was_active && app->gesture.active)
+    if (!was_active && app->gesture.active) {
         app->stack_close_press = app->stack_button_shown ||
             dock_ui_folder_open(app->ui) || dock_ui_folder_moving(app->ui);
-    int movable = index >= 0 && !app->items[index].temporary && !app->items[index].stack;
+        app->stack_next_pin = 0; /* a new press replaces a stack waiting to open */
+    }
+    int movable = index >= 0 && !app->items[index].temporary;
     int commit = (effect.flags & DOCK_EFFECT_REORDER) && movable &&
-        effect.target_slot >= 0 && effect.target_slot < stack_index(app);
+        effect.target_slot >= 0 && effect.target_slot < app->count;
     if (effect.flags & DOCK_EFFECT_REDRAW) *redraw = 1;
     if (effect.flags & DOCK_EFFECT_FOCUS) {
         if (app->label_pin_id) reset_hover_label(app);
@@ -1994,9 +2028,13 @@ static void apply_gesture(App *app, const DockGestureInput *in, int *redraw, int
         int focused = item->running && (item->kind == PIN_PROGRAM || item->owner) &&
             item_window_action(app,item,WINDOW_FOCUS);
         /* A click on the open stack's close button (native modes; PiP
-           consumes it in the handler) closes it rather than reopening. */
-        if (item->stack && app->stack_close_press) dock_ui_dismiss_popup(app->ui);
-        else if (item->stack) open_stack_view(app,index);
+           consumes it in the handler) closes it rather than reopening. A
+           click on another stack while a box is open or moving closes that
+           box, and the event loop opens this one once it is gone. */
+        if (item->stack && app->stack_close_press) {
+            dock_ui_dismiss_popup(app->ui);
+            if (item->pin_id != app->open_stack_pin) app->stack_next_pin = item->pin_id;
+        } else if (item->stack) open_stack_view(app,index);
         /* A click on another pin closes the open stack, as on the Mac. */
         else if (dock_ui_folder_open(app->ui)) {
             dock_ui_dismiss_popup(app->ui);
@@ -2195,7 +2233,7 @@ static int update_drag_preview(App *app)
     int x = app->left+gesture->x, y = app->top+gesture->y;
     const DockImage *icon = NULL;
     int inside = 0; /* the dock itself can draw the icon */
-    if (index >= 0 && !app->items[index].temporary && !app->items[index].stack) {
+    if (index >= 0 && !app->items[index].temporary) {
         int level = app->moving_item ? app->held_icon.level : app->placement[index].level;
         int visible = pip_visible_width(app);
         int left = gesture->x-app->items[index].cache.image[level].width/2;
@@ -2269,6 +2307,7 @@ static void sync_input_ui(App *app)
 static void open_menu(App *app, int x, int y, uint32_t pin_id)
 {
     int opened, can_keep = 0, stack = 0, action = DOCK_UI_NONE;
+    app->stack_next_pin = 0;
     if (pin_id) {
         int index = pin_index(app,pin_id);
         const Item *item;
@@ -2356,11 +2395,7 @@ int apply_preferences(App *app, const DockUIPrefs *prefs)
     DockSettings previous = app->settings, next;
     DockEdge previous_edge = app->edge;
     DockCache *swap = NULL;
-    Item stack = {0};
-    char previous_folder[PATH_CAP];
     int i, changed_sizes, ok, old_count = app->count;
-    int slot = stack_index(app), has_stack = slot < old_count;
-    int change_stack = strcmp(prefs->folder,app->prefs.folder) != 0 || (!!prefs->folder[0] != has_stack);
     int previous_scale = app->scale_percent, scale;
     /* The same rules as the Settings Size slider (ui_fit). */
     if (!draft_settings(app,prefs,prefs->size,&next,&scale)) {
@@ -2372,7 +2407,7 @@ int apply_preferences(App *app, const DockUIPrefs *prefs)
         return 0;
     }
     changed_sizes = next.base_size != previous.base_size || next.max_size != previous.max_size;
-    if (!change_stack && !changed_sizes && prefs->edge == (int)app->edge) {
+    if (!changed_sizes && prefs->edge == (int)app->edge) {
         app->scale_percent = scale;
         ok = save_config(app);
         if (!ok) app->scale_percent = previous_scale;
@@ -2384,7 +2419,6 @@ int apply_preferences(App *app, const DockUIPrefs *prefs)
         for (i = 0; i < app->count; ++i) {
             DockImage image = {0};
             char status[64];
-            if (change_stack && i == slot) continue;
             /* Rebuilding takes seconds at large sizes: show progress. */
             snprintf(status,sizeof(status),"Resizing icons %d/%d...",i+1,app->count);
             dock_ui_set_busy(app->ui,status);
@@ -2401,24 +2435,10 @@ int apply_preferences(App *app, const DockUIPrefs *prefs)
             }
         }
     }
-    if (change_stack && prefs->folder[0]) dock_ui_set_busy(app->ui,"Reading Folder Stack...");
-    if (change_stack && prefs->folder[0] && !prepare_stack(app,prefs->folder,&next,&stack)) {
-        if (swap) for (i = 0; i < old_count; ++i) dock_cache_free(&swap[i]);
-        free(swap);
-        dock_ui_set_busy(app->ui,NULL);
-        message("Cannot open this drawer. Choose another one.");
-        return 0;
-    }
     dock_ui_set_busy(app->ui,"Opening the dock...");
     close_surface(app);
     if (swap) for (i = 0; i < app->count; ++i) {
-        if (change_stack && i == slot) continue;
         DockCache old = app->items[i].cache; app->items[i].cache = swap[i]; swap[i] = old;
-    }
-    if (change_stack) {
-        strcpy(previous_folder,app->prefs.folder);
-        strcpy(app->prefs.folder,stack.path);
-        exchange_stack(app,slot,&stack);
     }
     app->settings = next; app->edge = (DockEdge)prefs->edge;
     app->scale_percent = scale;
@@ -2426,12 +2446,7 @@ int apply_preferences(App *app, const DockUIPrefs *prefs)
     if (ok && !save_config(app)) ok = 0;
     if (!ok) {
         close_surface(app);
-        if (change_stack) {
-            exchange_stack(app,slot,&stack);
-            strcpy(app->prefs.folder,previous_folder);
-        }
         if (swap) for (i = 0; i < app->count; ++i) {
-            if (change_stack && i == slot) continue;
             DockCache failed = app->items[i].cache; app->items[i].cache = swap[i]; swap[i] = failed;
         }
         app->settings = previous; app->edge = previous_edge;
@@ -2439,12 +2454,11 @@ int apply_preferences(App *app, const DockUIPrefs *prefs)
         if (!open_surface(app))
             fail_after_cleanup(app,"Cannot restore the dock surface. Check graphics memory and screen size.");
         else message("Cannot apply settings. Previous settings restored.");
-    }
+    } else arm_prefetch(app);
     if (swap) {
         for (i = 0; i < old_count; ++i) dock_cache_free(&swap[i]);
         free(swap);
     }
-    dock_cache_free(&stack.cache);
     dock_ui_set_busy(app->ui,NULL);
     return ok;
 }
@@ -2577,6 +2591,11 @@ static __attribute__((noinline)) void event_loop(App *app)
                 if (index >= 0 && app->items[index].stack) open_stack_view(app,index);
             } else if (action.type == DOCK_UI_OPEN_PATH) {
                 if (launch_pin(app,action.path,0)) status_changed(app);
+            } else if (action.type == DOCK_UI_OPEN_DRAWER) {
+                /* The stack's drawer as a window (a lister under Directory Opus). */
+                int index = pin_index(app,app->menu_pin_id);
+                if (index >= 0 && app->items[index].stack && launch_pin(app,app->items[index].path,1))
+                    status_changed(app);
             }
             else if (action.type == DOCK_UI_KEEP_ITEM) keep_menu_item(app);
             else if (action.type >= DOCK_UI_NEW_SHELL && action.type <= DOCK_UI_QUIT_SHELL)
@@ -2663,6 +2682,14 @@ static __attribute__((noinline)) void event_loop(App *app)
             apply_gesture(app, &in, &redraw, &save, &recreate);
         }
         if (update_drag_preview(app)) redraw = 1;
+        /* A stack clicked while another stack's box was open or moving
+           opens once that box has gone. */
+        if (app->stack_next_pin && !recreate && running && !app->gesture.active &&
+            !dock_ui_busy(app->ui) && !dock_ui_folder_pending(app->ui)) {
+            int index = pin_index(app,app->stack_next_pin);
+            app->stack_next_pin = 0;
+            if (index >= 0 && app->items[index].stack) { open_stack_view(app,index); redraw = 1; }
+        }
         /* The Folder Stack pin swaps to its close button and back. */
         if (dock_ui_folder_open(app->ui) != app->stack_button_shown) redraw = 1;
         if (save) save_config(app);
@@ -2944,38 +2971,21 @@ int main(int argc, char **argv)
     if (app->features.error) { message(dock_profile_error_text(app->features.error)); goto done; }
     app->ui = create_ui(app);
     if (!app->ui) { message("Cannot set up the dock controls."); goto done; }
-    dock_ui_set_blocking_hook(app->ui,ui_blocking,app);
     dock_ui_set_fit_hook(app->ui,ui_fit,app);
     if (app->profile) dock_ui_set_field_counter(app->ui,&app->vblank.fields);
     use_pixel_backend(app);
-    {
-        DockSettings configured = app->settings;
-        int count = app->prefs.count+!!app->prefs.folder[0];
-        configured.end_gap = app->prefs.folder[0] ? STACK_DIVIDER_GAP : 0;
-        if (!dock_items_fit(&configured,count,viewport_limit(app,app->edge))) {
-            const char *error = "The saved pins do not fit the screen or cache.\n"
-                "Use smaller icons or less zoom. Preferences are unchanged.";
-            if (argc) puts(error);
-            else message(error);
-            goto done;
-        }
+    if (!dock_items_fit(&app->settings,app->prefs.count,viewport_limit(app,app->edge))) {
+        const char *error = "The saved pins do not fit the screen or cache.\n"
+            "Use smaller icons or less zoom. Preferences are unchanged.";
+        if (argc) puts(error);
+        else message(error);
+        goto done;
     }
     if (!canonical_path("SYS:System/CLI",app->shell_launcher_path)) app->shell_launcher_path[0] = 0;
     for (i = 0; i < app->prefs.count; ++i) {
         int loaded = pin_path(app,app->prefs.paths[i],0);
         if (loaded < 0) goto done;
         if (!loaded) app->incomplete_pins = 1;
-    }
-    if (app->prefs.folder[0]) {
-        Item stack = {0};
-        int count = app->count+1;
-        DockSettings settings = app->settings;
-        settings.end_gap = STACK_DIVIDER_GAP;
-        if (dock_items_fit(&settings,count,viewport_limit(app,app->edge)) &&
-            prepare_stack(app,app->prefs.folder,&settings,&stack)) {
-            exchange_stack(app,app->count,&stack);
-            app->settings.end_gap = settings.end_gap;
-        }
     }
     initial_count = app->count;
     for (i = 1; i < argc; ++i) {
@@ -2993,7 +3003,10 @@ int main(int argc, char **argv)
     if (!animation_open(app)) { fail_after_cleanup(app,"Cannot open timer.device for dock animation."); goto done; }
     if (!install_input(app)) { fail_after_cleanup(app,"Cannot install pointer observer in input.device."); goto done; }
     reset_watch_open(app);
-    if (app->count != initial_count || config_state != 1) save_config(app);
+    /* A migrated file loses "folder" at once, unless a pin is missing
+       (saving then would drop it). */
+    if (app->count != initial_count || config_state != 1 ||
+        (app->prefs_migrated && !app->incomplete_pins)) save_config(app);
     struct Task *self = FindTask(NULL);
     int priority = self->tc_Node.ln_Pri, desktop_priority = priority;
     struct MsgPort *desktop;
@@ -3022,6 +3035,9 @@ int main(int argc, char **argv)
     status = app->failed ? 20 : 0;
 done:
     app->input_context.popup_open = 0;
+    /* The icon cache goes with the UI: keep its counts for the report. */
+    dock_ui_folder_cache_stats(app->ui,&app->stats.cache_used,&app->stats.cache_capacity,
+        &app->stats.cache_evicted);
     dock_ui_destroy(app->ui); app->ui = NULL;
     app->input_context.ui_busy = 0;
     remove_input(app);

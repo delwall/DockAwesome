@@ -547,42 +547,25 @@ static void test_distant_icon_motion(void)
     DockPlacement previous[17], target[17], current[17];
     DockAnimation animation;
     int x, i, tick, far_x;
-    int rest_center[17], outside, end_gap;
-    /* A complete wave, five pitches each way, travels inside this row, with
-       and without the Folder Stack's end gap. Icons outside it stay at size
-       32. Rounded neighboring widths previously moved them up to 3px for a
-       single pointer pixel; the wave keeps the row's growth constant, so
-       these icons must stay put. */
-    for (end_gap = 0; end_gap <= 12; end_gap += 12) {
-        int reach = 5*(s.base_size+s.gap)+end_gap;
-        s.end_gap = end_gap; outside = 0;
-        assert(dock_layout(&s,17,1024,128,0,0,0,current));
-        for (i = 0; i < 17; ++i) rest_center[i] = current[i].x+s.base_size/2;
-        assert(dock_layout(&s,17,1024,128,rest_center[5],100,1,previous));
-        for (x = rest_center[5]+1; x <= rest_center[11]; ++x) {
-            assert(dock_layout(&s,17,1024,128,x,100,1,target));
-            for (i = 0; i < 17; ++i)
-                if (abs(x-1-rest_center[i]) >= reach && abs(x-rest_center[i]) >= reach) {
-                    assert(!previous[i].level && !target[i].level);
-                    assert(previous[i].x == target[i].x);
-                    ++outside;
-                }
-            memcpy(previous,target,sizeof(previous));
-        }
-        assert(outside > 900);
-    }
-    /* Crossing the wider Folder Stack pitch: the wave sees the pointer in
-       resting slots, so the first icon stays put. With per-icon distances
-       it jumped back and forth over 9 px. */
-    s.end_gap = 12;
+    int rest_center[17], outside = 0, reach = 5*(s.base_size+s.gap);
+    /* A complete wave, five pitches each way, travels inside this row.
+       Icons outside it stay at size 32. Rounded neighboring widths
+       previously moved them up to 3px for a single pointer pixel; the wave
+       keeps the row's growth constant, so these icons must stay put. */
     assert(dock_layout(&s,17,1024,128,0,0,0,current));
-    far_x = -1;
-    for (x = current[15].x+16; x <= current[16].x+16; ++x) {
+    for (i = 0; i < 17; ++i) rest_center[i] = current[i].x+s.base_size/2;
+    assert(dock_layout(&s,17,1024,128,rest_center[5],100,1,previous));
+    for (x = rest_center[5]+1; x <= rest_center[11]; ++x) {
         assert(dock_layout(&s,17,1024,128,x,100,1,target));
-        if (far_x < 0) far_x = target[0].x;
-        assert(target[0].x == far_x);
+        for (i = 0; i < 17; ++i)
+            if (abs(x-1-rest_center[i]) >= reach && abs(x-rest_center[i]) >= reach) {
+                assert(!previous[i].level && !target[i].level);
+                assert(previous[i].x == target[i].x);
+                ++outside;
+            }
+        memcpy(previous,target,sizeof(previous));
     }
-    s.end_gap = 0;
+    assert(outside > 900);
     assert(dock_layout(&s,17,1024,128,0,0,0,current));
     assert(dock_layout(&s,17,1024,128,380,100,1,target));
     dock_animation_reset(&animation);
@@ -615,7 +598,7 @@ static void test_distant_icon_motion(void)
    overlapped the first two icons by 5 px). */
 static void test_animation_no_overlap(void)
 {
-    static const int config[][4] = {{64,164,5,12},{64,164,5,0},{32,64,2,12},{48,96,3,0},{40,78,33,12}};
+    static const int config[][3] = {{64,164,5},{32,64,2},{48,96,3},{40,78,33}};
     static const int codex[4] = {137,230,650,659}, codex_active[4] = {1,1,0,1};
     size_t c;
     unsigned seed = 31;
@@ -624,7 +607,7 @@ static void test_animation_no_overlap(void)
         DockPlacement current[8], target[8];
         DockAnimation animation;
         int step, i;
-        s.base_size = config[c][0]; s.max_size = config[c][1]; s.levels = config[c][2]; s.end_gap = config[c][3];
+        s.base_size = config[c][0]; s.max_size = config[c][1]; s.levels = config[c][2];
         assert(dock_layout(&s,8,704,200,0,0,0,current));
         dock_animation_reset(&animation);
         for (step = 0; step < 4000; ++step) {
@@ -1118,30 +1101,6 @@ static void test_reorder(void)
     assert(!dock_reorder(items, sizeof(items[0]), 3, -1, 1));
 }
 
-static void test_clipped_divider(void)
-{
-    unsigned char pixels[32*32*4+16];
-    DockImage canvas = {32,32,pixels+8};
-    DockSettings s = dock_settings_default();
-    const DockCache *icons[2] = {NULL,NULL};
-    static const int positions[][2] = {{INT_MAX-4,INT_MAX},{INT_MIN,INT_MAX},
-        {INT_MIN,16},{-16,INT_MAX},{INT_MAX,INT_MIN}};
-    size_t i;
-    int edge, j;
-    s.end_gap = 12;
-    for (edge = DOCK_EDGE_BOTTOM; edge <= DOCK_EDGE_RIGHT; ++edge)
-        for (i = 0; i < sizeof(positions)/sizeof(positions[0]); ++i) {
-            DockPlacement p[2] = {{positions[i][0],positions[i][0],32,0},
-                {positions[i][1],positions[i][1],32,0}};
-            memset(pixels,0xa5,sizeof(pixels));
-            dock_render_oriented_mask(&canvas,NULL,icons,p,2,&s,NULL,NULL,NULL,0,edge,0,NULL);
-            for (j = 0; j < 8; ++j) {
-                assert(pixels[j] == 0xa5);
-                assert(pixels[sizeof(pixels)-1-j] == 0xa5);
-            }
-        }
-}
-
 static void test_decode_rgb24(void)
 {
     unsigned char source[128], original[128], actual[160], expected[160];
@@ -1184,9 +1143,6 @@ static void test_items_fit(void)
     assert(!dock_items_fit(&s,0,INT_MIN));
     assert(!dock_items_fit(NULL,0,320));
     s = dock_settings_default();
-    s.end_gap = 12;
-    assert(!dock_items_fit(&s,6,width));
-    assert(dock_items_fit(&s,6,width+12));
     s.base_size = 96; s.max_size = 192;
     assert(!dock_items_fit(&s,6,1280));
     assert(dock_items_fit(&s,5,1280));
@@ -1257,7 +1213,7 @@ static void test_icon_runs(void)
 /* Shared render fixture for the goldens and damage tests: three synthetic
    icons with opaque, translucent and transparent runs, a patterned backdrop,
    and the app's running dot at the app's position. */
-enum { FIX_COUNT = 5, FIX_SCENARIOS = 3*2*2*2*2*2*4 };
+enum { FIX_COUNT = 5, FIX_SCENARIOS = 3*2*2*2*2*4 };
 typedef struct {
     DockSettings s;
     DockCache cache[3];
@@ -1377,72 +1333,42 @@ static const int fixture_running[FIX_COUNT] = {1,0,0,1,0};
    depend on dock_layout: they were regenerated once when the zoom wave
    changed to the macOS profile, with the rest scenarios unchanged. The
    centre scenarios were regenerated once when the mirrored plate became a
-   plate that reaches over a gap (fixture_gap); all others were unchanged. */
+   plate that reaches over a gap (fixture_gap); all others were unchanged.
+   When the divider went, its scenarios were dropped and the rest kept as
+   they were (filtered, not regenerated). */
 static const uint32_t render_goldens[FIX_SCENARIOS] = {
-    0x1d1a8288, 0xe3a6c983, 0x84b7daf1, 0xbaeb2950, 0x8ccc2510, 0xcca2f0fb,
-    0x3e66c599, 0x46d84034, 0x65d50368, 0x21535213, 0x8c4ef5f9, 0xf4efe522,
-    0x560de330, 0x3a6741cb, 0x3a0ff17b, 0x211810ea, 0x52a4e958, 0xa8cfd5a4,
-    0xb9e8109e, 0xbca8bb10, 0x8943428c, 0x376ba5e0, 0x4c6588e6, 0x83bbf6f8,
-    0x769834d8, 0xd4ae74b4, 0xbedd932e, 0x388694a2, 0x5eb4554c, 0x69867670,
-    0x7e54b330, 0xbd9d2a0e, 0x1d1a8288, 0xe3a6c983, 0x84b7daf1, 0xbaeb2950,
-    0x8ccc2510, 0xcca2f0fb, 0x3e66c599, 0x46d84034, 0x65d50368, 0x21535213,
-    0x8c4ef5f9, 0xf4efe522, 0x560de330, 0x3a6741cb, 0x3a0ff17b, 0x211810ea,
-    0x52a4e958, 0xa8cfd5a4, 0xb9e8109e, 0xbca8bb10, 0x8943428c, 0x376ba5e0,
-    0x4c6588e6, 0x83bbf6f8, 0x769834d8, 0xd4ae74b4, 0xbedd932e, 0x388694a2,
-    0x5eb4554c, 0x69867670, 0x7e54b330, 0xbd9d2a0e, 0xf6243960, 0x4ffb78f7,
-    0x1faf51cf, 0x4dbc7131, 0x65808cc1, 0xc647c92b, 0x03e48aef, 0xa1c61264,
-    0xe33040b3, 0x6b77f68b, 0x674632a2, 0x272378cd, 0x7816552b, 0x9a215cae,
-    0x7f2df722, 0x3c04e787, 0x6da0b0ef, 0xf072c23e, 0xff4e1a8e, 0xdfcde28a,
-    0x2af548bc, 0x923eca85, 0xa5cdd355, 0x33123961, 0x541335f8, 0x3bf3eef6,
-    0x79787b8f, 0xa9279f62, 0x2a4f11aa, 0x02e13ac0, 0xa47bed24, 0xa4f64632,
-    0xf6243960, 0x4ffb78f7, 0x1faf51cf, 0x4dbc7131, 0x65808cc1, 0xc647c92b,
-    0x03e48aef, 0xa1c61264, 0xe33040b3, 0x6b77f68b, 0x674632a2, 0x272378cd,
-    0x7816552b, 0x9a215cae, 0x7f2df722, 0x3c04e787, 0x6da0b0ef, 0xf072c23e,
-    0xff4e1a8e, 0xdfcde28a, 0x2af548bc, 0x923eca85, 0xa5cdd355, 0x33123961,
-    0x541335f8, 0x3bf3eef6, 0x79787b8f, 0xa9279f62, 0x2a4f11aa, 0x02e13ac0,
-    0xa47bed24, 0xa4f64632, 0xa09a8da0, 0xd47b6ced, 0xc5ce8c5c, 0x8ed46511,
-    0x855f4a7c, 0x6b019cf9, 0xc6a3ec74, 0x710286d5, 0x1715d130, 0x6fdccb9d,
-    0xa7236948, 0x9b47556f, 0x3557128c, 0x8f9ef029, 0x479fc852, 0x5e7a2bb3,
-    0xf3060da0, 0xbe504041, 0x44276c8b, 0x41b04c11, 0xcc3aca7c, 0x83b7b7ad,
-    0x106959f3, 0x96c94dd5, 0x670a5d70, 0x291fa4f1, 0x1b210fd7, 0x1916692f,
-    0xb667a8cc, 0x38af38dd, 0xbe283409, 0x1dd20273, 0xa09a8da0, 0xd47b6ced,
-    0xc5ce8c5c, 0x8ed46511, 0x855f4a7c, 0x6b019cf9, 0xc6a3ec74, 0x710286d5,
-    0x1715d130, 0x6fdccb9d, 0xa7236948, 0x9b47556f, 0x3557128c, 0x8f9ef029,
-    0x479fc852, 0x5e7a2bb3, 0xf3060da0, 0xbe504041, 0x44276c8b, 0x41b04c11,
-    0xcc3aca7c, 0x83b7b7ad, 0x106959f3, 0x96c94dd5, 0x670a5d70, 0x291fa4f1,
-    0x1b210fd7, 0x1916692f, 0xb667a8cc, 0x38af38dd, 0xbe283409, 0x1dd20273,
-    0x34f1533f, 0xf9000c98, 0xed44f88f, 0x67a56abd, 0xe5c27c6c, 0x3e8f1cf2,
-    0xaf32b392, 0x4a1ec3bb, 0xba9f8581, 0xbcd3995c, 0x68dfd3ea, 0x43b2258c,
-    0xeeaa4b32, 0x9e8aebc6, 0x88a406f8, 0xfcc05a52, 0x08498ab7, 0x21ff5f4c,
-    0xd38bba85, 0x83844abd, 0x45b411b4, 0xe81275b6, 0xf5dd8336, 0x5399a3bb,
-    0xad779551, 0x3704c3a0, 0x2691dd98, 0xc42cebc8, 0x91406202, 0x57e554ca,
-    0x57f57b84, 0x76af3836, 0x34f1533f, 0xf9000c98, 0xed44f88f, 0x67a56abd,
-    0xe5c27c6c, 0x3e8f1cf2, 0xaf32b392, 0x4a1ec3bb, 0xba9f8581, 0xbcd3995c,
-    0x68dfd3ea, 0x43b2258c, 0xeeaa4b32, 0x9e8aebc6, 0x88a406f8, 0xfcc05a52,
-    0x08498ab7, 0x21ff5f4c, 0xd38bba85, 0x83844abd, 0x45b411b4, 0xe81275b6,
-    0xf5dd8336, 0x5399a3bb, 0xad779551, 0x3704c3a0, 0x2691dd98, 0xc42cebc8,
-    0x91406202, 0x57e554ca, 0x57f57b84, 0x76af3836, 0xa251c330, 0x05326d1c,
-    0x760bb050, 0x99ffcaf8, 0x4171878c, 0xf473a078, 0xdc4a2188, 0x5b3c5494,
-    0x18d6cb40, 0x32fa87ac, 0x5751a6a4, 0xf2e0ca86, 0xb31d761c, 0xce4a5b08,
-    0x517d508a, 0x2b4657e2, 0x73bff1b0, 0x71e10b6b, 0x65453aef, 0xc47b59b8,
-    0xd828740c, 0x0e42d207, 0x45332407, 0x9d70cf54, 0xa76e1000, 0xcf1df23b,
-    0xc621a3c3, 0x9f191a46, 0xe9de40dc, 0x092411d7, 0x64f46481, 0xe3a84da2,
-    0xa251c330, 0x05326d1c, 0x760bb050, 0x99ffcaf8, 0x4171878c, 0xf473a078,
-    0xdc4a2188, 0x5b3c5494, 0x18d6cb40, 0x32fa87ac, 0x5751a6a4, 0xf2e0ca86,
-    0xb31d761c, 0xce4a5b08, 0x517d508a, 0x2b4657e2, 0x73bff1b0, 0x71e10b6b,
-    0x65453aef, 0xc47b59b8, 0xd828740c, 0x0e42d207, 0x45332407, 0x9d70cf54,
-    0xa76e1000, 0xcf1df23b, 0xc621a3c3, 0x9f191a46, 0xe9de40dc, 0x092411d7,
-    0x64f46481, 0xe3a84da2, 0xa46d6f02, 0x1dcdf89c, 0x1eb00470, 0xa33c58ad,
-    0xc755d1c0, 0x9ca18a67, 0x96ccf9ca, 0xbb5fe2a7, 0x2cff5ed7, 0x61c306c3,
-    0x6fac6e0d, 0x180dcdca, 0x50625949, 0x76d73ed0, 0x6c32ccf1, 0xc998a68c,
-    0x0785f749, 0xdfc6bfe0, 0xb971d18f, 0x8c2e2049, 0xd0a2b297, 0x2dfdd6db,
-    0x1f2ebc42, 0xa187254b, 0x0d11fb88, 0x8a6d3ea7, 0x73413582, 0xc8c725ee,
-    0xe1cb319a, 0x60c52fc4, 0xcbd7ca2d, 0xb8cead48, 0xa46d6f02, 0x1dcdf89c,
-    0x1eb00470, 0xa33c58ad, 0xc755d1c0, 0x9ca18a67, 0x96ccf9ca, 0xbb5fe2a7,
-    0x2cff5ed7, 0x61c306c3, 0x6fac6e0d, 0x180dcdca, 0x50625949, 0x76d73ed0,
-    0x6c32ccf1, 0xc998a68c, 0x0785f749, 0xdfc6bfe0, 0xb971d18f, 0x8c2e2049,
-    0xd0a2b297, 0x2dfdd6db, 0x1f2ebc42, 0xa187254b, 0x0d11fb88, 0x8a6d3ea7,
-    0x73413582, 0xc8c725ee, 0xe1cb319a, 0x60c52fc4, 0xcbd7ca2d, 0xb8cead48
+    0x1d1a8288, 0xe3a6c983, 0x84b7daf1, 0xbaeb2950, 0x65d50368, 0x21535213,
+    0x8c4ef5f9, 0xf4efe522, 0x52a4e958, 0xa8cfd5a4, 0xb9e8109e, 0xbca8bb10,
+    0x769834d8, 0xd4ae74b4, 0xbedd932e, 0x388694a2, 0x1d1a8288, 0xe3a6c983,
+    0x84b7daf1, 0xbaeb2950, 0x65d50368, 0x21535213, 0x8c4ef5f9, 0xf4efe522,
+    0x52a4e958, 0xa8cfd5a4, 0xb9e8109e, 0xbca8bb10, 0x769834d8, 0xd4ae74b4,
+    0xbedd932e, 0x388694a2, 0xf6243960, 0x4ffb78f7, 0x1faf51cf, 0x4dbc7131,
+    0xe33040b3, 0x6b77f68b, 0x674632a2, 0x272378cd, 0x6da0b0ef, 0xf072c23e,
+    0xff4e1a8e, 0xdfcde28a, 0x541335f8, 0x3bf3eef6, 0x79787b8f, 0xa9279f62,
+    0xf6243960, 0x4ffb78f7, 0x1faf51cf, 0x4dbc7131, 0xe33040b3, 0x6b77f68b,
+    0x674632a2, 0x272378cd, 0x6da0b0ef, 0xf072c23e, 0xff4e1a8e, 0xdfcde28a,
+    0x541335f8, 0x3bf3eef6, 0x79787b8f, 0xa9279f62, 0xa09a8da0, 0xd47b6ced,
+    0xc5ce8c5c, 0x8ed46511, 0x1715d130, 0x6fdccb9d, 0xa7236948, 0x9b47556f,
+    0xf3060da0, 0xbe504041, 0x44276c8b, 0x41b04c11, 0x670a5d70, 0x291fa4f1,
+    0x1b210fd7, 0x1916692f, 0xa09a8da0, 0xd47b6ced, 0xc5ce8c5c, 0x8ed46511,
+    0x1715d130, 0x6fdccb9d, 0xa7236948, 0x9b47556f, 0xf3060da0, 0xbe504041,
+    0x44276c8b, 0x41b04c11, 0x670a5d70, 0x291fa4f1, 0x1b210fd7, 0x1916692f,
+    0x34f1533f, 0xf9000c98, 0xed44f88f, 0x67a56abd, 0xba9f8581, 0xbcd3995c,
+    0x68dfd3ea, 0x43b2258c, 0x08498ab7, 0x21ff5f4c, 0xd38bba85, 0x83844abd,
+    0xad779551, 0x3704c3a0, 0x2691dd98, 0xc42cebc8, 0x34f1533f, 0xf9000c98,
+    0xed44f88f, 0x67a56abd, 0xba9f8581, 0xbcd3995c, 0x68dfd3ea, 0x43b2258c,
+    0x08498ab7, 0x21ff5f4c, 0xd38bba85, 0x83844abd, 0xad779551, 0x3704c3a0,
+    0x2691dd98, 0xc42cebc8, 0xa251c330, 0x05326d1c, 0x760bb050, 0x99ffcaf8,
+    0x18d6cb40, 0x32fa87ac, 0x5751a6a4, 0xf2e0ca86, 0x73bff1b0, 0x71e10b6b,
+    0x65453aef, 0xc47b59b8, 0xa76e1000, 0xcf1df23b, 0xc621a3c3, 0x9f191a46,
+    0xa251c330, 0x05326d1c, 0x760bb050, 0x99ffcaf8, 0x18d6cb40, 0x32fa87ac,
+    0x5751a6a4, 0xf2e0ca86, 0x73bff1b0, 0x71e10b6b, 0x65453aef, 0xc47b59b8,
+    0xa76e1000, 0xcf1df23b, 0xc621a3c3, 0x9f191a46, 0xa46d6f02, 0x1dcdf89c,
+    0x1eb00470, 0xa33c58ad, 0x2cff5ed7, 0x61c306c3, 0x6fac6e0d, 0x180dcdca,
+    0x0785f749, 0xdfc6bfe0, 0xb971d18f, 0x8c2e2049, 0x0d11fb88, 0x8a6d3ea7,
+    0x73413582, 0xc8c725ee, 0xa46d6f02, 0x1dcdf89c, 0x1eb00470, 0xa33c58ad,
+    0x2cff5ed7, 0x61c306c3, 0x6fac6e0d, 0x180dcdca, 0x0785f749, 0xdfc6bfe0,
+    0xb971d18f, 0x8c2e2049, 0x0d11fb88, 0x8a6d3ea7, 0x73413582, 0xc8c725ee
 };
 
 /* An empty slot just before the first icon: a drag's gap at the row start. */
@@ -1454,9 +1380,9 @@ static DockRect fixture_gap(int edge, const DockPlacement *p)
 }
 
 static int fixture_scenario(int edge, int captured, int glass, int pressed, int center,
-                            int end_gap, int pointer)
+                            int pointer)
 {
-    return ((((((edge*2+captured)*2+glass)*2+pressed)*2+center)*2+end_gap)*4)+pointer;
+    return (((((edge*2+captured)*2+glass)*2+pressed)*2+center)*4)+pointer;
 }
 
 /* as_overlays 0: dots blended after the frame (the generated table);
@@ -1465,14 +1391,13 @@ static void test_render_goldens(int as_overlays)
 {
     RenderFixture f;
     uint32_t sums[FIX_SCENARIOS];
-    int edge, captured, glass, pressed, center, end_gap, pointer, i, print = getenv("DOCK_PRINT_GOLDENS") != NULL;
+    int edge, captured, glass, pressed, center, pointer, i, print = getenv("DOCK_PRINT_GOLDENS") != NULL;
     DockPanelShape *shape = calloc(1,sizeof(*shape));
     assert(shape);
     memset(&f,0,sizeof(f));
-    for (end_gap = 0; end_gap < 2; ++end_gap) {
+    {
         f.s = dock_settings_default();
         f.s.levels = 9; f.s.max_size = 64;
-        f.s.end_gap = end_gap ? 6 : 0;
         fixture_sources(&f);
         for (edge = DOCK_EDGE_BOTTOM; edge <= DOCK_EDGE_RIGHT; ++edge) {
             fixture_open(&f,edge);
@@ -1515,7 +1440,7 @@ static void test_render_goldens(int as_overlays)
                     &f.s,NULL,shape,f.coverage,pressed ? 2 : 0,edge,include,NULL);
                 if (!as_overlays) for (i = 0; i < dot_count; ++i)
                     dock_blend_masked(&f.canvas,dots[i].image,dots[i].x,dots[i].y,f.coverage);
-                sums[fixture_scenario(edge,captured,glass,pressed,center,end_gap,pointer)] = fixture_checksum(&f);
+                sums[fixture_scenario(edge,captured,glass,pressed,center,pointer)] = fixture_checksum(&f);
             }
             fixture_close(&f);
         }
@@ -1646,44 +1571,6 @@ static void test_damage_add(void)
             assert(d.rect[i].left < d.rect[i].right && d.rect[i].top < d.rect[i].bottom);
         }
     }
-}
-
-/* The divider moves with the last two slots. With no artwork there and the
-   plate ends far away, only the divider rule repaints its old position. */
-static void test_damage_divider(void)
-{
-    enum { LONG = 600, CROSS = 92 };
-    static const int frames[][3] = {{20,100,143},{20,300,343},{20,300,343},{20,120,170},{20,121,171}};
-    DockSettings s = dock_settings_default();
-    DockRenderer r;
-    DockPanelShape *shape = calloc(1,sizeof(*shape));
-    const DockCache *icons[3] = {NULL,NULL,NULL};
-    unsigned char *pixels = malloc(LONG*CROSS*4), *ref = malloc(LONG*CROSS*4);
-    unsigned char *cov = malloc(LONG*CROSS), *ref_cov = malloc(LONG*CROSS);
-    int edge, k;
-    assert(shape && pixels && ref && cov && ref_cov);
-    s.end_gap = 6;
-    for (edge = DOCK_EDGE_BOTTOM; edge <= DOCK_EDGE_RIGHT; ++edge) {
-        int bottom = edge == DOCK_EDGE_BOTTOM;
-        DockImage canvas = {bottom ? LONG : CROSS, bottom ? CROSS : LONG, pixels};
-        DockImage reference = {canvas.width, canvas.height, ref};
-        memset(&r,0,sizeof(r));
-        r.pixels = dock_backend_portable(); r.coverage = cov; r.edge = (DockEdge)edge;
-        for (k = 0; k < (int)(sizeof(frames)/sizeof(frames[0])); ++k) {
-            DockPlacement p[3];
-            int i;
-            for (i = 0; i < 3; ++i) {
-                int cross = bottom ? CROSS-3-40 : edge == DOCK_EDGE_LEFT ? 3+4 : CROSS-3-40;
-                p[i] = bottom ? (DockPlacement){frames[k][i],cross,32,0} : (DockPlacement){cross,frames[k][i],32,0};
-            }
-            dock_renderer_draw(&r,&canvas,NULL,icons,p,3,&s);
-            if (k) assert(!r.damage.full);
-            dock_render_oriented_mask(&reference,NULL,icons,p,3,&s,NULL,shape,ref_cov,0,edge,0,NULL);
-            assert(!memcmp(pixels,ref,LONG*CROSS*4) && !memcmp(cov,ref_cov,LONG*CROSS));
-        }
-        dock_renderer_release(&r);
-    }
-    free(shape); free(pixels); free(ref); free(cov); free(ref_cov);
 }
 
 static unsigned fuzz_next(unsigned *seed, unsigned range)
@@ -2001,7 +1888,6 @@ static void test_damage_fuzz(void)
         int running[MAX_COUNT] = {1,0,1,0,0,1}, hidden = -1, pressed = 0, center = 0, active = 0;
         int count = FIX_COUNT, along, cross, drag = 0, drag_x = 0, drag_y = 0, drag_level = 0, frame, i;
         int bottom = edge == DOCK_EDGE_BOTTOM, size;
-        f.s.end_gap = 0;
         fixture_open(&f,edge);
         size = f.width*f.height;
         ref = (DockImage){f.width,f.height,malloc((size_t)size*4)};
@@ -2066,7 +1952,6 @@ static void test_damage_fuzz(void)
                 dock_cache_free(c);
                 *c = rebuilt;
             } else if (event < 96) hidden = hidden >= 0 ? -1 : (int)fuzz_next(&seed,MAX_COUNT);
-            else if (event < 97) f.s.end_gap = f.s.end_gap ? 0 : 6;
             /* else: an unchanged frame */
             if (!fuzz_next(&seed,6)) {
                 /* A window moves behind the dock: random screen boxes change
@@ -2158,10 +2043,10 @@ int main(void)
     test_normalize(); test_clamp_helpers(); test_image_opaque_at(); test_reference_wave_and_hover(); test_zoom_gap_compaction(); test_inter_icon_anchor_continuity(); test_alpha_fringe(); test_distant_icon_motion(); test_animation_no_overlap(); test_layout(); test_blend();
     test_mix(); test_pressed_artwork(); test_side_panel_coverage(); test_reorder(); test_renderer();
     test_faint_shadows(); test_scaled_shadows(); test_resampling(); test_enclosed_glass_and_centering(); test_animation_stays_inside(); test_zoom_end_keeps_pace(); test_icon_build(); test_scaled_fill(); test_icon_runs();
-    test_clipped_divider(); test_decode_rgb24(); test_items_fit();
+    test_decode_rgb24(); test_items_fit();
     test_animation_and_pointer_anchor(); test_reference_timing_and_panel(); test_rounded_panel();
     test_convert(); test_native565(); test_key565(); test_overlay_coverage();
-    test_render_goldens(0); test_render_goldens(1); test_damage_add(); test_damage_upload_rects(); test_damage_divider(); test_damage_stamp(); test_rgb565_refresh(); test_backdrop_damage(); test_damage_fuzz(); test_conversion_double_buffer();
+    test_render_goldens(0); test_render_goldens(1); test_damage_add(); test_damage_upload_rects(); test_damage_stamp(); test_rgb565_refresh(); test_backdrop_damage(); test_damage_fuzz(); test_conversion_double_buffer();
     printf("All core tests passed: normalization, alpha, layout bounds, clipping, 65536 blends, reorder, renderer.\n");
     printf("Default cache: %lu bytes/icon; 20 icons: %lu bytes.\n",
         (unsigned long)dock_cache_bytes(&defaults),

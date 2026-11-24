@@ -1642,3 +1642,31 @@ to the same slot (inverted offset test, store attributes required).
 - [ ] Install the release binary on AmiKit XE, ApolloOS and Coffin (they run
       0.527, the same code) at their next boot, and delete the
       Disabled/DockAwesome-locked-delete left on ApolloOS and Coffin.
+
+## Folder Stacks for every pinned drawer, no divider (2026-11-24)
+Plan: tasks/plan-folder-stacks.md (D1-D17). Branch folder-stacks, one PR.
+- [x] §4.2 goldens filtered from the 384-entry table (keep i with bit 2
+      clear, new index ((i>>3)<<2)|(i&3)) before the renderer changed.
+- [x] D1 divider out of the core (end_gap, extra_gap, draw_divider,
+      add_divider, STACK_DIVIDER_GAP).
+- [x] D2 dock_prefs_migrate; "folder" read, never written; startup saves
+      once after migrating (not while a pin is missing).
+- [x] D3-D9 every pinned directory (not a volume root) is a stack; append
+      at the end; stacks move and are removed like pins; open-stack
+      identity by pin id; a click on another stack closes the box and
+      opens the other; no running state for stacks.
+- [x] D10 stack menu: Show Contents, Open in Workbench (DOCK_UI_OPEN_DRAWER).
+- [x] D11 Settings without the Folder Stack section, ASL and blocking hook.
+- [x] D12-D15 close button on the first stack, round-robin prefetch with
+      the real page size, 512-entry hashed cache without prefetch
+      eviction, profile line.
+- [x] D16 host tests; D17 documents.
+- [ ] Self-review against plan §3.
+- [ ] make host-test, make host-sanitize, make amiga (no warnings).
+- [ ] impeccable polish: Settings dialog and the stack menu.
+- [ ] Agent smoke run on the booted system.
+- [ ] Opus review rounds until clean; Codex review.
+- [ ] Hardware matrix §4.4 per available boot.
+- [ ] Performance §4.5 old/new/old (first open AmiKit; hover Coffin, AmiKit).
+- [ ] Fable final pass.
+- [ ] Handover, release-notes draft, one push, PR.

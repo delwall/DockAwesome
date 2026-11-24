@@ -179,7 +179,7 @@ static int same_settings(const DockSettings *a, const DockSettings *b)
 {
     return a->base_size == b->base_size && a->max_size == b->max_size && a->levels == b->levels &&
         a->gap == b->gap && a->padding == b->padding && a->cache_limit == b->cache_limit &&
-        a->end_gap == b->end_gap && a->edge_padding == b->edge_padding;
+        a->edge_padding == b->edge_padding;
 }
 
 /* Long-axis span [a,b) across the plate's cross extent. */
@@ -190,15 +190,6 @@ static void add_span(DockDamage *d, int bottom, const DockRect *panel, int64_t a
     if (bottom) r = (DockRect){dock_saturate_int(a), panel->top, dock_saturate_int(b), panel->bottom};
     else r = (DockRect){panel->left, dock_saturate_int(a), panel->right, dock_saturate_int(b)};
     dock_damage_add(d, r, width, height);
-}
-
-/* The long-axis extent of the last two slots, which bounds the divider. */
-static void add_divider(DockDamage *d, int bottom, const DockRect *panel,
-                        const DockPlacement *a, const DockPlacement *b, int width, int height)
-{
-    int64_t a0 = bottom ? a->x : a->y, b0 = bottom ? b->x : b->y;
-    int64_t a1 = a0+a->size, b1 = b0+b->size;
-    add_span(d, bottom, panel, a0 < b0 ? a0 : b0, a1 > b1 ? a1 : b1, width, height);
 }
 
 static int same_rect(DockRect a, DockRect b)
@@ -253,7 +244,6 @@ void dock_renderer_draw(DockRenderer *r, DockImage *canvas,
     else {
         int old_low = bottom ? o->panel.left : o->panel.top, low = bottom ? panel.left : panel.top;
         int old_high = bottom ? o->panel.right : o->panel.bottom, high = bottom ? panel.right : panel.bottom;
-        int panel_moved = old_low != low || old_high != high;
         /* A moved end changes its corners and rim up to radius pixels inward. */
         if (old_low != low)
             add_span(d, bottom, &panel, old_low < low ? old_low : low,
@@ -261,12 +251,6 @@ void dock_renderer_draw(DockRenderer *r, DockImage *canvas,
         if (old_high != high)
             add_span(d, bottom, &panel, (int64_t)(old_high < high ? old_high : high)-radius-1,
                      old_high > high ? old_high : high, width, height);
-        if (s->end_gap && count > 1 && (panel_moved ||
-                memcmp(&o->placement[count-2], &p[count-2], sizeof(*p)) ||
-                memcmp(&o->placement[count-1], &p[count-1], sizeof(*p)))) {
-            add_divider(d, bottom, &panel, &o->placement[count-2], &o->placement[count-1], width, height);
-            add_divider(d, bottom, &panel, &p[count-2], &p[count-1], width, height);
-        }
         for (i = 0; i < count; ++i) {
             const DockImage *image = level_image(icons[i], p[i].level);
             if (memcmp(&o->placement[i], &p[i], sizeof(*p)) ||

@@ -23,6 +23,6 @@ Keep the original Workbench artwork, aspect ratio, and alpha.
 - Show **Remove** beyond the drag boundary. Dropping there removes only the pin.
 - Put the hover label on the desktop side of the icon.
 - Use a compact dark context menu. Match the dock's glass and thin rim.
-- Keep **Size**, **Scale**, position, and **Folder Stack** in a compact native
+- Keep **Size**, **Scale** and position in a compact native
   window. **Save** applies the draft. **Cancel** discards it.
 - Keep side icons upright. Use the same zoom and input rules on all edges.

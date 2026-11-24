@@ -12,13 +12,15 @@ typedef struct DockUI DockUI;
 /* edge uses DOCK_EDGE_* from dock_geometry.h. UI edits remain a draft. */
 typedef struct {
     int size, scale_percent, edge;
-    char folder[DOCK_PREFS_PATH_CAP];
 } DockUIPrefs;
 enum {
     DOCK_UI_NONE, DOCK_UI_SETTINGS, DOCK_UI_ABOUT, DOCK_UI_QUIT,
     DOCK_UI_SAVE, DOCK_UI_CANCEL, DOCK_UI_REFRESH, DOCK_UI_CLOSE_ITEM, DOCK_UI_QUIT_ITEM,
     DOCK_UI_KEEP_ITEM, DOCK_UI_NEW_SHELL, DOCK_UI_SHOW_SHELL, DOCK_UI_QUIT_SHELL,
-    DOCK_UI_SHOW_CONTENTS, DOCK_UI_OPEN_PATH
+    DOCK_UI_SHOW_CONTENTS, DOCK_UI_OPEN_PATH,
+    /* A Folder Stack's menu: open its drawer as a window (a Directory Opus
+       lister when Directory Opus is the desktop). */
+    DOCK_UI_OPEN_DRAWER
 };
 typedef struct {
     int type;
@@ -35,12 +37,8 @@ typedef int (*DockUIReadIcon)(const void *context, const char *path, DockImage *
 DockUI *dock_ui_create(struct Screen *screen, int window_shapes, int glass, int rgb_pens, int alpha_text);
 void dock_ui_set_converters(DockUI *ui, DockConvertRGB24 encode, DockConvertRGB565 decode,
     DockConvertRGB565 encode565, DockMixHalf mix_half);
-/* Called with 1 before and 0 after a UI call that blocks the main task, such
-   as the ASL drawer requester. Suspend PiP and input capture in between. */
-typedef void (*DockUIBlocking)(void *context, int blocking);
-void dock_ui_set_blocking_hook(DockUI *ui, DockUIBlocking hook, void *context);
-/* Returns the largest Size the dock can show for a draft (its edge, scale
-   and Folder Stack). Settings never offer a larger Size. */
+/* Returns the largest Size the dock can show for a draft (its edge and
+   scale). Settings never offer a larger Size. */
 typedef int (*DockUIFit)(void *context, const DockUIPrefs *draft);
 /* Shows work in progress in the open dialog: a busy pointer and the status
    as its title. NULL restores the normal pointer and title. */
@@ -72,10 +70,18 @@ ULONG dock_ui_folder_frame_delay(const DockUI *ui);
 /* Only icons are left to load in the open Folder Stack: no motion. */
 int dock_ui_folder_loading(const DockUI *ui);
 /* Reads one more icon of path's first page into the icon cache, for a
-   Folder Stack that opens with its icons. Call while the dock is idle;
-   returns 1 while icons remain (or a popup is open). */
-int dock_ui_prefetch_folder(DockUI *ui, const char *path, int icon_size,
-    DockUIReadIcon read_icon, const void *context);
+   Folder Stack that opens with its icons. Call while the dock is idle.
+   slot: 0..DOCK_MAX_ITEMS-1, one read-ahead state each; it starts over
+   (and rereads the drawer) when path, icon_size or edge differ.
+   (edge,x,y): the anchor the box would open at, for the real page size.
+   1 while icons of the first page remain (or a popup is open); 0 when the
+   page is read, the drawer cannot be read, or the cache has no free entry
+   (the prefetch never evicts). */
+int dock_ui_prefetch_folder(DockUI *ui, int slot, DockEdge edge, int x, int y,
+    const char *path, int icon_size, DockUIReadIcon read_icon, const void *context);
+/* The Folder Stack icon cache: live entries, entries, and the live entries
+   of another path an open box overwrote. */
+void dock_ui_folder_cache_stats(const DockUI *ui, int *used, int *capacity, unsigned long *evicted);
 int dock_ui_folder_step(DockUI *ui);
 void dock_ui_finish_folder_motion(DockUI *ui);
 /* The label for the dock's own image: its height with the tip, its width

@@ -284,12 +284,33 @@ int dock_prefs_write(FILE *file, const DockPrefs *prefs)
             prefs->size,prefs->scale_percent ? "scale_percent" : "zoom",
             prefs->scale_percent ? prefs->scale_percent : prefs->zoom,prefs->levels,edge_names[prefs->edge],
             prefs->pip_x_offset,prefs->pip_y_offset) < 0) return 0;
-    if (prefs->folder[0] && (fputs("  \"folder\": ",file) == EOF ||
-            !write_string(file,prefs->folder) || fputs(",\n",file) == EOF)) return 0;
     if (fputs("  \"paths\": [",file) == EOF) return 0;
     for (i = 0; i < prefs->count; ++i) {
         if (fputs(i ? ",\n    " : "\n    ",file) == EOF ||
             !write_string(file,prefs->paths[i])) return 0;
     }
     return fputs(prefs->count ? "\n  ]\n}\n" : "]\n}\n",file) != EOF && !ferror(file);
+}
+
+/* ASCII letters compare without case, as AmigaDOS names do. */
+static int same_path(const char *a, const char *b)
+{
+    for (;; ++a, ++b) {
+        int x = (unsigned char)*a, y = (unsigned char)*b;
+        if (x >= 'A' && x <= 'Z') x += 'a'-'A';
+        if (y >= 'A' && y <= 'Z') y += 'a'-'A';
+        if (x != y) return 0;
+        if (!x) return 1;
+    }
+}
+
+int dock_prefs_migrate(DockPrefs *prefs)
+{
+    int i;
+    if (!prefs || !prefs->folder[0]) return 0;
+    for (i = 0; i < prefs->count; ++i) if (same_path(prefs->paths[i],prefs->folder)) break;
+    if (i == prefs->count && prefs->count < DOCK_MAX_ITEMS)
+        memcpy(prefs->paths[prefs->count++],prefs->folder,sizeof(prefs->folder));
+    memset(prefs->folder,0,sizeof(prefs->folder));
+    return 1;
 }

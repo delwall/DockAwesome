@@ -15,7 +15,7 @@ Pointer -> layout -> renderer -> frame -> native window or PiP2
 | Module | Role |
 | --- | --- |
 | `dock_core.c` | Settings, icon caches, layout, animation, and pixel conversion kernels |
-| `dock_compose.c` | Compositor: plate, glass rows, divider, and icon and overlay blending |
+| `dock_compose.c` | Compositor: plate, glass rows, and icon and overlay blending |
 | `dock_geometry.c` | Bottom, left, and right geometry and hit testing |
 | `dock_interaction.c` | Button pairs, drag state, and pin actions |
 | `dock_renderer.c` | Pixel backend selection, damage tracking, and damaged PiP conversion |
@@ -165,8 +165,7 @@ rebuilt cache can reuse a freed address, so freeing, rebuilding, swapping
 or reordering caches needs no full redraw; the Folder Stack morph blends
 into one buffer and restamps it only when its inputs change. Changed
 slots add their old and new image rectangles, moved plate ends a strip that
-reaches the corner radius plus one pixel inward, the divider its old and new
-span, and running dots and the dragged icon, which the renderer now draws as
+reaches the corner radius plus one pixel inward, and running dots and the dragged icon, which the renderer now draws as
 overlays, their old and new rectangles. A different canvas, backdrop,
 coverage buffer, edge, centered plate, setting, item count, corner radius or
 plate thickness redraws everything, as does `dock_renderer_invalidate`. Each
@@ -221,11 +220,19 @@ Window regions must outlive their windows. See [Hardware](hardware.md) for
 the input and layer ABI notes.
 
 Settings use GadTools. The Size slider stops at the largest size that fits
-the draft's edge, scale, and Folder Stack, using the same check as Save.
+the draft's edge and scale, using the same check as Save.
 Build candidate caches before swapping them in; the dialog shows progress and
 disables its controls meanwhile. Restore the previous settings and caches if
 saving or opening the surface fails. The JSON file stores the edge. A missing
-edge defaults to bottom.
+edge defaults to bottom. A `"folder"` key from 1.0 beta 5 and older is read,
+moved to the end of `"paths"` (`dock_prefs_migrate`) and never written again.
+
+Every pinned drawer that is a directory and not a volume root is a Folder
+Stack: a click opens its box, and the pin moves and is removed like any
+other, without a running dot. While the dock idles with the pointer off it,
+the event loop reads one more icon of a stack's first page per live tick,
+round robin over the stacks from the one nearest the pointer, into a
+512-entry icon cache that this read-ahead never evicts from.
 
 ## References
 

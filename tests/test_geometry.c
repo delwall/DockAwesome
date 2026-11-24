@@ -312,33 +312,6 @@ static void test_zoom_room_after_insertion(void)
     assert(small_peak == 46 && grown_peak >= s.max_size-2);
 }
 
-static void test_stack_gap(void)
-{
-    DockSettings s = dock_settings_default();
-    DockPlacement rest[N], zoom[N], insert[N];
-    int edge, w, h, x, y;
-    s.end_gap = 12;
-    assert(dock_row_length(&s,1) == s.base_size);
-    for (edge = DOCK_EDGE_BOTTOM; edge <= DOCK_EDGE_RIGHT; ++edge) {
-        int previous, stack;
-        dimensions((DockEdge)edge,&w,&h);
-        assert(dock_edge_layout(&s,edge,N,w,h,0,0,0,rest));
-        previous = edge == DOCK_EDGE_BOTTOM ? rest[N-2].x : rest[N-2].y;
-        stack = edge == DOCK_EDGE_BOTTOM ? rest[N-1].x : rest[N-1].y;
-        assert(stack-previous-rest[N-2].size == s.gap+s.end_gap);
-        actual_point(edge,stack+s.base_size/2,70,&x,&y);
-        assert(dock_edge_layout(&s,edge,N,w,h,x,y,1,zoom));
-        previous = edge == DOCK_EDGE_BOTTOM ? zoom[N-2].x : zoom[N-2].y;
-        stack = edge == DOCK_EDGE_BOTTOM ? zoom[N-1].x : zoom[N-1].y;
-        assert(zoom[N-1].size == s.max_size);
-        assert(stack-previous-zoom[N-2].size >= s.end_gap);
-        assert(dock_edge_insertion_layout(&s,edge,N,w,h,N-1,insert));
-        previous = edge == DOCK_EDGE_BOTTOM ? insert[N-2].x : insert[N-2].y;
-        stack = edge == DOCK_EDGE_BOTTOM ? insert[N-1].x : insert[N-1].y;
-        assert(stack-previous == 2*(s.base_size+s.gap)+s.end_gap);
-    }
-}
-
 static int along_low(DockEdge edge, DockRect r) { return edge == DOCK_EDGE_BOTTOM ? r.left : r.top; }
 static int along_high(DockEdge edge, DockRect r) { return edge == DOCK_EDGE_BOTTOM ? r.right : r.bottom; }
 
@@ -490,7 +463,6 @@ int main(void)
     test_external_insertion();
     test_zoomed_reorder_gap();
     test_zoom_room_after_insertion();
-    test_stack_gap();
     test_gap_motion();
     test_outside_shown();
     puts("geometry: bottom/left/right layout, upright hit/slot/outside, half-open panel bounds and animation equivalence PASS");

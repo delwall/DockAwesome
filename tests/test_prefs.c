@@ -27,7 +27,6 @@ static void test_roundtrip(void)
     before.zoom = 70;
     before.pip_x_offset = -128;
     before.pip_y_offset = 128;
-    strcpy(before.folder,"SYS:My \"folder\"/F\xf6r");
     before.count = 3;
     strcpy(before.paths[0],"SYS:Tools/A quoted \"tool\"\\here");
     strcpy(before.paths[1],"RAM:control\t\x01\x7f\xe5\xff");
@@ -38,7 +37,7 @@ static void test_roundtrip(void)
     json[length] = 0;
     assert(strstr(json,"\\\"tool\\\"\\\\here"));
     assert(strstr(json,"\\u0009\\u0001\\u007f\\u00e5\\u00ff"));
-    assert(strstr(json,"\"folder\": \"SYS:My \\\"folder\\\"/F\\u00f6r\""));
+    assert(!strstr(json,"\"folder\""));
     assert(!strstr(json,"snapshot") && strstr(json,"\"pip\": true"));
     rewind(file);
     assert(dock_prefs_read(file,&after));
@@ -61,6 +60,57 @@ static void test_edited_file(void)
     /* Files from before PiP only still load; their backend keys are ignored. */
     assert(read_text("{\"version\":1,\"snapshot\":true,\"pip\":true,\"edge\":\"right\"}",&prefs));
     assert(prefs.edge == DOCK_EDGE_RIGHT);
+    /* A 1.0 beta 5 file with its Folder Stack still parses. */
+    assert(read_text("{\"version\":1,\"folder\":\"SYS:My \\\"folder\\\"/F\\u00f6r\",\"paths\":[\"SYS:One\"]}",&prefs));
+    assert(!strcmp(prefs.folder,"SYS:My \"folder\"/F\xf6r") && prefs.count == 1);
+}
+
+static int written_has_folder(const DockPrefs *prefs)
+{
+    FILE *file = tmpfile();
+    char json[4096];
+    size_t length;
+    assert(file);
+    assert(dock_prefs_write(file,prefs));
+    rewind(file);
+    length = fread(json,1,sizeof(json)-1,file);
+    json[length] = 0;
+    assert(fclose(file) == 0);
+    return strstr(json,"\"folder\"") != NULL;
+}
+
+/* The old Folder Stack becomes the last pin unless it is one already;
+   "folder" is cleared and never written again. */
+static void test_folder_migration(void)
+{
+    DockPrefs prefs;
+    int i;
+    assert(read_text("{\"version\":1,\"folder\":\"Work:Stack\",\"paths\":[\"SYS:One\",\"SYS:Two\"]}",&prefs));
+    assert(written_has_folder(&prefs) == 0);
+    assert(dock_prefs_migrate(&prefs) == 1);
+    assert(prefs.count == 3 && !strcmp(prefs.paths[2],"Work:Stack") && !prefs.folder[0]);
+    assert(!strcmp(prefs.paths[0],"SYS:One") && !strcmp(prefs.paths[1],"SYS:Two"));
+    assert(!written_has_folder(&prefs));
+    assert(dock_prefs_migrate(&prefs) == 0 && prefs.count == 3);
+    /* Already a pin, in another case: not added twice. */
+    assert(read_text("{\"version\":1,\"folder\":\"work:STACK\",\"paths\":[\"Work:Stack\",\"SYS:Two\"]}",&prefs));
+    assert(dock_prefs_migrate(&prefs) == 1);
+    assert(prefs.count == 2 && !strcmp(prefs.paths[0],"Work:Stack") && !prefs.folder[0]);
+    /* No folder: nothing to do. */
+    assert(read_text("{\"version\":1,\"paths\":[\"SYS:One\"]}",&prefs));
+    assert(dock_prefs_migrate(&prefs) == 0 && prefs.count == 1 && !prefs.folder[0]);
+    assert(read_text("{\"version\":1,\"folder\":\"\",\"paths\":[]}",&prefs));
+    assert(dock_prefs_migrate(&prefs) == 0 && prefs.count == 0);
+    /* A full dock has no room: the folder is dropped, the pins stay. */
+    dock_prefs_defaults(&prefs);
+    for (i = 0; i < DOCK_MAX_ITEMS; ++i) sprintf(prefs.paths[i],"SYS:Pin%d",i);
+    prefs.count = DOCK_MAX_ITEMS;
+    strcpy(prefs.folder,"Work:Stack");
+    assert(dock_prefs_migrate(&prefs) == 1);
+    assert(prefs.count == DOCK_MAX_ITEMS && !prefs.folder[0]);
+    assert(!strcmp(prefs.paths[DOCK_MAX_ITEMS-1],"SYS:Pin31"));
+    assert(!written_has_folder(&prefs));
+    assert(dock_prefs_migrate(NULL) == 0);
 }
 
 static void test_scale(void)
@@ -178,6 +228,7 @@ int main(void)
     test_edited_file();
     test_scale();
     test_bad_file();
+    test_folder_migration();
     puts("JSON preferences: ordered paths, escapes, bounds, unknown keys and transactional read PASS");
     return 0;
 }

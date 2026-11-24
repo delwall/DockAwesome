@@ -1,6 +1,6 @@
 #ifndef DOCK_COMPOSE_H
 #define DOCK_COMPOSE_H
-/* The compositor: plate, glass, divider and icon blending onto a canvas. */
+/* The compositor: plate, glass and icon blending onto a canvas. */
 #include "dock_core.h"
 #include "dock_geometry.h"
 

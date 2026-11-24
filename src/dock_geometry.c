@@ -12,7 +12,7 @@ int dock_viewport_length(const DockSettings *s, int count)
     int pitch, wanted, wave;
     if (!dock_settings_valid(s) || count < 0 || count > DOCK_MAX_ITEMS) return 0;
     pitch = s->base_size+s->gap;
-    wanted = count*pitch+(count > 1 ? s->end_gap : 0)+2*s->max_size+2*s->padding+s->base_size;
+    wanted = count*pitch+2*s->max_size+2*s->padding+s->base_size;
     wave = dock_row_length(s,count)+4*(s->max_size-s->base_size)+2*s->padding;
     if (wanted < wave) wanted = wave;
     return wanted < 320 ? 320 : wanted;
@@ -175,7 +175,7 @@ static int insertion_slot(const DockSettings *s, DockEdge edge,
         return -1;
     start = (width-span)/2;
     for (slot = 0; slot < count; ++slot)
-        if (x < start+slot*pitch+s->base_size/2+(slot && slot == count-1 ? s->end_gap : 0)) break;
+        if (x < start+slot*pitch+s->base_size/2) break;
     return slot;
 }
 

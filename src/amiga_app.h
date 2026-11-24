@@ -74,6 +74,9 @@ typedef struct {
     int running, kind, temporary, stack;
     const struct Task *owner; /* A task showing this item's window; compare only. */
     ULONG lister;             /* The Directory Opus lister showing this drawer. */
+    /* A stack: its first page is not read ahead yet, and the prefetch turns
+       it has had (prefetch_stack_icons). */
+    int prefetch, prefetch_turns;
 } Item;
 typedef struct {
     struct Screen *screen;
@@ -223,7 +226,7 @@ typedef struct {
    (amiga_pip_flip_at_vblank). */
 typedef struct { struct Task *task; ULONG mask; volatile ULONG armed, fields, flip_register, flip_buffer; } VBlankState;
 
-/* One of the stack pin's blends between its icon and the close button. */
+/* One of the open stack pin's blends between its icon and the close button. */
 typedef struct { DockCache cache; unsigned char *pixels; int level; unsigned long icon, button; } MorphSlot;
 void dock_vblank_entry(void);
 /* --profile counters. Only the profile report reads them. */
@@ -290,6 +293,10 @@ typedef struct {
     /* Dock frames drawn while the Folder Stack box moved. */
     ULONG folder_dock_draws;
     uint64_t folder_dock_ticks;
+    ULONG prefetch_reads; /* idle read-ahead calls for the stacks */
+    /* The Folder Stack icon cache when the UI closed (see dock_ui_folder_cache_stats). */
+    int cache_used, cache_capacity;
+    unsigned long cache_evicted;
 } ProfileStats;
 /* The surface backend: how the dock reaches the screen. PiP is the only
    one; select_backend sets it while no surface is open. Each entry runs at
@@ -423,7 +430,7 @@ typedef struct App {
     uint32_t drag_float_token;
     const DockImage *drag_float_icon; /* the cache image shown, to see a level change */
     uint32_t preview_attempt;
-    int prefetch_pending; /* the stack's icons are still being read ahead */
+    int prefetch_pending; /* some stack's icons are still being read ahead */
     int drag_preview_remove; /* drag_preview's Remove state when opened */
     /* Without shapes and PiP1: the pin drawn on the screen (amiga_drag_bob.h),
        its picture for drag_bob_icon and Remove, where it goes after the
@@ -492,20 +499,25 @@ typedef struct App {
     ULONG wheel_seen; /* input_context.wheel_serial when last handled */
     LabelSlot label_slot[DOCK_MAX_ITEMS];
     unsigned long label_stamp;
-    /* The close button that replaces the Folder Stack pin while it is
-       open, built with the surface for its settings and edge, and kept
-       while those stay as it was built for (button_settings, button_edge). */
+    /* The close button that replaces the open Folder Stack's pin, built
+       with the surface for its settings and edge (when any pin is a stack),
+       and kept while those stay as it was built for (button_settings,
+       button_edge). */
     DockCache stack_button;
     DockSettings button_settings;
     DockEdge button_edge;
     int stack_button_shown;
-    /* The pin morphs between the stack's icon (0) and the close button
+    /* The open stack's pin morphs between its icon (0) and the close button
        (256) in quarter steps. The three blends between are kept, each with
        its runs, and rebuilt only when their inputs change: the stack's
-       level or either image. */
+       level or either image (so also when another stack opens). */
     int morph;
     MorphSlot morph_slot[3];
     int stack_close_press;
+    /* The stack whose box is or was last open; a stack to open once the
+       current box has closed (a click on it while another was open). */
+    uint32_t open_stack_pin, stack_next_pin;
+    int prefs_migrated; /* read_config moved an old Folder Stack into the pins */
     /* Added last so every other field keeps its offset. */
     const SurfaceOps *surface; /* The backend; set with the profile. */
 } App;
@@ -541,7 +553,7 @@ static inline int item_path_index(const App *app, const char *path)
 {
     int i;
     for (i = 0; i < app->count; ++i)
-        if (!app->items[i].stack && !Stricmp((STRPTR)app->items[i].path,(STRPTR)path)) return i;
+        if (!Stricmp((STRPTR)app->items[i].path,(STRPTR)path)) return i;
     return -1;
 }
 
