@@ -1,5 +1,22 @@
 # Release notes
 
+## 1.0 beta 6
+
+Draft, not released. Changes since 1.0 beta 5, so far run on ApolloOS only.
+
+**Folder Stacks**
+- Every drawer you pin is a Folder Stack: a click opens its contents above
+  the dock. Disks stay ordinary pins that open a window.
+- Stacks move and are removed like any other pin. A click on another stack
+  closes the open one and opens the one you clicked.
+- Right-click a stack for **Show Contents** or **Open in Workbench**.
+- Stacks show no running dot.
+- The Folder Stack setting is gone from **Settings**. A Folder Stack set in
+  1.0 beta 5 becomes the last pin on the first start.
+- The divider before the last icon is gone: all icons are evenly spaced.
+- While the dock idles, the first page of every stack is read ahead, so the
+  first opening is as quick as with the single stack of 1.0 beta 5.
+
 ## 1.0 beta 5
 
 Changes since 1.0 beta 4.
