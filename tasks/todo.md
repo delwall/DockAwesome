@@ -1607,9 +1607,18 @@ to the same slot (inverted offset test, store attributes required).
       The idle 20-60 ms polls passes show here too (pre-existing).
 - [ ] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete after the
       next ApolloOS boot.
+- [x] Coffin (2026-11-24, 24-bit Workbench, so the new capture path runs
+      without the Magellan motion path): the old -locked-delete deleted;
+      8f55e11 installed (release 1.0b4 is the new
+      Disabled/DockAwesome-locked-delete). Agent test with --profile:
+      hover 1 stall in 38 frames, desktop drop pinned Ram Disk (added=1),
+      dragging it out removed it, prefs as before, clean Ctrl-C.
+      Restarted with WBRun; RAM: clean.
+- [ ] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete after the
+      next Coffin boot.
 - [ ] Open (not compared with baseline under hover): during hover
       animation about every third frame spends ~23 ms in the polls phase
       (surface->poll, live capture), 109 of 743 frames stalled. The
       animation rate is 10 ms before and after the patch, so probably
       pre-existing; an A/B hover run with the user's mouse would settle it.
-- [ ] 3.2.3 and Coffin: plain Workbench behaves as before.
+- [ ] 3.2.3: plain Workbench behaves as before (Coffin and ApolloOS done).
