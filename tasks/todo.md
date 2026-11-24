@@ -1598,6 +1598,15 @@ to the same slot (inverted offset test, store attributes required).
       dragged out again, prefs unchanged), receiver presses_armed=2,
       motion_polls=921 at 26.5 ms avg (the new 10/33 ms mix). Dock
       restarted with Run (no profile); RAM: test files deleted.
+- [x] ApolloOS (2026-11-24, 16-bit screen, so the 24/32-bit capture
+      change is not exercised): 8f55e11 installed (release 1.0b4 renamed
+      to Disabled/DockAwesome-locked-delete, WBRun binary in use). Agent
+      test with --profile: hover 0 stalled frames, desktop drop pinned
+      RAM Disk at slot 7 (drops added=1) and dragging it out removed it;
+      prefs as before; clean Ctrl-C. Restarted with WBRun; RAM: clean.
+      The idle 20-60 ms polls passes show here too (pre-existing).
+- [ ] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete after the
+      next ApolloOS boot.
 - [ ] Open (not compared with baseline under hover): during hover
       animation about every third frame spends ~23 ms in the polls phase
       (surface->poll, live capture), 109 of 743 frames stalled. The
