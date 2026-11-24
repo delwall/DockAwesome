@@ -1593,6 +1593,14 @@ to the same slot (inverted offset test, store attributes required).
 - [ ] Pre-existing, not from the patch: on AmiKit about one main-loop
       pass a second takes 20-65 ms in the "polls" phase, equally in the
       baseline. Find which poll (DOpus/program status?) costs it.
-- [ ] User on AmiKit: drop from the desktop and from a lister, hover
-      entering fast, mouse moved around the desktop; read RAM:user.log.
+- [x] User on AmiKit (physical mouse, 77 s): "Tycker det såg bra ut".
+      Profile: downs/ups 6/6, Workbench drops messages=1 added=1 (pin
+      dragged out again, prefs unchanged), receiver presses_armed=2,
+      motion_polls=921 at 26.5 ms avg (the new 10/33 ms mix). Dock
+      restarted with Run (no profile); RAM: test files deleted.
+- [ ] Open (not compared with baseline under hover): during hover
+      animation about every third frame spends ~23 ms in the polls phase
+      (surface->poll, live capture), 109 of 743 frames stalled. The
+      animation rate is 10 ms before and after the patch, so probably
+      pre-existing; an A/B hover run with the user's mouse would settle it.
 - [ ] 3.2.3 and Coffin: plain Workbench behaves as before.
