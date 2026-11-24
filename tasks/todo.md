@@ -1661,10 +1661,29 @@ Plan: tasks/plan-folder-stacks.md (D1-D17). Branch folder-stacks, one PR.
       the real page size, 512-entry hashed cache without prefetch
       eviction, profile line.
 - [x] D16 host tests; D17 documents.
-- [ ] Self-review against plan §3.
-- [ ] make host-test, make host-sanitize, make amiga (no warnings).
-- [ ] impeccable polish: Settings dialog and the stack menu.
-- [ ] Agent smoke run on the booted system.
+- [x] Self-review against plan §3 (one fix: an open box is dismissed when
+      its stack is removed).
+- [x] make host-test, make host-sanitize (after replacing a sprintf the
+      sanitizer build rejected), make amiga: green, no warnings.
+- [x] impeccable polish (in-thread; its detector is web-only): Settings is
+      Size, Scale, Position, Cancel/Save with equal 12 px margins above and
+      below; the stack menu's two rows are sized by the longer label. No
+      change needed; both checked in screenshots on ApolloOS.
+- [x] Agent smoke run, ApolloOS R9.5 (build 530, --config RAM:mig.json, a
+      copy of the user's 1.0b5 file with "folder": "Personal:Downloads"):
+      --caps identical to the baseline; after start the file had no
+      "folder" and Personal:Downloads last in "paths"; a second start left
+      the file untouched. The stack opened (first paint 104.8 ms) and closed
+      by its pin. A dropped volume (Archives:) opened a window, its menu
+      showed Close. A dropped drawer (Archives:Games) became a stack; with
+      it open, one click on Downloads closed it and opened Downloads. Menu
+      rows "Show Contents" and "Open in Workbench" and the box's tile all
+      worked; with the Downloads window open the menu showed no Close.
+      Reordered a stack to slot 0 (saved first), dragged a stack out
+      (removed from the file). Settings had no Folder Stack section; Save
+      wrote the file. Profile: prefetch stacks=1 pending=0 reads=63
+      cache=63/512 evicted=0; Input downs=7 ups=7. --pip-dump: the first and
+      last of 13 icons 492 px apart = 12 x 41 (5 px gaps, no divider).
 - [ ] Opus review rounds until clean; Codex review.
 - [ ] Hardware matrix §4.4 per available boot.
 - [ ] Performance §4.5 old/new/old (first open AmiKit; hover Coffin, AmiKit).

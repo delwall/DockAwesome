@@ -103,7 +103,7 @@ static void test_folder_migration(void)
     assert(dock_prefs_migrate(&prefs) == 0 && prefs.count == 0);
     /* A full dock has no room: the folder is dropped, the pins stay. */
     dock_prefs_defaults(&prefs);
-    for (i = 0; i < DOCK_MAX_ITEMS; ++i) sprintf(prefs.paths[i],"SYS:Pin%d",i);
+    for (i = 0; i < DOCK_MAX_ITEMS; ++i) snprintf(prefs.paths[i],sizeof(prefs.paths[i]),"SYS:Pin%d",i);
     prefs.count = DOCK_MAX_ITEMS;
     strcpy(prefs.folder,"Work:Stack");
     assert(dock_prefs_migrate(&prefs) == 1);
