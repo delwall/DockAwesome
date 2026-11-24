@@ -1727,5 +1727,7 @@ Plan: tasks/plan-folder-stacks.md (D1-D17). Branch folder-stacks, one PR.
       reboots or the AmiKit gestures.
 - [ ] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete after the
       next ApolloOS boot.
-- [ ] Fable final pass.
-- [ ] Handover, release-notes draft, one push, PR.
+- [x] Fable final pass: no code blocker; merge blocked only by the hardware
+      not run (above) and the owner's decision on A5.
+- [x] Handover (tasks/handover-folder-stacks-pr1.md), release-notes draft.
+- [x] One push; PR opened as a draft, left a draft (blocked on hardware).
