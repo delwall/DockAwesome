@@ -1807,4 +1807,32 @@ content as, Options.
       One Kind run (117.2) is above that maximum; the repeat was 109.1, so
       it reads as run noise (one run is noise, lessons). Every other run is
       under 110.5.
+- [x] Large drawer, ApolloOS:C (253 entries, 3 pages of 119), timing probe
+      at ChangeTaskPri -30, 10 reads each, whole amiga_folder_read and
+      the sort alone:
+
+      | sort | read+sort ms | sort alone ms |
+      | --- | --- | --- |
+      | Name | 102.1 | 4.3 |
+      | Date Modified | 108.4 | 6.6 |
+      | Kind | 116.4 | 14.6 |
+
+      Downloads (30): 16.8 / 17.2 / 17.9 ms. The directory read dominates;
+      sorting by pointers instead of moving the 128-byte entries measured
+      no gain (14.0 ms Kind) and was reverted. In the dock the box of
+      ApolloOS:C opened in every order (first paint 335-384 ms, set by how
+      many of the 119 icons were cached), dock frames during its motion
+      us_avg=4049, prefetch evicted=0.
+- [x] Opus review: one P2 (a press on the heading/separator did not
+      disarm an earlier press, so a later drag onto that row fired it);
+      fixed in ad454f3; on ApolloOS (build 538) press Show Contents ->
+      release on the separator, press heading -> release on Show Contents:
+      the menu closed, no box opened.
+- [x] Codex review (base main): no findings; tree unchanged after it.
+- [x] Build 538 installed in place (SYS:WBStartup/DockAwesome, WBRun,
+      running); the user's ENVARC:DockAwesome.json has no "sorts" (all
+      Name) and its Downloads menu shows Name checked. RAM: clean.
+- [ ] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete,
+      -locked-delete2 and -locked-delete3 after the next ApolloOS boot
+      (in use until then).
 - [ ] NOT RUN: Coffin, AmigaOS 3.2.3, 3.9, 3.1.4.1, AmiKit XE (not booted).

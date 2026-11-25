@@ -121,6 +121,11 @@ pin the migration appended is treated so (App.migrated_pin).
 - Verification: tasks/todo.md, section "Folder Stack Sort by per
   stack": host tests, ApolloOS menu/order/persistence/reorder/removal/
   migration, first-open table per sort.
+- Reviews: Opus one P2 (inert row kept an earlier press armed), fixed
+  ad454f3 and checked on ApolloOS; Codex (base main) no findings.
+- Installed: build 538 in ApolloOS SYS:WBStartup/DockAwesome, running.
+  Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete, -2 and -3
+  after the next ApolloOS boot.
 - Not run: the other boots (as above).
 
 ## Delivery
