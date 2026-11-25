@@ -542,3 +542,16 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
   after any Break the agent sends.
 - A Codex review run in the repository follows AGENTS.md and writes its
   own section into tasks/todo.md: check `git status` after every Codex run.
+
+## A quick click is not a long hold (Coffin, 2026-11-25)
+- With a Folder Stack open, a quick click on another stack only closed the
+  box, while my press-wait-release test switched stacks. The release lost
+  its pin: the box's closing motion, started by the press, withdrew the
+  input handler's hit snapshot; a 1 s hold released after the motion.
+  The same loss kept a program pin from starting, also in 1.0 beta 5.
+- Rule: test clicks at normal speed (amiga_click) as well as held presses,
+  and when a release does nothing, log what the release carried (pin,
+  hit, flags) before theorising.
+- A pin's hit test follows its artwork's alpha: Coffin's Prefs drawer icon
+  is a flat bar, so a click at the row's middle height missed it
+  (downs=0). Aim at the artwork from a --pip-dump.

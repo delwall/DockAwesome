@@ -1836,3 +1836,105 @@ content as, Options.
       -locked-delete2 and -locked-delete3 after the next ApolloOS boot
       (in use until then).
 - [ ] NOT RUN: Coffin, AmigaOS 3.2.3, 3.9, 3.1.4.1, AmiKit XE (not booted).
+
+### Coffin hardware matrix and performance (2026-11-25)
+Coffin r65 on the Vampire (Kickstart 45.57, Workbench 45.5, core 12856,
+24-bit 1280x720), agent input. Builds: 539 (HEAD 57d6ef8) for steps 1-2,
+540 (= 539 + the release-hit fix below) for the rest; baseline tag v1.0b5
+(989cfa7) built in a scratch worktree outside the repo. All destructive
+runs used --config RAM:<file>.json; the user's ENVARC:DockAwesome.json
+(1.0b5 format, "folder": "Personal:Downloads") was only copied.
+- [x] 1 --caps: installed 0.527, new 539 and v1.0b5 identical (Diff).
+- [x] 2 Migration: a copy of the user's file -> after start no "folder",
+      Personal:Downloads last in "paths"; a second start left it
+      byte-identical (Diff).
+- [x] 3 No divider (--pip-dump, 18 icons): icon lefts at 135 + 37k up to
+      the Downloads stack at 764, so the last two icons are 5 px apart.
+      v1.0b5 with the same file: 17 icons at 37 px, then 12 px more before
+      its Folder Stack.
+- [x] 4 Drop a drawer (Archives:Games) -> stack appended last; click
+      opens, a click on its pin (close button) closes; with two stacks a
+      click on the other closes one and opens the other, both ways (after
+      the fix below; before it, only the box closed).
+- [x] 5 Drop a volume (Ram Disk:) -> click opened its window; its menu
+      showed Close, which closed the window.
+- [x] 6 Stack menu: Sort by heading, Name/Date Modified/Kind with the
+      check, separator, Show Contents, Open in Workbench; no Close, also
+      with the drawer's window open. The box's Open in Workbench tile and
+      the menu row each opened a Workbench window.
+- [x] 7 Downloads dragged to slot 0 (saved first); Games dragged out
+      (gone from "paths").
+- [x] 8 Settings: Size, Scale, Position, Cancel/Save, no Folder Stack
+      section; Save rewrote the file and kept "sorts".
+- [x] Sort by: Date Modified saved "sorts": {"Personal:Downloads":
+      "date"}, box newest first (SAGA readme/lha first, as on ApolloOS);
+      Kind saved "kind"; after a restart the box kept Kind (drawers, no
+      extension, .adf, .jic, .key, .lha, .readme, .zip) and the menu showed
+      Kind checked; a click on the heading kept the menu; Name removed the
+      "sorts" key. The other stack's menu kept Name.
+- [x] A5: "folder": "RAM:DoesNotExist" -> no message, dock running, file
+      saved with paths [EditPad, Personal:Downloads] and no "folder".
+- [x] Defect found (also in v1.0b5): with a box open, a quick click on
+      another pin only closed the box; the other stack did not open and a
+      program pin (EditPad) did not start; a 1 s hold worked. Diagnostic
+      build: the press reached apply_gesture with the right pin, the
+      release came with hit_id=0, because the box's closing motion
+      (started by the press activating another window) made
+      input_publish withdraw the handler's snapshot. Fix: the handler marks
+      such a release INPUT_HIT_UNRESOLVED and the main task hit-tests the
+      row it drew (still while the UI holds the dock). Build 540: switch
+      Games->Downloads and Downloads->Games with quick clicks, EditPad
+      started and the box closed, the open stack's own pin still only
+      closes it.
+- [x] make host-test, make host-sanitize green; make amiga no warnings
+      (build 540).
+- [x] Opus review of the fix: no P0/P1. P2 fixed: message() now cancels a
+      press held when its requester opens (else that press's release came
+      unresolved and launched after OK); comment says "the row as last
+      drawn". P2 not fixed (older, same root, at the press): a press during
+      the ~130 ms box motion is not taken by the handler and goes to what
+      lies under the dock; left for the owner (changing what "the UI holds
+      the dock" means for input touches every caps branch).
+- [x] Build 541 (540 + those P2 fixes): host-test, host-sanitize green,
+      make amiga no warnings. Coffin, RAM:tq.json: Downloads->Games switch
+      with quick clicks, EditPad started from an open box; a double-click
+      on a pin whose file was deleted showed one requester and nothing
+      after OK (Input downs=4 ups=4).
+- [x] First open after 45 s idle, pointer off the dock, fresh dock per
+      run, config = the user's file + Archives:Games + System:Prefs
+      (old: 19 pins + Folder Stack Downloads; new: migrated, 3 stacks):
+
+      | run | stack | first paint ms | entrance ms |
+      | --- | --- | --- | --- |
+      | old 1 (v1.0b5) | Downloads | 101.4 | 135.9 |
+      | new (540) | Downloads | 85.1 | 134.5 |
+      | new (540) | Games (30 entries, same box) | 86.4 | 133.2 |
+      | new (540) | Prefs (58 entries, larger box) | 141.1 | 154.0 |
+      | old 2 (v1.0b5) | Downloads | 89.6 | 130.3 |
+
+      New: prefetch stacks=3 pending=0 reads=120 cache=120/512 evicted=0.
+      Pass: Downloads and Games under the old maximum (101.4 / 135.9);
+      Prefs has a larger first page (exempt by §4.5).
+- [x] Hover, agent sweep (relative moves to x 350, 500, 650, 800, 950,
+      then off, one per message, after 45 s idle), old/new/old:
+      render_us_avg 10400 / 9410 / 10525, stalled 3 / 3 / 4, redraws
+      101 / 100 / 100. Each old run holds one ~104 ms frame (max 103745 /
+      104206; without it ~9466 / ~9579); new max 18760. New stalled within
+      the old spread; render average below it.
+- [x] Hover, --bench-sweep 8, old/new/old/new/old: render_us_avg 7898 /
+      5546 / 7435 / 5900 / 5805, stalled 50 / 49 / 49 / 51 / 49 of
+      195-199 frames (the synthetic sweep stalls a quarter of its frames
+      on this 24-bit screen with either build).
+- [x] 9 Build 541 installed in place: SYS:WBStartup/DockAwesome.new
+      copied, the boot's 0.527 (in use) renamed to
+      SYS:WBStartup/Disabled/DockAwesome-locked-delete (the older one there
+      from Saturday deleted), .new renamed into place, started with WBRun;
+      its Downloads stack opened and closed from the dock; Status shows no
+      other dock. ENVARC:DockAwesome.json migrated by it (no "folder",
+      Personal:Downloads last); the tests only copied it. RAM: clean; the
+      v1.0b5 binary deleted from RAM:, its worktree removed on the Mac.
+- [ ] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete (0.527) on
+      Coffin after its next boot.
+- [ ] NOT RUN on Coffin: nothing of §4.4/§4.5 is left; AmigaOS 3.2.3,
+      3.9 (plain), 3.1.4.1 and AmiKit XE not booted; ApolloOS not rerun
+      with build 540.

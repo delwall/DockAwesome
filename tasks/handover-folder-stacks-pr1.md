@@ -132,3 +132,33 @@ pin the migration appended is treated so (App.migrated_pin).
 
 One push of folder-stacks; PR opened as a draft and left a draft with a
 "Blocked on hardware" checklist. Not merged.
+
+## Follow-up: Coffin matrix, performance and a release-hit fix (2026-11-25)
+
+- Boot: Coffin r65 (Kickstart 45.57, Workbench 45.5, core 12856, 24-bit
+  1280x720), agent input. Details and tables: tasks/todo.md, section
+  "Coffin hardware matrix and performance".
+- §4.4 steps 1-8, Sort by and A5 passed (step 1-2 with build 539, the rest
+  with 540); all destructive runs used --config RAM: copies.
+- Defect found and fixed (also in 1.0 beta 5): with a box open, a quick
+  click on another pin only closed the box. The press started the box's
+  closing motion, `input_publish` withdrew the handler's snapshot, and the
+  release came with hit_id 0. The handler now flags such a release
+  `INPUT_HIT_UNRESOLVED` and the main task hit-tests the row it drew
+  (`src/amiga_input_handler.c`, `src/amiga_main.c`, `src/amiga_app.h`).
+  Verified on Coffin with builds 540/541 (stack switch both ways, EditPad
+  started); not rerun on ApolloOS.
+- §4.5 Coffin, v1.0b5 / 540 / v1.0b5: first paint Downloads 101.4 / 85.1
+  / 89.6 ms, entrance 135.9 / 134.5 / 130.3 ms (Games 86.4 / 133.2; Prefs,
+  larger page, 141.1 / 154.0); prefetch evicted=0. Hover agent sweep
+  render_us_avg 10400 / 9410 / 10525, stalled 3 / 3 / 4.
+- Opus review of the fix: no P0/P1; P2s fixed in build 541 (message()
+  cancels a held press; comment). Open P2 for the owner: a press during
+  the ~130 ms box motion is not taken by the dock and reaches what lies
+  under it (older behaviour, same root at the press).
+- Installed on Coffin: build 541 in SYS:WBStartup/DockAwesome, running
+  (WBRun); ENVARC:DockAwesome.json migrated by it. Delete
+  SYS:WBStartup/Disabled/DockAwesome-locked-delete (0.527) after the next
+  Coffin boot. RAM: clean.
+- Still not run: AmigaOS 3.2.3, plain 3.9, 3.1.4.1, AmiKit XE (matrix,
+  AmiKit first open and hover); ApolloOS with build 540.

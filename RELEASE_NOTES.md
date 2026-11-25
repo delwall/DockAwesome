@@ -2,7 +2,8 @@
 
 ## 1.0 beta 6
 
-Draft, not released. Changes since 1.0 beta 5, so far run on ApolloOS only.
+Draft, not released. Changes since 1.0 beta 5, so far run on ApolloOS and
+Coffin only.
 
 **Folder Stacks**
 - Every drawer you pin is a Folder Stack: a click opens its contents above
@@ -19,6 +20,11 @@ Draft, not released. Changes since 1.0 beta 5, so far run on ApolloOS only.
 - The divider before the last icon is gone: all icons are evenly spaced.
 - While the dock idles, the first page of every stack is read ahead, so the
   first opening is as quick as with the single stack of 1.0 beta 5.
+
+**Fixes**
+- With a Folder Stack open, a quick click on another pin closes the stack
+  and starts that pin (or opens that stack). Before, only the stack closed
+  (seen on Coffin, also in 1.0 beta 5).
 
 ## 1.0 beta 5
 
