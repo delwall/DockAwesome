@@ -373,3 +373,39 @@ One push of folder-stacks; PR opened as a draft and left a draft with a
   scratch worktrees removed.
 - Not run on Coffin: drops (pins from config), the box's Open in
   Workbench tile, --bench-sweep.
+
+## Follow-up: plain AmigaOS 3.9 with build 551 (2026-11-25)
+
+- Boot: AmigaOS 3.9 (Kickstart 40.68 ROM, Workbench 45.5; graphics 40,
+  intuition 40, icon 51.4, workbench 45.132, so the dock's V39/V44
+  requirements hold), core 12856, 24-bit 1280x720, no shaped windows, agent
+  input. Before: release 1.0 beta 4 installed and running. amiagent did not
+  start at boot; the user started it by hand. Build 551 = HEAD 1fb8556, not
+  rebuilt; no code change. Details: tasks/todo.md, "AmigaOS 3.9 matrix and
+  performance with build 551".
+- §4.4 all passed with --config RAM: copies: --caps identical to v1.0b5
+  and 1.0 beta 4; migration and a second start; A5; no divider (41 px
+  pitch, last two 5 px apart); drawer drop -> stack, volume drop ->
+  window; stack switch both ways with quick clicks and 1 s holds; Editor
+  started by a quick click with a box open; Archives: window and its
+  Close; Sort by rows, heading, check and persistence; the box's Open in
+  Workbench tile; Click to Open Folder (window, no box, no Close row, no
+  running dot by --pip-dump), Show Stack back, both after a restart;
+  reorder and drag-out keep each stack's "clicks"/"sorts"; Settings
+  without the Folder Stack section, Save keeps "clicks".
+- §4.5 first open, v1.0b5 / 551 alternating (o1 n1 o2 n2 o3 n3):
+  Downloads first paint 114.4 / 97.4 / 110.4 / 97.8 / 100.6 / 97.7 ms,
+  entrance 145.6 / 137.6 / 144.7 / 137.2 / 134.5 / 137.3 ms; Games
+  96.4-96.9 / 138.1-138.8; Prefs (smaller box) 87.6-88.2 ms, entrance
+  131.5 / 130.9 and once 152.1 (n1: a one-frame entrance, 6.5 ms over the
+  old maximum 145.6; not repeated in n2/n3). Open for the owner, like the
+  Coffin n2 outlier. Prefetch stacks=3 pending=0 evicted=0.
+- §4.5 hover agent sweep (15 pins, -30): render_us_avg v1.0b5 / 551 /
+  v1.0b5 9460 / 9540 / 9561, stalled 0 / 0 / 1: pass.
+- Installed on 3.9: 551 in SYS:WBStartup/DockAwesome, running (WBRun, the
+  user's ENVARC config migrated by it, not written by the tests), the only
+  dock. Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete (1.0 beta
+  4, in use) after the next 3.9 boot; the older one (509) is deleted. RAM:
+  clean; scratch worktree removed. C:ApolloExplorerSrv runs until reboot.
+- Not run on 3.9: --bench-sweep; DOpus lister (Workbench is the desktop).
+- Still not booted with this PR: AmigaOS 3.1.4.1.

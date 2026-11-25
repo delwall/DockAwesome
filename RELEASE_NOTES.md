@@ -3,7 +3,7 @@
 ## 1.0 beta 6
 
 Draft, not released. Changes since 1.0 beta 5, so far run on ApolloOS,
-Coffin, AmigaOS 3.2.3 and AmiKit XE only.
+Coffin, AmigaOS 3.2.3, AmigaOS 3.9 and AmiKit XE only.
 
 **Folder Stacks**
 - Every drawer you pin is a Folder Stack: a click opens its contents above
@@ -13,8 +13,8 @@ Coffin, AmigaOS 3.2.3 and AmiKit XE only.
 - Right-click a stack to choose what a click on it does: **Show Stack**
   (its contents above the dock, the default) or **Open Folder** (its
   drawer as a window, as a pinned drawer did in 1.0 beta 5). The choice is
-  saved per stack and kept when the stack is moved (checked on ApolloOS
-  and Coffin).
+  saved per stack and kept when the stack is moved (checked on ApolloOS,
+  Coffin and AmigaOS 3.9).
 - Each stack can be sorted by **Name**, **Date Modified** (newest first) or
   **Kind** (drawers first, then by file type) from its right-click menu;
   the choice is saved per stack.
@@ -28,8 +28,8 @@ Coffin, AmigaOS 3.2.3 and AmiKit XE only.
 **Fixes**
 - With a Folder Stack open, a quick click on another pin closes the stack
   and starts that pin (or opens that stack). Before, only the stack closed
-  (seen on Coffin, also in 1.0 beta 5; checked on Coffin, AmigaOS 3.2.3
-  and ApolloOS).
+  (seen on Coffin, also in 1.0 beta 5; checked on Coffin, AmigaOS 3.2.3,
+  AmigaOS 3.9 and ApolloOS).
 - Zoom: when one frame ran late, every later frame of the same motion
   waited up to 30 ms for the display, and the zoom stuttered until the row
   came to rest (also in 1.0 beta 5). The dock now draws such a frame at the
