@@ -643,5 +643,12 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
   `__chkabort` and handles Ctrl-C itself. Test "Break at startup" by
   running the program in-process with Ctrl-C already pending (RunCommand
   after SetSignal), not by racing a Break against the start.
-- Give a just-started test dock a few seconds before stop.s, and after an
-  odd stop check the PiP lease (FindSemaphore) before the next start.
+- My procedure caused the "PiP2 is already in use." the user saw: I sent
+  stop.s within a second of starting a test dock, it died with the lease
+  held, and my next test dock hit the lease. Give a just-started test
+  dock a few seconds before stop.s; before every start check Status (CLI
+  docks), FindTask (the Workbench dock) and the PiP2 lease
+  (FindSemaphore): exactly one owner or none.
+- A requester that frozen input cannot reach can still be answered: send
+  its window the IDCMP_GADGETUP its OK gadget would send (PutMsg to the
+  window's UserPort with your own reply port).

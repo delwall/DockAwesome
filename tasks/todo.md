@@ -2766,9 +2766,13 @@ scratch worktree outside the repo, no warnings.
       the frozen input need a reboot first. ENVARC:DockAwesome.json
       (1.0b5 format, "folder": "Personal:Downloads", 12 paths) kept its
       date (Saturday 00:40:38); 553 migrates it on its first start.
-      RAM: clean except RAM:m1.txt, held open by the second test dock
-      that waits on its "PiP2 is already in use" requester (gone at
-      reboot); ENV:dpid deleted; scratch worktree removed on the Mac.
+      The second test dock's "PiP2 is already in use." requester (the
+      one the user saw) could not be clicked with frozen input; a tool
+      (ReqOK) sent its window the OK gadget's GADGETUP, the dock exited
+      and Status lists no dock. RAM: clean (only amiagent's own file);
+      ENV:dpid deleted; scratch worktree removed on the Mac. The leaked
+      1x1 window, the PiP2 lease and the frozen input stay until the
+      reboot.
 - [ ] Reboot 3.1.4.1 (the user; a software reboot needs their consent).
       Then: delete SYS:WBStartup/Disabled/DockAwesome-locked-delete
       (1.0 beta 4), check that 553 started from WBStartup (FindTask) and
