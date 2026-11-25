@@ -270,6 +270,9 @@ typedef struct {
     /* Display fields between consecutive animation frames: one is even
        motion, zero a frame never shown, two or more a stall. */
     ULONG pace_one, pace_same, pace_stall, pace_field;
+    /* Presents that waited in WaitTOF for their back buffer, and frames
+       moved to the next field instead (see the main loop). */
+    ULONG retire_waits, retire_defers;
     /* The first stalled frames: fields since the last, this frame's draw
        and present, and the time from the last frame's end to this draw. */
     struct { UWORD fields, render_us, present_us, gap_us; } stall_log[24];
@@ -493,6 +496,8 @@ typedef struct App {
     /* This loop pass took a display field's step; a redraw asked for
        outside one waits for the next field (redraw_due). */
     int field_pass, redraw_due;
+    /* This redraw already waited one field for its PiP back buffer. */
+    int retire_deferred;
     /* The hover label is drawn in the dock's own image, at once and with
        the zooming icon (a label window took 26 ms to open):
        label_max_width is its widest, 0 when the screen font cannot be

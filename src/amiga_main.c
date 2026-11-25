@@ -1207,9 +1207,10 @@ static void profile_report(App *app)
             (unsigned long)(app->stats.conversion_frames && canvas ?
                 app->stats.conversion_pixels*100/(canvas*app->stats.conversion_frames) : 0));
     }
-    printf("Frame pacing: one_field=%lu same_field=%lu stalled=%lu vsync=%d\n",
+    printf("Frame pacing: one_field=%lu same_field=%lu stalled=%lu vsync=%d retire_waits=%lu retire_defers=%lu\n",
         (unsigned long)app->stats.pace_one, (unsigned long)app->stats.pace_same,
-        (unsigned long)app->stats.pace_stall, app->vblank_open && !app->no_vsync);
+        (unsigned long)app->stats.pace_stall, app->vblank_open && !app->no_vsync,
+        (unsigned long)app->stats.retire_waits, (unsigned long)app->stats.retire_defers);
     if (app->stats.stall_logged) {
         ULONG n;
         printf("Stalls (fields/render_us/present_us/gap_us):");
@@ -2776,8 +2777,20 @@ static __attribute__((noinline)) void event_loop(App *app)
            the display pacing the dock, a redraw asked for between fields
            is drawn at the next one. */
         if (app->redraw_due && app->field_pass) { redraw = 1; app->redraw_due = 0; }
-        if (redraw && !app->field_pass && app->vblank_open && app->vblank_rate_ok &&
-            !app->no_vsync && !app->timer_failed) { app->redraw_due = 1; redraw = 0; }
+        if (redraw && app->vblank_open && app->vblank_rate_ok && !app->no_vsync && !app->timer_failed) {
+            if (!app->field_pass) { app->redraw_due = 1; redraw = 0; }
+            /* The last present crossed into this field (a frame that ran
+               late): its flip waits for the next field, and so would this
+               frame's conversion, in WaitTOF. Each later frame then started
+               on its field's already pending signal and waited again, up to
+               30 ms a frame for as long as the row moved. Draw at the next
+               field instead (once; the wait stays the safeguard). */
+            else if (!app->retire_deferred && amiga_pip_back_busy(app->pip)) {
+                app->retire_deferred = app->redraw_due = 1; redraw = 0;
+                ++app->stats.retire_defers;
+            }
+        }
+        if (redraw) app->retire_deferred = 0;
         animation_schedule(app); live_schedule(app);
         if (redraw) draw(app);
         else if (app->profile && !due) {

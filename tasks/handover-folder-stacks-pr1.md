@@ -190,3 +190,30 @@ One push of folder-stacks; PR opened as a draft and left a draft with a
   (WBRun); the 1.0 beta 5 binary deleted; ENVARC:DockAwesome.json migrated
   by it; the tests only copied it. RAM: clean; scratch worktrees removed.
 - Still not run: plain 3.9, 3.1.4.1, AmiKit XE; ApolloOS with build 540+.
+
+## Follow-up: hover pacing on AmigaOS 3.2.3 (2026-11-25)
+
+- Root cause of the failed 3.2.3 hover sweep: a pacing cascade present
+  since 1.0 beta 5, not the stacks. Once one frame's present lands after
+  the next VBlank, each later frame of the motion starts on the already
+  pending field signal and blocks 9-30 ms in the PiP back-buffer WaitTOF
+  until the row rests. The new evenly spaced row puts larger icons under
+  the x 800 / 950 rests (compose 10-12.5 ms), which triggers it; v1.0b5
+  with the same 15-pin row fails the same way (13508 / 13561 / 10679 us,
+  stalled 10 / 10 / 4). Details: tasks/todo.md, "Hover pacing on AmigaOS
+  3.2.3".
+- Fix (build 542): `amiga_pip_back_busy()`; such a frame is drawn at the
+  next field instead (once; the WaitTOF stays as the safeguard). Profile
+  `Frame pacing:` adds `retire_waits` and `retire_defers`.
+- 3.2.3 results: hover sweep 542 9695 / 9697 / 9711 us, stalled 2 / 3 / 2,
+  retire_waits 0 (541: 14096, stalled 9; v1.0b5 po: 10931, stalled 3);
+  first open 95.8 / 95.5 ms, entrance 139.5 / 138.6 ms (541 95.4 / 144.5,
+  v1.0b5 98.1 / 138.8); --bench-sweep 8 6836 / 6582 / 6826, stalled 41 /
+  41 / 42. host-test, host-sanitize green, make amiga no warnings; Opus
+  review no P0/P1/P2.
+- Installed on 3.2.3: build 542 in SYS:WBStartup/DockAwesome, running
+  (WBRun); 541 deleted; RAM: clean; ENVARC:DockAwesome.json not written by
+  the tests.
+- Still not run: Coffin and ApolloOS with 542; plain 3.9, 3.1.4.1, AmiKit
+  XE.
+

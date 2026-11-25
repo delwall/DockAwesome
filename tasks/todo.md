@@ -2001,8 +2001,11 @@ started).
 - [x] Hover, --bench-sweep 8 at ChangeTaskPri -30, old/new/old/new/old:
       render_us_avg 6799 / 6602 / 6804 / 7707 / 7889, stalled 41 / 41 /
       42 / 41 / 44 of ~166 frames. Pass.
-- [ ] Hover, agent sweep (relative moves to x 350, 500, 650, 800, 950,
-      then off, one per message, after 45 s idle): FAILS.
+- [x] Hover, agent sweep (relative moves to x 350, 500, 650, 800, 950,
+      then off, one per message, after 45 s idle): FAILED with build 541;
+      cause found and fixed in build 542, see "Hover pacing on AmigaOS
+      3.2.3" below (not a Folder Stack effect: v1.0b5 shows it with the
+      same row).
       At ChangeTaskPri -30, old/new/old/new/old: render_us_avg 10076 /
       12049 / 9569 / 14718 / 9557, stalled 1 / 6 / 0 / 14 / 0. At the
       shell's priority (1), old/new: 9549 / 12087, stalled 0 / 7.
@@ -2029,3 +2032,73 @@ started).
 - [ ] NOT RUN on 3.2.3: nothing of §4.4/§4.5 is left except the failed
       agent hover comparison above. Still not booted: plain 3.9, 3.1.4.1,
       AmiKit XE.
+
+### Hover pacing on AmigaOS 3.2.3 (2026-11-25)
+Build 542 (541 + this fix), AmigaOS 3.2.3 on the Vampire, agent input,
+ChangeTaskPri -30, all runs with --config RAM: copies (ENVARC untouched).
+Configs: pn = the user's 12 pins + Archives:Games + AOS32:Prefs +
+Personal:Downloads (3 stacks, Games and Prefs beside SD-Card); pl = the
+same 15 paths for v1.0b5 (no "folder": the same evenly spaced row, canvas
+896, Games/Prefs/Downloads plain drawer pins); po = v1.0b5 with Downloads
+as its Folder Stack (divider, canvas 928), as in the earlier runs.
+- [x] Root cause (pre-existing since 1.0 beta 5, in the frame pacing, not
+      in the stacks): when one frame's present lands after the next VBlank
+      (wake 3.5-4 ms + compose 10-12.5 ms at the large zoom levels + convert
+      > 20 ms), its flip waits for the following field. The pass for the
+      field already crossed is pending, so the next frame starts at once,
+      composes, and blocks in `amiga_pip_back_buffer`'s WaitTOF until the
+      next field; its present again lands just after a VBlank, and so on:
+      every later frame of the motion waits 9-30 ms (every fourth or so
+      misses a field when the check races the VBlank), until the row
+      rests. Trace (build 541 and v1.0b5 pl): one frame with done_us
+      17-20.7 ms, then convert_us 9-30 ms on every frame of the long tick-8
+      tail at the x 800 / x 950 rests.
+- [x] Evidence it is not the stacks: v1.0b5 with the same 15-pin row (pl,
+      no stack code involved) fails the same way, render_us_avg 13508 /
+      13561 / 10679, stalled 10 / 10 / 4. The divider of the old layout put
+      other icons under x 800, which is why v1.0b5 (po) looked normal; po
+      also shows the cascade sometimes (this session 10931, stalled 3, with
+      35 ms frames). The earlier control (Time/Locale in the stacks'
+      places) changed the artwork at that rest, so compose stayed short.
+      Ruled out earlier and still: prefetch (pending=0, reads=86 before the
+      sweep; it only runs while the pointer is off the dock), other tasks
+      (sampler), CPU in the main task.
+- [x] Fix: `amiga_pip_back_busy()`; a field pass that finds the last
+      present in the current field moves its redraw to the next field
+      (once per redraw; the WaitTOF stays as the safeguard). Profile line
+      `Frame pacing:` gains `retire_waits` (presents that waited) and
+      `retire_defers`.
+- [x] Hover agent sweep, pn/pl, order L1 (moves sent together) / F1 / L2 /
+      F2 / L3 / N1 / F3, plus po:
+
+      | run | build | config | render_us_avg | stalled | max us |
+      | --- | --- | --- | --- | --- | --- |
+      | L1 | v1.0b5 | pl | 13508 | 10 | 37116 |
+      | F1 | 542 | pn | 9695 | 2 | 18533 |
+      | L2 | v1.0b5 | pl | 13561 | 10 | 36706 |
+      | F2 | 542 | pn | 9697 | 3 | 18165 |
+      | L3 | v1.0b5 | pl | 10679 | 4 | 35921 |
+      | N1 | 541 | pn | 14096 | 9 | 112418 |
+      | F3 | 542 | pn | 9711 | 2 | 18172 |
+      | P1 | v1.0b5 | po | 10931 | 3 | 36300 |
+
+      542: retire_waits=0, retire_defers=2 in each run; the x 800 / 950
+      tails convert in ~1.8 ms. Pass: 542 below every old run.
+- [x] First open (45 s idle, pointer off the dock, Downloads): 542 first
+      paint 95.8 / 95.5 ms, entrance 139.5 / 138.6 ms; 541 this session
+      95.4 / 144.5; v1.0b5 (po) 98.1 / 138.8. prefetch pending=0 reads=86
+      evicted=0. Pass (under the old maximum of the earlier 3.2.3 table).
+- [x] --bench-sweep 8 (ChangeTaskPri -30), v1.0b5 po / 542 pn / v1.0b5 po:
+      render_us_avg 6836 / 6582 / 6826, stalled 41 / 41 / 42 (542
+      retire_waits=0). Pass.
+- [x] make host-test, make host-sanitize green; make amiga no warnings
+      (build 542); Opus review of the delta: no P0/P1/P2.
+- [x] Build 542 installed in place on 3.2.3: copied to
+      SYS:WBStartup/DockAwesome.new, 541 deleted (not locked), renamed,
+      started with WBRun; FindTask finds DockAwesome. RAM: clean (only
+      amiagent's RAM:T files); ENVARC:DockAwesome.json not written by the
+      tests (date 10:45:25, from 541's migration); scratch worktree removed.
+- [ ] Not run: Coffin and ApolloOS with 542 (the fix is in the shared PiP
+      path; Coffin's earlier sweep had stalled 3 / 3 / 4 with either
+      build); AmiKit XE, plain 3.9, 3.1.4.1 not booted.
+

@@ -39,6 +39,9 @@ volatile UWORD *amiga_pip_dma_register(int unit);
 /* The buffer last presented (diagnosis). */
 const unsigned char *amiga_pip_front_buffer(const AmigaPip *pip);
 unsigned char *amiga_pip_back_buffer(AmigaPip *pip);
+/* 1 while the back buffer may still be on screen: the last present was
+   in the current field, so amiga_pip_back_buffer would wait for the next. */
+int amiga_pip_back_busy(const AmigaPip *pip);
 /* 0 or 1: which buffer amiga_pip_back_buffer returns. A failed or suspended
    present keeps it, so it then holds the newest conversion. */
 int amiga_pip_back_index(const AmigaPip *pip);

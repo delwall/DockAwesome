@@ -39,4 +39,9 @@ builds with the same configuration, back to back. The `Damage:` line gives
 the number of full frames and the share of the canvas composed and converted.
 `Frame pacing:` counts display fields between consecutive animation frames:
 one is even motion, zero a frame never shown, two or more a visible stall.
+`retire_waits` counts presents that waited in `WaitTOF` for their PiP back
+buffer (the previous frame's flip still pending); it is 0 when the main loop
+moves such frames to the next field.
+`retire_defers` counts frames moved to the next field because the previous
+present crossed into the current one.
 Compare a default run with `--no-vsync` using the same pointer motion.

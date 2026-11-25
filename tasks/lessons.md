@@ -565,3 +565,17 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
 - The trace's convert_us includes the PiP back-buffer retirement wait
   (WaitTOF in amiga_pip_back_buffer): a slow "convert" with few pixels is
   a wait for a field, not CPU. Count the waits before blaming other tasks.
+
+## Compare the same row before blaming a feature (3.2.3, 2026-11-25)
+- The 3.2.3 hover failure was put on the stacks beside the hovered pin.
+  v1.0b5 had looked normal only because its divider put other icons under
+  the same pointer x; with the same 15 evenly spaced pins (no "folder")
+  v1.0b5 failed the same way. The cause was an old pacing cascade (a late
+  present makes every later frame wait in WaitTOF), triggered by heavier
+  icons at that rest.
+- Rule: for a hover/zoom regression, first run the old build with the same
+  pixel layout (same pin count and spacing, canvas width in the profile
+  header) and the same gestures; a control that swaps icons also swaps the
+  compose cost. Read the frame trace for the first late frame (done_us near
+  20 ms) before looking for other tasks or features.
+

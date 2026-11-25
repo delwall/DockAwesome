@@ -25,6 +25,10 @@ Coffin and AmigaOS 3.2.3 only.
 - With a Folder Stack open, a quick click on another pin closes the stack
   and starts that pin (or opens that stack). Before, only the stack closed
   (seen on Coffin, also in 1.0 beta 5; checked on Coffin and AmigaOS 3.2.3).
+- Zoom: when one frame ran late, every later frame of the same motion
+  waited up to 30 ms for the display, and the zoom stuttered until the row
+  came to rest (also in 1.0 beta 5). The dock now draws such a frame at the
+  next field and keeps pace (checked on AmigaOS 3.2.3).
 
 ## 1.0 beta 5
 
