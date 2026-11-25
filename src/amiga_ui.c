@@ -1281,10 +1281,10 @@ static void folder_glyph(DockUI *ui, struct RastPort *rp, int x, int y, int draw
 
 enum { FOLDER_PAINT_LABELS = 1, FOLDER_PAINT_GLYPHS = 2 };
 
-/* The parent drawer and page buttons: a round face with a chevron
-   pointing up (DOCK_BUTTON_UP), left or right, 5/6 of the control and
-   centred in it (dock_button_pixels). Natively a disc and a two-pixel
-   chevron. */
+/* The parent drawer and page buttons: a round face with a stemmed up
+   arrow (DOCK_BUTTON_PARENT) or a chevron pointing left or right, 5/6 of
+   the control and centred in it (dock_button_pixels). Natively a disc and
+   lines two pixels wide (the arrow's stem one). */
 static void folder_button(DockUI *ui, struct RastPort *rp, int direction,
     int x, int y, int width, int height)
 {
@@ -1295,7 +1295,7 @@ static void folder_button(DockUI *ui, struct RastPort *rp, int direction,
     popup_color(ui,rp,MENU_HOVER);
     fill_rounded(rp,b.left,b.top,b.size,b.size,b.size/2);
     popup_color(ui,rp,MENU_TEXT);
-    for (i = 0; i < 2; ++i) {
+    for (i = 0; i < b.count; ++i) {
         Move(rp,b.stroke[i][0][0],b.stroke[i][0][1]);
         Draw(rp,b.stroke[i][1][0],b.stroke[i][1][1]);
         Draw(rp,b.stroke[i][2][0],b.stroke[i][2][1]);
@@ -1353,7 +1353,7 @@ static void paint_folder_content(DockUI *ui, struct RastPort *rp, int parts, Doc
     if (labels)
         centered_folder_text(ui,rp,target,title,offset+width/2,(f->header-font_height)/2,width-4*control,MENU_TEXT);
     if (folder_nested(f))
-        folder_control(ui,rp,target,parts,DOCK_BUTTON_UP,offset+f->pad,(f->header-control)/2,control,control);
+        folder_control(ui,rp,target,parts,DOCK_BUTTON_PARENT,offset+f->pad,(f->header-control)/2,control,control);
     if (labels && !f->count) {
         centered_folder_text(ui,rp,target,f->read_ok ? "Empty drawer" : "Cannot read drawer",
             offset+width/2,f->header,width-2*f->pad,MENU_TEXT);

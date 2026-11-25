@@ -89,24 +89,26 @@ int dock_gap_moving(const DockGap *gap);
 /* The shown gap, or an empty rect. */
 DockRect dock_gap_rect(const DockGap *gap);
 /* The Folder Stack box's buttons: a faint disc with a round-capped
-   chevron pointing left or right (the page buttons) or up (the parent
-   drawer button), drawn 5/6 of the control's size and centred in it. The
-   control (the hit area) keeps its size. Positions and lengths in 1/16 px:
-   the chevron's two arms run from end[0] and end[1] to tip, so its ink is
-   the bounding box of those three points grown by half on every side,
-   centred on the disc's centre (cx, cy). */
-/* direction: DOCK_BUTTON_UP, or below 0 left, otherwise right. */
-enum { DOCK_BUTTON_LEFT = -1, DOCK_BUTTON_RIGHT = 1, DOCK_BUTTON_UP = 2 };
-typedef struct { int cx, cy, radius, half, tip[2], end[2][2]; } DockButtonGlyph;
+   glyph, drawn 5/6 of the control's size and centred in it. The page
+   buttons show a chevron pointing left (DOCK_BUTTON_LEFT) or right
+   (DOCK_BUTTON_RIGHT); the parent drawer button (DOCK_BUTTON_PARENT) a
+   stemmed arrow pointing up. The control (the hit area) keeps its size.
+   Positions and lengths in 1/16 px: the glyph is count segments
+   segment[i] = {x0, y0, x1, y1} stroked half wide with round caps, so its
+   ink is the bounding box of their end points grown by half on every
+   side, centred on the disc's centre (cx, cy). */
+enum { DOCK_BUTTON_LEFT = -1, DOCK_BUTTON_RIGHT = 1, DOCK_BUTTON_PARENT = 2 };
+typedef struct { int cx, cy, radius, half, count, segment[3][4]; } DockButtonGlyph;
 void dock_button_glyph(int x, int y, int width, int height, int direction, DockButtonGlyph *out);
-/* Pixel (px,py) sampled 4x4: how many samples (0..16) lie in the stroke,
-   and in *disc how many lie in the disc. */
+/* Pixel (px,py) sampled 4x4: how many samples (0..16) lie in the glyph's
+   stroke, and in *disc how many lie in the disc. */
 int dock_button_coverage(const DockButtonGlyph *glyph, int px, int py, int *disc);
 /* The same button without antialiasing, in whole pixels: a disc of size
-   pixels at (left, top), and a two-pixel chevron drawn as two 45 degree
-   polylines, stroke[i] = {end, tip, end}. Centred on the control: exactly
-   along the direction it points, and to half a pixel across it when the
-   control is an even number of pixels. */
-typedef struct { int left, top, size, stroke[2][3][2]; } DockButtonPixels;
+   pixels at (left, top), and count polylines stroke[i] = {a, b, c} of 45
+   degree or straight lines: a chevron two pixels wide, the arrow's head
+   the same pointing up plus a one pixel stem. Centred on the control:
+   exactly along the direction it points, and to half a pixel across it
+   when the control is an even number of pixels. */
+typedef struct { int left, top, size, count, stroke[3][3][2]; } DockButtonPixels;
 void dock_button_pixels(int x, int y, int width, int height, int direction, DockButtonPixels *out);
 #endif

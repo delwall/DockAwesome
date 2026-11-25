@@ -314,29 +314,37 @@ DockRect dock_gap_rect(const DockGap *g)
     return r;
 }
 
+static void button_segment(DockButtonGlyph *g, int x0, int y0, int x1, int y1)
+{
+    int *segment = g->segment[g->count++];
+    segment[0] = g->cx+x0; segment[1] = g->cy+y0;
+    segment[2] = g->cx+x1; segment[3] = g->cy+y1;
+}
+
 void dock_button_glyph(int x, int y, int width, int height, int direction, DockButtonGlyph *out)
 {
-    int size = width < height ? width : height;
+    /* At most 96 px: the 32-bit distances stay in range (fonts give 18). */
+    int size = width < height ? (width < 96 ? width : 96) : (height < 96 ? height : 96);
     /* 5/6 of the control, but a 12 px disc where the control has room. */
     int radius = (size*40+3)/6, least = size*8 < 96 ? size*8 : 96;
-    int reach, arm;
     if (radius < least) radius = least;
-    reach = radius*3/16;
-    arm = radius*3/8;
     out->cx = x*16+width*8;
     out->cy = y*16+height*8;
     out->radius = radius;
     /* The stroke shrinks with the glyph: 5/6 of its old 13. */
     out->half = 11;
-    if (direction == DOCK_BUTTON_UP) {
-        out->tip[0] = out->cx; out->tip[1] = out->cy-reach;
-        out->end[0][0] = out->cx-arm; out->end[1][0] = out->cx+arm;
-        out->end[0][1] = out->end[1][1] = out->cy+reach;
+    out->count = 0;
+    if (direction == DOCK_BUTTON_PARENT) {
+        /* A stem as tall as the chevron, each side of the head a third
+           of it. */
+        int reach = radius*3/8, head = radius/4;
+        button_segment(out,0,-reach,0,reach);
+        button_segment(out,-head,head-reach,0,-reach);
+        button_segment(out,head,head-reach,0,-reach);
     } else {
-        int sign = direction < 0 ? -1 : 1;
-        out->tip[0] = out->cx+sign*reach; out->tip[1] = out->cy;
-        out->end[0][0] = out->end[1][0] = out->cx-sign*reach;
-        out->end[0][1] = out->cy-arm; out->end[1][1] = out->cy+arm;
+        int sign = direction < 0 ? -1 : 1, reach = radius*3/16, arm = radius*3/8;
+        button_segment(out,-sign*reach,-arm,sign*reach,0);
+        button_segment(out,-sign*reach,arm,sign*reach,0);
     }
 }
 
@@ -354,12 +362,14 @@ static int segment_distance2(int px, int py, int x0, int y0, int x1, int y1)
 
 int dock_button_coverage(const DockButtonGlyph *g, int px, int py, int *disc)
 {
-    int stroke = 0, inside = 0, sx, sy, half2 = g->half*g->half, radius2 = g->radius*g->radius;
+    int stroke = 0, inside = 0, sx, sy, i, half2 = g->half*g->half, radius2 = g->radius*g->radius;
     for (sy = 0; sy < 4; ++sy) for (sx = 0; sx < 4; ++sx) {
         int qx = px*16+2+4*sx, qy = py*16+2+4*sy, dx = qx-g->cx, dy = qy-g->cy;
         if (dx*dx+dy*dy <= radius2) ++inside;
-        if (segment_distance2(qx,qy,g->end[0][0],g->end[0][1],g->tip[0],g->tip[1]) <= half2 ||
-            segment_distance2(qx,qy,g->end[1][0],g->end[1][1],g->tip[0],g->tip[1]) <= half2) ++stroke;
+        for (i = 0; i < g->count; ++i) {
+            const int *s = g->segment[i];
+            if (segment_distance2(qx,qy,s[0],s[1],s[2],s[3]) <= half2) { ++stroke; break; }
+        }
     }
     if (disc) *disc = inside;
     return stroke;
@@ -369,33 +379,44 @@ void dock_button_pixels(int x, int y, int width, int height, int direction, Dock
 {
     int size = width < height ? width : height;
     int inset = size >= 12 ? (size+6)/12 : 0, drawn = size-2*inset, arm = drawn/5;
-    int left = x+(width-size)/2, top = y+(height-size)/2, i;
-    /* Along its direction the chevron spans arm+2 pixels: the same parity
-       as the disc's centres it exactly. Positions as if it pointed right
-       or down from (0,0) = the control's corner: tip at lead, across at
-       middle. */
-    int lead, middle = size/2;
-    if (arm < 1) arm = 1;
-    if ((drawn+arm)&1) ++arm;
-    lead = (size+arm-2)/2;
+    int left = x+(width-size)/2, top = y+(height-size)/2, middle = size/2, i, k;
     out->left = left+inset;
     out->top = top+inset;
     out->size = drawn;
-    for (i = 0; i < 2; ++i) {
-        /* Pointing right: (lead-(arm-i), middle-arm) -> (lead+i, middle)
-           -> (lead-(arm-i), middle+arm); left and up mirror and turn it. */
-        int along[3] = {lead-(arm-i), lead+i, lead-(arm-i)};
-        int across[3] = {middle-arm, middle, middle+arm};
-        int k;
-        for (k = 0; k < 3; ++k) {
-            int a = direction == DOCK_BUTTON_UP || direction < 0 ? size-1-along[k] : along[k];
-            if (direction == DOCK_BUTTON_UP) {
+    if (arm < 1) arm = 1;
+    if (direction == DOCK_BUTTON_PARENT) {
+        /* Rows tip .. tip+length-1 with length of the disc's parity, so the
+           arrow is centred down exactly; the head is the up chevron. */
+        int length = drawn/2, tip;
+        if ((length+size)&1) ++length;
+        if (length < arm+2) length = arm+2+((arm+size)&1);
+        tip = (size-length)/2;
+        out->count = 3;
+        for (i = 0; i < 2; ++i) {
+            int along[3] = {tip+arm+i, tip+i, tip+arm+i}, across[3] = {middle-arm, middle, middle+arm};
+            for (k = 0; k < 3; ++k) {
                 out->stroke[i][k][0] = left+across[k];
-                out->stroke[i][k][1] = top+a;
-            } else {
-                out->stroke[i][k][0] = left+a;
-                out->stroke[i][k][1] = top+across[k];
+                out->stroke[i][k][1] = top+along[k];
             }
+        }
+        for (k = 0; k < 3; ++k) {
+            out->stroke[2][k][0] = left+middle;
+            out->stroke[2][k][1] = top+(k ? tip+length-1 : tip);
+        }
+        return;
+    }
+    /* The chevron spans arm+2 columns: the same parity as the disc's
+       centres it exactly. Pointing right, its tip is at column lead. */
+    if ((drawn+arm)&1) ++arm;
+    out->count = 2;
+    for (i = 0; i < 2; ++i) {
+        /* Right: (lead-(arm-i), middle-arm) -> (lead+i, middle) ->
+           (lead-(arm-i), middle+arm); left mirrors it in the control. */
+        int lead = (size+arm-2)/2;
+        int along[3] = {lead-(arm-i), lead+i, lead-(arm-i)}, across[3] = {middle-arm, middle, middle+arm};
+        for (k = 0; k < 3; ++k) {
+            out->stroke[i][k][0] = left+(direction < 0 ? size-1-along[k] : along[k]);
+            out->stroke[i][k][1] = top+across[k];
         }
     }
 }
