@@ -2170,3 +2170,42 @@ format, "folder": "Personal:Downloads") was only copied.
 - [ ] After the batch: stop the test dock, read RAM:ak.prof/ak.json,
       WBRun the installed dock (migrates ENVARC:DockAwesome.json), clean
       RAM: (ak.json, ak.prof, run.s, stop.s, FindTask, ENV:dpid).
+
+### AmiKit XE: "dos device not mounted" for Personal:Audio (2026-11-25)
+User, mid gesture batch: dropping Personal:Audio on the dock and clicking it
+gave a window saying "dos device not mounted"; Downloads and Demos work as
+stacks.
+- [x] Personal:Audio (shell only): a plain directory on Personal: (DH12,
+      mounted, 61G), not an assign, link or volume; Personal:Audio.info is
+      a PNG icon whose icOn type is 2 (WBDRAWER). Contents Apollo.mp3, MOD,
+      MP3, Streams (all ordinary). RAM:ak.json stores "Personal:Audio"
+      (canonical). The dock's --profile showed stacks=6 (Audio among them)
+      and a 185x156 box (Audio's 4 entries + Open cell), so it opened as a
+      stack.
+- [x] Window: a Directory Opus 5 lister titled `DOS error: device (or
+      volume) is not mounted`, path `"Personal:Audio"/`. Reproduced through
+      ARexx without the dock: `lister new "Personal:Audio"` gives exactly
+      that lister; `lister new Personal:Audio` opens the drawer. DOpus 5
+      takes the rest of the line as the path, quotes included; unquoted,
+      `RAM:T/a b` (space) and `RAM:T/q"x` (quote) opened correctly too
+      (`lister query <h> path` = `RAM:T/a b/`, `RAM:T/q"x/`).
+- [x] Cause: the dock's own command, `lister new "<path>"` in
+      launch_object (src/amiga_launch.c, since 050f9c8 / 1.0 beta 2;
+      identical in v1.0b5). Every drawer the dock opens without Workbench
+      (Open in Workbench in a stack's box or menu, a drawer or disk pin)
+      opened such an error lister on AmiKit. Not a DOS requester: the
+      folder reads already run with pr_WindowPtr -1, and the prefetch did
+      not raise anything. Todo item "3. Drawers and disks without
+      Workbench" was never run on DOpus 5 before.
+- [x] Fix (build 544, Opus review: no P0/P1/P2): `dock_dopus_lister_new` (dock_text.c, host-tested)
+      builds `lister new <path>` unquoted; refuses an empty path, control
+      codes and no room; the quote refusal is gone (DOpus takes quotes).
+      make host-test, host-sanitize green; make amiga no warnings.
+- [x] Installed: build 544 in place of 542 (SYS:WBStartup/DockAwesome, 542
+      deleted, Version 0.544). The test dock was stopped (stop.s) and
+      restarted with the same arguments (run.s, --config RAM:ak.json
+      --profile >RAM:ak.prof); the batch profile before the restart is
+      saved as RAM:T/ak-batch1.prof and on the Mac.
+- [ ] End to end through the dock: agent clicks do not reach the dock on
+      AmiKit; the user checks Open in Workbench on Personal:Audio (and a
+      drawer/disk pin such as Archives:) during the batch.

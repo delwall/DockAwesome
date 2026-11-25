@@ -333,9 +333,7 @@ int launch_object(App *app, const char *path, LONG *error)
     if (icon && icon->do_Type != WBTOOL && icon->do_Type != WBPROJECT) {
         /* Drawers and disks open in the desktop's own windows. */
         char command[PATH_CAP+16];
-        /* A quote would end the ARexx argument: no such drawer opens. */
-        snprintf(command,sizeof(command),"lister new \"%s\"",path);
-        if (strchr(path,'"')) *error = ERROR_OBJECT_WRONG_TYPE;
+        if (!dock_dopus_lister_new(command,sizeof(command),path)) *error = ERROR_OBJECT_WRONG_TYPE;
         else if (rexx_send(app->launch_port,command)) ++app->rexx_pending;
         else *error = ERROR_OBJECT_WRONG_TYPE;
         FreeDiskObject(icon);

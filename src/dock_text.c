@@ -111,6 +111,20 @@ int dock_shell_quote(char *out, size_t size, const char *text)
     return 1;
 }
 
+int dock_dopus_lister_new(char *out, size_t size, const char *path)
+{
+    static const char verb[] = "lister new ";
+    size_t length = strlen(path), i;
+    if (!size) return 0;
+    out[0] = 0;
+    if (!length || sizeof(verb)+length > size) return 0;
+    for (i = 0; i < length; ++i)
+        if ((unsigned char)path[i] < 32) return 0;
+    memcpy(out,verb,sizeof(verb)-1);
+    memcpy(out+sizeof(verb)-1,path,length+1);
+    return 1;
+}
+
 /* The start of a file reads as text: a picture, an archive or any other
    binary document must never reach Execute. */
 int dock_text_bytes(const unsigned char *bytes, size_t count)

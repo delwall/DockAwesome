@@ -581,3 +581,13 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
   compose cost. Read the frame trace for the first late frame (done_us near
   20 ms) before looking for other tasks or features.
 
+
+## Quote rules are per receiver: DOpus 5 keeps quotes in `lister new` (2026-11-25)
+- `lister new "<path>"` was written from Shell/ARexx habit and shipped from
+  1.0 beta 2 to 542 unrun on DOpus 5; DOpus 5 takes the rest of the line as
+  the path, quotes included, and showed "device (or volume) is not mounted".
+- Before sending a command string to another program, run the exact string
+  against that program once (ARexx from amiga_arexx is enough) with a plain
+  path, a path with a space and one with a quote.
+- A "not mounted" error for a mounted path: look at the exact path the
+  error names (here `"Personal:Audio"/`) before suspecting DOS or devices.

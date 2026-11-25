@@ -217,3 +217,25 @@ One push of folder-stacks; PR opened as a draft and left a draft with a
 - Still not run: Coffin and ApolloOS with 542; plain 3.9, 3.1.4.1, AmiKit
   XE.
 
+
+## Follow-up: AmiKit "dos device not mounted" (2026-11-25)
+
+- Report (user, gesture batch on AmiKit XE with 542): Personal:Audio
+  dropped and clicked gave a window "dos device not mounted".
+- Personal:Audio is an ordinary directory on the mounted Personal: (DH12)
+  with a WBDRAWER PNG icon; it opened as a stack (profile stacks=6).
+- The window was a Directory Opus 5 lister `DOS error: device (or volume)
+  is not mounted` on `"Personal:Audio"/`: the dock sent `lister new
+  "<path>"`, and DOpus 5 keeps the quotes as part of the path. Reproduced
+  with ARexx alone; unquoted paths (with a space, with a quote) open.
+  Present since 1.0 beta 2 (050f9c8), the same in v1.0b5; not a DOS
+  requester and not the prefetch. This PR makes it more visible: Open in
+  Workbench of every stack goes through it.
+- Fix (build 544): `dock_dopus_lister_new` sends `lister new <path>`
+  unquoted (host test in tests/test_text.c). Not run end to end through
+  the dock (agent clicks do not reach it on AmiKit); the user checks Open
+  in Workbench during the batch.
+- AmiKit state: build 544 in SYS:WBStartup/DockAwesome; the test dock runs
+  from it with the batch's arguments (--config RAM:ak.json --profile
+  >RAM:ak.prof); the profile before the restart is RAM:T/ak-batch1.prof.
+  The batch and its cleanup are still open (tasks/todo.md).
