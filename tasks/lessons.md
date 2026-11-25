@@ -330,10 +330,9 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
 - Commit titles describe intent; the verification notes describe what is true.
 
 ## AmiKit: Directory Opus is the desktop (2026-11-10)
-- Synthetic input from amiagent does not reach the dock or Intuition windows on
-  AmiKit (`Input: downs=0`). Ask the user for clicks and drags there.
-  Pointer moves do reach it: hover reads the screen's pointer, so the agent
-  can run hover sweeps on AmiKit itself (2026-11-25).
+- WRONG until 2026-11-25: "agent input does not reach the dock on AmiKit".
+  It does; the agent's warp lands elsewhere. See "AmiKit: agent clicks land
+  at twice the coordinates" below.
 - `a || b` on bit flags collapses them to 1, which is RUNNING_WORKBENCH: a
   window's dot became Workbench evidence that is kept while the Workbench list
   cannot be read (no Workbench). Combine flags with `|`.
@@ -591,3 +590,23 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
   path, a path with a space and one with a quote.
 - A "not mounted" error for a mounted path: look at the exact path the
   error names (here `"Personal:Audio"/`) before suspecting DOS or devices.
+
+## AmiKit: agent clicks land at twice the coordinates (2026-11-25)
+- amiga_move_mouse/amiga_click/amiga_drag warp with IECLASS_POINTERPOS. On
+  AmiKit XE (1280x720, 24-bit) the pointer lands at screen = 2*w-4 on both
+  axes: a click "at 476,690" pressed at 948,719, beside the dock, so the
+  profile said `Input: downs=0`. One such click was taken as "input does not
+  reach the dock" and every AmiKit gesture went to the user for weeks.
+- The button events themselves are fine: an input.device spy (handlers at
+  pri 127 and 59 around the dock's 60) showed RAWMOUSE LBUTTON, qualifier
+  0x8000, ie_X/Y 0, and the dock nulled both (captured). No other handler
+  sits above the dock (commodities 53, intuition 50, console 0).
+- Works on AmiKit: pass w = ((X+4)/2, (Y+4)/2) to amiga_click, amiga_drag and
+  amiga_move_mouse; check with amiga_pointer first. relative:true is not
+  exact (pointer acceleration: 32 ticks gave ~35 px). amiga_ui_click uses the
+  unscaled warp and misses. Screenshots and amiga_ui_tree report real pixels.
+- The dock and the Folder Stack box are drawn in PiP (not in screenshots);
+  the box's window position and size are in amiga_ui_tree, and the stack and
+  dock menus are real windows that screenshots show.
+- Rule: when an agent gesture "does nothing", read amiga_pointer after the
+  move before concluding anything about the target program.

@@ -3,7 +3,7 @@
 ## 1.0 beta 6
 
 Draft, not released. Changes since 1.0 beta 5, so far run on ApolloOS,
-Coffin and AmigaOS 3.2.3 only.
+Coffin, AmigaOS 3.2.3 and AmiKit XE only.
 
 **Folder Stacks**
 - Every drawer you pin is a Folder Stack: a click opens its contents above
@@ -29,6 +29,10 @@ Coffin and AmigaOS 3.2.3 only.
   waited up to 30 ms for the display, and the zoom stuttered until the row
   came to rest (also in 1.0 beta 5). The dock now draws such a frame at the
   next field and keeps pace (checked on AmigaOS 3.2.3).
+- AmiKit (Directory Opus 5 as the desktop): **Open in Workbench** and disk
+  pins open a Directory Opus lister again. Before, Directory Opus showed an
+  empty lister titled "DOS error: device (or volume) is not mounted" (also
+  in 1.0 beta 5; checked on AmiKit XE).
 
 ## 1.0 beta 5
 

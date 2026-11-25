@@ -239,3 +239,31 @@ One push of folder-stacks; PR opened as a draft and left a draft with a
   from it with the batch's arguments (--config RAM:ak.json --profile
   >RAM:ak.prof); the profile before the restart is RAM:T/ak-batch1.prof.
   The batch and its cleanup are still open (tasks/todo.md).
+
+## Follow-up: AmiKit XE, agent-driven (2026-11-25)
+
+- Agent input works on AmiKit: the agent's warp lands at screen = 2*w-4,
+  so earlier clicks pressed beside the dock. Clicks, drags and menus at
+  ((X+4)/2, (Y+4)/2) reach the dock (input.device spy: the dock captures
+  the agent's button events). tasks/lessons.md, "AmiKit: agent clicks land
+  at twice the coordinates".
+- Build 544 (HEAD 4ed4e32), --config RAM: copies, agent: Open in Workbench
+  on Personal:Audio opens a DOpus lister without the DOS error (fix
+  4ed4e32 verified); Archives: pin opens a lister; stack switch, program
+  pin with a box open, Sort by rows and check mark, reorder, drag out,
+  Settings Save all pass (tasks/todo.md, "AmiKit XE: agent gestures").
+  Not run: the box's Open in Workbench tile, the no-dot check (PiP only).
+- §4.5 first open, Pictures 584x527, v1.0b5 / 544 alternating, 4 runs
+  each: first paint new 238.7-285.8 ms vs old 239.2-363.5 (pass);
+  entrance new 132.5-174.2 vs old 134.3-159.4: FAILS the "not above the
+  old maximum" rule in 2 of 4 runs (4-frame entrances with a late last
+  frame, as in old o1). Not fixed; open for the owner.
+- Pre-existing finding (also v1.0b5): the first click after the dock idles
+  can be lost (4 of 12 fresh-start runs); a diagnostic build showed the
+  hit snapshot withdrawn at the press. Open for the owner.
+- Compose finding closed: same binary gives 3.8 ms or 5.3 ms per run with
+  code and canvas at the same addresses; clean runs 544 3820/3837 vs
+  v1.0b5 3778-3793 us. Run-level interference, not a code regression.
+- End state AmiKit: installed 544 running (Run from a Stack 400000 script),
+  the only dock; ENVARC:DockAwesome.json migrated by it; RAM: clean;
+  scratch worktrees removed. No code change in this follow-up.

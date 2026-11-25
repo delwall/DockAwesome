@@ -2162,14 +2162,11 @@ format, "folder": "Personal:Downloads") was only copied.
 - [x] Build 542 installed in place: SYS:WBStartup/DockAwesome.new copied,
       0.527 deleted (not locked), renamed; Version says 0.542 build 542.
       v1.0b5 and bisect binaries deleted from RAM:, worktrees removed.
-- [ ] Gesture batch (user, physical mouse): 542 runs from the installed
-      binary with --profile, --config RAM:ak.json (user's paths migrated +
-      "sorts": {"Personal:Demos": "date"}), output RAM:ak.prof. Steps 4-8,
-      menu rows, first open of each stack (reference from the brief for
-      1.0 beta 5 on AmiKit: first paint 109-127 ms, opening 132-150 ms).
-- [ ] After the batch: stop the test dock, read RAM:ak.prof/ak.json,
-      WBRun the installed dock (migrates ENVARC:DockAwesome.json), clean
-      RAM: (ak.json, ak.prof, run.s, stop.s, FindTask, ENV:dpid).
+- [x] Gesture batch: the user did part of it by hand (Personal:Audio
+      finding below); the rest ran agent-driven with build 544 (next
+      section "AmiKit XE: agent gestures").
+- [x] After the batch: test dock stopped, installed dock started, RAM:
+      cleaned (next section).
 
 ### AmiKit XE: "dos device not mounted" for Personal:Audio (2026-11-25)
 User, mid gesture batch: dropping Personal:Audio on the dock and clicking it
@@ -2206,6 +2203,99 @@ stacks.
       restarted with the same arguments (run.s, --config RAM:ak.json
       --profile >RAM:ak.prof); the batch profile before the restart is
       saved as RAM:T/ak-batch1.prof and on the Mac.
-- [ ] End to end through the dock: agent clicks do not reach the dock on
-      AmiKit; the user checks Open in Workbench on Personal:Audio (and a
-      drawer/disk pin such as Archives:) during the batch.
+- [x] End to end through the dock (agent, build 544, next section): Open
+      in Workbench on Personal:Audio opens a lister on `Personal:Audio/`,
+      no DOS error; the Archives: pin opens a lister on `Archives:`.
+
+### AmiKit XE: agent gestures, first open, compose (2026-11-25)
+Build 544 (HEAD 4ed4e32), installed in SYS:WBStartup; every test dock used
+--config RAM: copies; v1.0b5 built from the tag in a scratch worktree.
+- [x] Agent input works on AmiKit. The warp (IECLASS_POINTERPOS) lands at
+      screen = 2*w-4 on both axes, so earlier clicks pressed beside the
+      dock (`downs=0`). An input.device spy (pri 127 / 59 around the
+      dock's 60) showed the agent's button events reach the dock and are
+      captured; no handler above the dock. Working path: amiga_click /
+      amiga_drag / amiga_move_mouse at ((X+4)/2, (Y+4)/2), checked with
+      amiga_pointer; relative moves are accelerated (~1.1x), ui_click
+      misses. tasks/lessons.md has the rule.
+- [x] §4.4 on AmiKit, agent, profile `Input: downs=18 ups=18 right_seen=6`:
+
+      | check | result |
+      | --- | --- |
+      | Clock pin | starts Clock |
+      | Personal:Audio menu -> Open in Workbench | DOpus lister `Personal:Audio/`, no DOS error (fix 4ed4e32) |
+      | Archives: pin (volume) | DOpus lister `Archives:` |
+      | stack -> other stack, quick click | switches (Downloads->Demos 3x, Pictures->RiVA) |
+      | program pin with a box open | Shell starts: quick click 3 of 4 (plus 1 of 1 with the diagnostic build), 1 s hold 1 of 1 |
+      | Sort by rows | heading, Name/Date Modified/Kind, check mark moves Name->Kind->Name; file keeps only Demos "date" |
+      | reorder (Audio to slot 3) | saved in RAM:ak.json |
+      | drag out (Audio) | removed from RAM:ak.json |
+      | Settings | no Folder Stack section; Save writes the file |
+
+      The one failed quick click (Demos box open, receiver not armed) is
+      the lost-first-press finding below. A .png in Personal:Pictures
+      opened from the box gave "Could not open ... object not found": its
+      icon's default tool is DH0:Utilities/MysticView/MysticView and DH0:
+      does not exist on AmiKit (correct). Not run: the box's Open in
+      Workbench tile and the "no dot" check (both only in PiP).
+- [x] §4.5 first open after 47 s idle, pointer off the dock, Pictures
+      (584x527, 190 entries) as v1.0b5's Folder Stack (RAM:o.json = the
+      user's file with "folder": "Personal:Pictures") and as a stack in
+      544 (RAM:n.json = migrated user's file + Demos "date"):
+
+      | run | build | first paint ms | entrance ms | frames (fields) |
+      | --- | --- | --- | --- | --- |
+      | o1 | v1.0b5 | 363.5 | 159.4 | 4 (0223) |
+      | n2 | 544 | 238.7 | 164.7 | 4 (0124) |
+      | o2 | v1.0b5 | 282.8 | 134.3 | 3 (023) |
+      | n3 | 544 | 285.8 | 154.2 | 4 (0132) |
+      | o3 | v1.0b5 | 251.8 | 136.1 | 4 (0123) |
+      | n4 | 544 | 285.4 | 174.2 | 4 (0124) |
+      | o4 | v1.0b5 | 239.2 | 138.5 | 3 (023) |
+      | n5 | 544 | 254.5 | 132.5 | 3 (023) |
+
+      First paint: every new run under the old maximum (363.5), mean 266
+      vs 284: pass. Entrance: FAIL by the §4.5 rule: n2 and n4 lie above
+      the old maximum (159.4), mean 156 vs 142. Both are 4-frame entrances
+      whose last frame came at 61-65 ms (o1's at 59 ms); box compose per
+      frame is alike (new 13.9-23.3 ms, old 15.0-20.6). Not fixed: no
+      cause in the stack code found; AmiKit's 20-65 ms main-loop "polls"
+      passes (pre-existing, above) are the candidate. Open for the owner.
+      Other stacks, 544 (n3; n1 in brackets), first paint / entrance ms:
+      RiVA 242x209 69.8 / 148.3 (66.7 / 132.7), AmigaAMP 299x262 92.7 /
+      147.2 (101.1 / 138.5), Demos 185x209 54.8 / 145.0 (40.4 / 139.4),
+      Downloads 356x368 109.9 / 134.6 (127.5 / 131.7); prefetch stacks=5
+      pending=0 reads=153 cache=153/512 evicted=0 in every run.
+- [ ] FINDING (pre-existing, also v1.0b5): the first click after the dock
+      has idled can be lost: no box, the press goes to the receiver or the
+      desktop (`downs=0`, `presses_armed=1`). Seen on n2, n5, o3 and a
+      diagnostic run (4 of 12 fresh-start first clicks after 47 s; the
+      second click always worked). A diagnostic build (counters only, not
+      committed) showed `nosnap=1`: the handler's hit snapshot was
+      withdrawn at the press, after 38 withdrawals in that run (a normal
+      run has 1). Which input_publish condition withdrew it is not split
+      yet. A physical mouse moves onto the dock first (the zoom republishes),
+      so users see it less. Not this PR; open for the owner.
+- [x] Compose finding (compose_us_avg +16-19 % in --bench-sweep 8): not a
+      code regression. 5-pin row (Shell, Clock, AmiKit:, Archives:,
+      MultiView), ChangeTaskPri -30:
+
+      | binary | compose_us_avg per run |
+      | --- | --- |
+      | v1.0b5 | 3778, 3783, 3793 |
+      | 544 installed | 3820, 3837 |
+      | HEAD + 0..28 byte code pad (8 binaries, 2 batches) | 3767-3848, outliers 5378 (pad 4), 5323 (pad 24), 5391 (pad 0) |
+      | HEAD with address log, 12 runs | 3799-3830, one 5329 |
+
+      The 12 logged runs had the same code (dock_render_oriented_clip at
+      07a88d28) and canvas address; the outliers come and go per run of
+      the same binary (pad 4 and 24 slow in batch 1, normal in batch 2),
+      so they are run-level interference by other tasks above pri -30,
+      not code or data placement. Clean runs: 544 is within 1 % of v1.0b5.
+- [x] End state: test docks stopped (Ctrl-C; stop.s confirmed none left);
+      the installed 544 started with Run from a Stack 400000 script (WBRun
+      fails under DOpus, see above) and running, the only dock (Status);
+      ENVARC:DockAwesome.json migrated by it as designed (no "folder",
+      Personal:Downloads last), tests only used RAM: copies; RAM: and
+      RAM:T clean (configs, profiles, scripts, FindTask, InputSpy,
+      v1.0b5 and diagnostic binaries, ENV:dpid); scratch worktrees removed.
