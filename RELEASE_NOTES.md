@@ -2,8 +2,8 @@
 
 ## 1.0 beta 6
 
-Draft, not released. Changes since 1.0 beta 5, so far run on ApolloOS and
-Coffin only.
+Draft, not released. Changes since 1.0 beta 5, so far run on ApolloOS,
+Coffin and AmigaOS 3.2.3 only.
 
 **Folder Stacks**
 - Every drawer you pin is a Folder Stack: a click opens its contents above
@@ -24,7 +24,7 @@ Coffin only.
 **Fixes**
 - With a Folder Stack open, a quick click on another pin closes the stack
   and starts that pin (or opens that stack). Before, only the stack closed
-  (seen on Coffin, also in 1.0 beta 5).
+  (seen on Coffin, also in 1.0 beta 5; checked on Coffin and AmigaOS 3.2.3).
 
 ## 1.0 beta 5
 

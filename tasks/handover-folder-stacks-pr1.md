@@ -162,3 +162,31 @@ One push of folder-stacks; PR opened as a draft and left a draft with a
   Coffin boot. RAM: clean.
 - Still not run: AmigaOS 3.2.3, plain 3.9, 3.1.4.1, AmiKit XE (matrix,
   AmiKit first open and hover); ApolloOS with build 540.
+
+## Follow-up: AmigaOS 3.2.3 matrix and performance (2026-11-25)
+
+- Boot: AmigaOS 3.2.3 (Kickstart 47.115, Workbench 47.5, core 12856,
+  24-bit 1280x720), agent input. Build 541 (HEAD e6f433b, no rebuild
+  needed). Details and tables: tasks/todo.md, section "AmigaOS 3.2.3
+  hardware matrix and performance".
+- §4.4 steps 1-9, Sort by and A5 passed with --config RAM: copies; the
+  quick-click fix (32e645f) passed: stack switch both ways with quick
+  clicks and 1 s holds, TextEdit started from an open box.
+- §4.5 first open v1.0b5 / 541 / v1.0b5 / 541 / v1.0b5: Downloads first
+  paint 98.7 / 93.3 / 99.0 / 94.3 / 110.2 ms, entrance 134.3 / 145.4 /
+  137.6 / 134.7 / 146.8 ms; Games 92.7-92.9, Prefs (smaller box) 72.8;
+  every new value under the old maximum; prefetch evicted=0.
+- Hover --bench-sweep 8 (ChangeTaskPri -30): render_us_avg 6799 / 6602 /
+  6804 / 7707 / 7889, stalled 41-44; pass.
+- Hover agent sweep FAILS on 3.2.3: render_us_avg 12049 / 14718 / 12087
+  (new) against 9549-10076 (old), stalled 6-14 against 0-1. It comes from
+  the rest at x 800 beside the mid-row Games and Prefs stacks; the same
+  build without those two stacks is normal. The time is the PiP
+  back-buffer retirement wait (WaitTOF in amiga_pip_back_buffer, keyed to
+  GfxBase->VBCounter; unchanged since 1.0 beta 5), not CPU (task sampler,
+  diagnostic counters). Trigger not found, not fixed: open for the owner.
+  The control had one stack, last, as in the user's own file.
+- Installed on 3.2.3: build 541 in SYS:WBStartup/DockAwesome, running
+  (WBRun); the 1.0 beta 5 binary deleted; ENVARC:DockAwesome.json migrated
+  by it; the tests only copied it. RAM: clean; scratch worktrees removed.
+- Still not run: plain 3.9, 3.1.4.1, AmiKit XE; ApolloOS with build 540+.

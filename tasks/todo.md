@@ -1938,3 +1938,94 @@ runs used --config RAM:<file>.json; the user's ENVARC:DockAwesome.json
 - [ ] NOT RUN on Coffin: nothing of §4.4/§4.5 is left; AmigaOS 3.2.3,
       3.9 (plain), 3.1.4.1 and AmiKit XE not booted; ApolloOS not rerun
       with build 540.
+
+### AmigaOS 3.2.3 hardware matrix and performance (2026-11-25)
+AmigaOS 3.2.3 on the Vampire (Kickstart 47.115, Workbench 47.5, core
+12856, 24-bit 1280x720), agent input (Input downs=11 ups=11 in the main
+run). Build 541 (HEAD e6f433b; `make amiga` had nothing to rebuild);
+baseline tag v1.0b5 (989cfa7) built in a scratch worktree outside the
+repo. All destructive runs used --config RAM:<file>.json; the user's
+ENVARC:DockAwesome.json (1.0b5 format, "folder": "Personal:Downloads") was
+only copied (its date stayed 24-Nov 23:30:55 until the installed build
+started).
+- [x] 1 --caps: installed 1.0 beta 5 and 541 identical (diff on the Mac).
+- [x] 2 Migration: a copy of the user's file -> after start no "folder",
+      Personal:Downloads last in "paths"; a second start did not rewrite
+      it (cmp against a copy: identical).
+- [x] 3 No divider (--pip-dump, 13 icons): icon centres 41 px apart
+      (36 + 5) up to the Downloads stack, last two 620 / 661.5.
+- [x] 4 Drop a drawer (Archives:Games) -> stack appended last; a click
+      opens it, a click on its pin closes it. Switch Games -> Downloads and
+      Downloads -> Games with quick clicks and with 1 s holds, both ways.
+      With the Games box open, a quick click on the TextEdit pin closed the
+      box and started TextEdit (fix 32e645f).
+- [x] 5 Drop a volume (RAM Disk:) -> a click opened its window; its menu
+      showed Close, which closed the window.
+- [x] 6 Stack menu: Sort by heading, Name (checked), Date Modified, Kind,
+      separator, Show Contents, Open in Workbench; no Close, also with the
+      drawer's window open. The box's Open in Workbench tile and the menu
+      row each opened a Workbench window; Show Contents opened the box.
+- [x] Sort by: a click on the heading kept the menu; Date Modified saved
+      "sorts": {"Personal:Downloads": "date"}, box newest first (SAGA
+      readme/lha first, as on the other boots); Kind saved "kind" (drawers,
+      no extension, .adf, .jic, .key, .lha, .readme, .zip); the Games menu
+      kept Name; after a restart the box kept Kind and the menu showed Kind
+      checked; Name removed the "sorts" key.
+- [x] 7 Downloads dragged to slot 0 (first in "paths", "kind" kept);
+      Games dragged out (gone from "paths").
+- [x] 8 Settings: Size, Scale, Position, Cancel/Save, no Folder Stack
+      section; Save rewrote the file and kept "sorts".
+- [x] A5: "folder": "RAM:DoesNotExist" -> no requester, dock running, file
+      saved with paths [TextEdit, Personal:Downloads] and no "folder".
+- [x] First open after 45 s idle, pointer off the dock, fresh dock per
+      run, config = the user's file + Archives:Games + SYS:Prefs (old: 14
+      pins + Folder Stack Downloads; new: migrated, 3 stacks):
+
+      | run | stack | first paint ms | entrance ms |
+      | --- | --- | --- | --- |
+      | old 1 (v1.0b5) | Downloads | 98.7 | 134.3 |
+      | new 1 (541) | Downloads | 93.3 | 145.4 |
+      | new 1 | Games (same box) | 92.7 | 146.3 |
+      | new 1 | Prefs (smaller box) | 72.8 | 142.2 |
+      | old 2 | Downloads | 99.0 | 137.6 |
+      | new 2 | Downloads | 94.3 | 134.7 |
+      | new 2 | Games | 92.9 | 134.0 |
+      | old 3 | Downloads | 110.2 | 146.8 |
+
+      New: prefetch stacks=3 pending=0 reads=86 cache=86/512 evicted=0.
+      Pass: every new value is under the old maximum (110.2 / 146.8).
+      new 2's Games entrance drew one frame (134 ms, fields=0); not seen in
+      the ~20 other entrances this session. A discarded new run had the
+      pointer left on the dock from the previous click: reads=0 pending=3
+      (prefetch waits while the pointer is on the dock), 86.4 / 133.6.
+- [x] Hover, --bench-sweep 8 at ChangeTaskPri -30, old/new/old/new/old:
+      render_us_avg 6799 / 6602 / 6804 / 7707 / 7889, stalled 41 / 41 /
+      42 / 41 / 44 of ~166 frames. Pass.
+- [ ] Hover, agent sweep (relative moves to x 350, 500, 650, 800, 950,
+      then off, one per message, after 45 s idle): FAILS.
+      At ChangeTaskPri -30, old/new/old/new/old: render_us_avg 10076 /
+      12049 / 9569 / 14718 / 9557, stalled 1 / 6 / 0 / 14 / 0. At the
+      shell's priority (1), old/new: 9549 / 12087, stalled 0 / 7.
+      Isolated: the slow frames are the label frames while the pointer
+      rests at x 800 (the SD-Card pin, beside the Games and Prefs stacks):
+      "convert" 9-30 ms instead of ~2 ms. Control, same build with Games
+      and Prefs replaced by two program pins: normal (10788 / 1 stall and
+      10171 / 0); v1.0b5 at the same rest: normal. A task sampler (pri 100,
+      2 ms) showed no other task taking more CPU than in the control. A
+      diagnostic build (scratch worktree, not committed) counted 23 draws,
+      all on a field pass, vblank rate ok, and 9 back-buffer retirement
+      waits: amiga_pip_back_buffer WaitTOFs because GfxBase->VBCounter
+      still equals the last present's field, so the time is a wait for a
+      field, not CPU. That wait is unchanged since 1.0 beta 5. Why the
+      stacks beside the hovered pin trigger it was not found; not fixed.
+- [x] 9 Build 541 installed in place: SYS:WBStartup/DockAwesome.new
+      copied, the 1.0 beta 5 binary deleted (not locked), .new renamed
+      into place, started with WBRun; its Downloads stack opened and closed
+      from the dock; no CLI dock in Status. ENVARC:DockAwesome.json
+      migrated by it (no "folder", Personal:Downloads last). RAM: clean;
+      the v1.0b5 binary and all tools deleted; both scratch worktrees
+      removed on the Mac. SYS:WBStartup/Disabled holds only the user's
+      WBDock.
+- [ ] NOT RUN on 3.2.3: nothing of §4.4/§4.5 is left except the failed
+      agent hover comparison above. Still not booted: plain 3.9, 3.1.4.1,
+      AmiKit XE.

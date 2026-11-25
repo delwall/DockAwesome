@@ -555,3 +555,13 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
 - A pin's hit test follows its artwork's alpha: Coffin's Prefs drawer icon
   is a flat bar, so a click at the row's middle height missed it
   (downs=0). Aim at the artwork from a --pip-dump.
+
+## First-open runs need the pointer off the dock (3.2.3, 2026-11-25)
+- A first-open run started right after a click on the dock kept the pointer
+  over it: the read-ahead waits while the pointer is on the dock, so the
+  profile said reads=0 pending=3 after 45 s idle.
+- Rule: move the pointer off the dock before every idle wait, and accept a
+  first-open run only when its prefetch line reads pending=0.
+- The trace's convert_us includes the PiP back-buffer retirement wait
+  (WaitTOF in amiga_pip_back_buffer): a slow "convert" with few pixels is
+  a wait for a field, not CPU. Count the waits before blaming other tasks.
