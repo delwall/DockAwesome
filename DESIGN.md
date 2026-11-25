@@ -32,9 +32,11 @@ Keep the original Workbench artwork, aspect ratio, and alpha.
   the real icons: a ring about 72% of the icon size at the icon's centre,
   ring and one-line label in the muted heading tone.
 - A box's page buttons show **<** and **>** in a faint disc 5/6 of the
-  button (its click area stays the full button); inside a drawer, the
-  header's button to the parent drawer shows an up arrow (stem and head)
-  in the same disc. Each glyph sits exactly in the middle of its disc.
+  button (its click area stays the full button), each exactly in the
+  middle of its disc; inside a drawer, the header's button to the parent
+  drawer shows a return arrow in the same disc (a stem up from the bottom
+  right turning left into an arrowhead, one-pixel lines), set a pixel
+  below the middle so that it reads centred.
 - Keep **Size**, **Scale** and position in a compact native
   window. **Save** applies the draft. **Cancel** discards it.
 - Keep side icons upright. Use the same zoom and input rules on all edges.

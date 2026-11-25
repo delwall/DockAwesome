@@ -27,8 +27,9 @@ Coffin, AmigaOS 3.2.3, AmigaOS 3.9, AmigaOS 3.1.4.1 and AmiKit XE.
   opens a Directory Opus lister there).
 - The page buttons in a stack's box draw their **<** and **>** exactly in
   the middle of a slightly smaller disc (before, half a pixel toward the
-  open side); the button that goes back to the parent drawer shows an up
-  arrow, so it no longer looks like the page-back button. The click areas
+  open side); the button that goes back to the parent drawer shows a
+  return arrow (up, then left), so it no longer looks like the page-back
+  button. The click areas
   are unchanged (checked on AmigaOS 3.2.3 at icon sizes 36, 48 and 72).
 - The Folder Stack setting is gone from **Settings**. A Folder Stack set in
   1.0 beta 5 becomes the last pin on the first start.

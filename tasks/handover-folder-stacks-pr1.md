@@ -584,5 +584,10 @@ One push of folder-stacks; PR opened as a draft and left a draft with a
   contact sheet (scratchpad `design/parent-candidates-sheet.png`, A-E).
 - First open and hover with 559 within the 556 spread (tasks/todo.md,
   "Folder Stack box buttons").
-- Installed: 564 on AmigaOS 3.2.3 (WBRun, the only dock); 556 on AmiKit
+- Installed then: 564 on AmigaOS 3.2.3 (WBRun, the only dock); 556 on AmiKit
   XE; 553 on 3.1.4.1; 551 on ApolloOS, Coffin, 3.9.
+- Owner chose candidate C: the parent-drawer button shows a return arrow
+  (up, then left), one pixel lines on a one pixel grid at the 19 px
+  control, placed one pixel below the disc centre so it reads centred (box
+  +1.00 px, ink centroid 0.15 px down / 0.29 px right). Installed: 567 on
+  AmigaOS 3.2.3 (WBRun, the only dock).

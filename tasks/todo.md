@@ -3369,9 +3369,27 @@ rejected; the owner now chooses from candidates A-E, the build carries A).
       0.00/0.00, page buttons 0.00); its arrow opened the parent drawer.
       ENVARC:DockAwesome.json untouched (568 bytes, 17:36:48). RAM: holds
       only Clipboards, ENV, T; ENV:dpid deleted.
-- [ ] Owner: choose the parent-drawer glyph (A stemmed up arrow, in the
-      build; B folder + up arrow; C return arrow up then left; D stemmed
-      left arrow; E up arrow from a floor line).
+- [x] Owner chose C (return arrow, up then left) from the contact sheet.
+      Build 566/567: 8 round-capped segments on a grid of one pixel at the
+      19 px control (stem x 3 from y 5 to 1, quarter turn of radius 2, bar
+      at y -1 to x -3, head arms from (-1,-3) and (-1,1)), stroke half
+      9/16 px (the sheet's 11 with a smaller head was muddy at 1x; one
+      pixel lines keep the head crisp). Box-centred it read high (ink
+      centroid 0.85 px up), so it sits one pixel low: box offset +1.00 px
+      down, ink centroid 0.15 px down and 0.29 px right (options in
+      `design/parent-C-centring-options.png`). Dumps at 36/48/72: exactly
+      that in all three; page buttons unchanged (0.00). The arrow opens the
+      parent drawer. Coverage now skips the segment tests outside the
+      glyph's ink box (reviewer: byte-identical without the early-out).
+      Native: three one pixel polylines, half a pixel off both ways at even
+      controls.
+- [x] Review (Opus, fresh, delta): no P0/P1; seven P2 (comments, an ink
+      assertion, an unused mirror glyph in the test) fixed.
+- [x] Installed: 567 in SYS:WBStartup/DockAwesome (in place, WBRun), the
+      only dock; the installed file run from the CLI with --pip-dump gave
+      a box image byte-identical to 566's. ENVARC untouched (568 bytes,
+      17:36:48); RAM: holds only Clipboards, ENV, T; ENV:dpid deleted.
+      Images also in ~/Downloads/DockAwesome-design/.
 - [ ] NOT RUN: the native (no AA) path on hardware (no booted system uses
       it; host-tested only); an 18 px control (topaz 8 fallback; host
       only); other OSes.
