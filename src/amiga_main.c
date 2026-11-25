@@ -133,9 +133,11 @@ static void message(const char *text)
     if (!IntuitionBase) { puts(text); return; }
     if (app) {
         /* Presses pass through to the screen; queued ones would replay as
-           launches after OK. */
+           launches after OK, and so would a press held now (its release
+           would come unresolved and be hit-tested after OK). */
         Disable();
         app->input_context.ui_busy = 1; app->input_context.active = NULL;
+        if (app->input_context.held) app->input_context.held_cancelled = 1;
         Enable();
     }
     if (app && reset_watch_mask(app)) {
@@ -2687,6 +2689,17 @@ static __attribute__((noinline)) void event_loop(App *app)
                     pin_index(app, button.pin_id) < 0)) continue;
                 if (IntuitionBase->FirstScreen != app->screen || (PeekQualifier() & IEQUALIFIER_RBUTTON) || !app->pip_visible)
                     flags |= DOCK_INPUT_CANCELLED;
+                if (flags & INPUT_HIT_UNRESOLVED) {
+                    /* A quick click on another pin while a Folder Stack is
+                       open: the box began closing at the press and took
+                       the handler's snapshot, so the release still needs
+                       its pin to launch or open that pin. */
+                    flags &= ~INPUT_HIT_UNRESOLVED;
+                    if (button.generation == app->input_generation && !(flags & DOCK_INPUT_CANCELLED)) {
+                        int hit = input_hit_test(app, button.x, button.y);
+                        if (hit >= 0) button.hit_id = app->items[hit].pin_id;
+                    }
+                }
                 in = gesture_point(app, button.code == SELECTDOWN ? DOCK_GESTURE_DOWN : DOCK_GESTURE_UP,
                     button.token, button.pin_id, button.hit_id, button.x, button.y, flags);
                 apply_gesture(app, &in, &redraw, &save, &recreate);

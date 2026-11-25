@@ -37,7 +37,9 @@ directly. Check the actual display for alignment and scanout timing.
 
 The priority-60 `input.device` handler hit-tests the last presented icon
 alpha. It reserves space for both button events before consuming a press.
-It consumes the matching release even if the snapshot has changed.
+It consumes the matching release even if the snapshot has changed. When no
+snapshot is published at the release (a Folder Stack box began closing at
+the press), the main task hit-tests the row it drew instead.
 Stable pin IDs survive reordering. The main task handles actions and
 allocations. Ambiguous injected chains and presses on a full queue pass through.
 

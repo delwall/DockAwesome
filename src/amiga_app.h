@@ -96,6 +96,11 @@ typedef struct {
     uint32_t token, pin_id, hit_id;
     unsigned int flags;
 } InputButton;
+/* InputButton.flags beside the DOCK_INPUT_ bits: a clean release on the
+   dock's screen while no snapshot was published (the UI held the dock: the
+   Folder Stack box began closing at the press). The main task hit-tests the
+   row as last drawn. */
+enum { INPUT_HIT_UNRESOLVED = 0x100 };
 typedef struct {
     ULONG number;
     struct Process *process;
