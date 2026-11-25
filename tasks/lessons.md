@@ -610,3 +610,13 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
   dock menus are real windows that screenshots show.
 - Rule: when an agent gesture "does nothing", read amiga_pointer after the
   move before concluding anything about the target program.
+
+## Stop a CLI test dock by its CLI, not by task name (ApolloOS, 2026-11-25)
+- BreakTask/FindTask "DockAwesome" find the dock only when Workbench
+  started it (WBStartup, WBRun). A dock run from an Execute script is a
+  CLI process named after its CLI, so BreakTask said "not found", the
+  first test dock kept running and the next start showed "PiP2 is already
+  in use".
+- Rule: stop CLI-started docks with `Status COM=<binary>` + `Break <n>`
+  (stop.s) and check that Status lists none before the next start; use
+  BreakTask only for the Workbench-started dock.

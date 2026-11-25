@@ -1605,8 +1605,9 @@ to the same slot (inverted offset test, store attributes required).
       RAM Disk at slot 7 (drops added=1) and dragging it out removed it;
       prefs as before; clean Ctrl-C. Restarted with WBRun; RAM: clean.
       The idle 20-60 ms polls passes show here too (pre-existing).
-- [ ] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete after the
-      next ApolloOS boot.
+- [x] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete after the
+      next ApolloOS boot (done 2026-11-25, see "ApolloOS rerun with build
+      550").
 - [x] Coffin (2026-11-24, 24-bit Workbench, so the new capture path runs
       without the Magellan motion path): the old -locked-delete deleted;
       8f55e11 installed (release 1.0b4 is the new
@@ -1725,8 +1726,8 @@ Plan: tasks/plan-folder-stacks.md (D1-D17). Branch folder-stacks, one PR.
       first-open comparison on AmiKit; hover comparison on Coffin and
       AmiKit. Only ApolloOS was booted and no user was available for
       reboots or the AmiKit gestures.
-- [ ] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete after the
-      next ApolloOS boot.
+- [x] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete after the
+      next ApolloOS boot (done 2026-11-25, build 550 rerun).
 - [x] Fable final pass: no code blocker; merge blocked only by the hardware
       not run (above) and the owner's decision on A5.
 - [x] Handover (tasks/handover-folder-stacks-pr1.md), release-notes draft.
@@ -1832,9 +1833,9 @@ content as, Options.
 - [x] Build 538 installed in place (SYS:WBStartup/DockAwesome, WBRun,
       running); the user's ENVARC:DockAwesome.json has no "sorts" (all
       Name) and its Downloads menu shows Name checked. RAM: clean.
-- [ ] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete,
+- [x] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete,
       -locked-delete2 and -locked-delete3 after the next ApolloOS boot
-      (in use until then).
+      (done 2026-11-25: not locked after the reboot, deleted).
 - [ ] NOT RUN: Coffin, AmigaOS 3.2.3, 3.9, 3.1.4.1, AmiKit XE (not booted).
 
 ### Coffin hardware matrix and performance (2026-11-25)
@@ -2299,3 +2300,98 @@ Build 544 (HEAD 4ed4e32), installed in SYS:WBStartup; every test dock used
       Personal:Downloads last), tests only used RAM: copies; RAM: and
       RAM:T clean (configs, profiles, scripts, FindTask, InputSpy,
       v1.0b5 and diagnostic binaries, ENV:dpid); scratch worktrees removed.
+
+### ApolloOS rerun with build 550 (2026-11-25)
+ApolloOS R9.5 on the Vampire (Kickstart 51.3, core 12856, 16-bit
+1280x720), freshly rebooted, agent input. Build 550 = HEAD 2f42fad: the
+repo's build/ held build 549 from the AmiKit pad/address-log runs, so
+obj080 and the binary were rebuilt clean (`make amiga`, no warnings;
+`make host-test` green). No code change in this follow-up. Baseline tag
+v1.0b5 built in a scratch worktree outside the repo. Every test dock used
+--config RAM: copies; ENVARC:DockAwesome.json (migrated by 533, 12 paths,
+Downloads last) kept its date (18:06:15 on the Amiga clock) throughout.
+- [x] Old leftovers: SYS:WBStartup/Disabled/DockAwesome-locked-delete,
+      -2 and -3 were not locked after the reboot and are deleted.
+- [x] Install in place: 550 copied to SYS:WBStartup/DockAwesome.new; the
+      running 538 stopped (BreakTask), but its file stayed "in use"
+      (started from WBStartup at boot), so it is now
+      SYS:WBStartup/Disabled/DockAwesome-locked-delete (delete after the
+      next ApolloOS boot); .new renamed into place, Version 0.550.
+- [x] §4.4 checks the fixes touch (configs: the user's 11 pins + "folder"
+      Downloads, plus Archives:Games, ApolloOS:Prefs and Archives: where
+      needed; three stacks after migration):
+
+      | check | result |
+      | --- | --- |
+      | --caps | 550, v1.0b5 and 538 identical (diff on the Mac) |
+      | migration | no "folder", Downloads last; a second start left the file identical (cmp) |
+      | no divider | --pip-dump, 12 icons at lefts 142 + 41k, last two 552 / 593 (36 + 5) |
+      | stack switch, quick click | Downloads -> Games and Games -> Downloads |
+      | stack switch, 1 s hold | Downloads -> Games and Games -> Downloads |
+      | program pin with a box open, quick click | Editor started, box closed (from Downloads and from Games, 2 of 2) |
+      | volume pin (Archives:) | Workbench window; its menu shows Close, which closes it |
+      | stack menu | Sort by heading, Name/Date Modified/Kind, separator, Show Contents, Open in Workbench; no Close with the drawer's window open |
+      | Open in Workbench | menu row (Games) and box tile (Downloads) each opened a Workbench window |
+      | Sort by | Date saved "sorts" {"Personal:Downloads": "date"}, box newest first (SAGA readme first); heading click keeps the menu; Kind saved "kind"; Games kept Name; after a restart Kind checked and the box in Kind order; Name removed "sorts" |
+      | A5 | "folder": "RAM:DoesNotExist" -> no requester, dock running, file saved with paths [Editor] only |
+
+      Profile of the gesture run: Input downs=9 ups=9; prefetch stacks=3
+      pending=0 evicted=0.
+- [x] §4.5 first open after 45 s idle, pointer off the dock, fresh dock
+      per run (config = the user's 11 pins + Archives:Games +
+      ApolloOS:Prefs + "folder" Downloads; new: migrated, 3 stacks):
+
+      | run | stack | first paint ms | entrance ms | frames (fields) |
+      | --- | --- | --- | --- | --- |
+      | o1 v1.0b5 | Downloads | 107.6 | 130.9 | 4 (0112) |
+      | n1 550 | Downloads | 104.6 | 133.9 | 5 (01112) |
+      | n1 | Games (same box) | 107.7 | 146.1 | 5 (01121) |
+      | n1 | Prefs (smaller box) | 70.3 | 149.4 | 6 (011111) |
+      | o2 v1.0b5 | Downloads | 107.8 | 131.7 | 4 (0112) |
+      | n2 550 | Downloads | 105.1 | 141.2 | 5 (01121) |
+      | n2 | Games | 107.4 | 145.7 | 5 (01121) |
+      | o3 v1.0b5 | Downloads | 108.1 | 149.8 | 5 (01121) |
+
+      New prefetch: stacks=3 pending=0 reads=81 cache=81/512 evicted=0.
+      Pass: every new value is under the old maximum (108.1 / 149.8).
+      The entrance is a 130 ms timed motion; whether a fifth frame fits
+      before 130 ms decides 131 vs 141-150 ms in both builds (o3 shows it
+      in v1.0b5; the motion code is unchanged since v1.0b5).
+- [x] §4.5 hover, agent sweep (relative moves to x 350, 500, 650, 800,
+      950 at y 688, then off, one per message, after 45 s idle; same 15-pin
+      row for both builds: the 14 paths above + Downloads as a plain path,
+      canvas 896), ChangeTaskPri -30:
+
+      | run | build | render_us_avg | stalled | redraws |
+      | --- | --- | --- | --- | --- |
+      | ho1 | v1.0b5 | 10211 | 0 | 93 |
+      | hn1 | 550 | 9174 | 0 | 88 |
+      | ho2 | v1.0b5 | 9185 | 0 | 88 |
+      | hn2 | 550 | 9236 | 1 | 87 |
+      | ho3 | v1.0b5 | 9118 | 0 | 88 |
+      | hn3 | 550 | 9185 | 0 | 88 |
+      | ho4 | v1.0b5 | 9077 | 0 | 88 |
+
+      render_us_avg: every new run inside the old spread (9077-10211).
+      Stalled: hn1 and hn3 0 as old; hn2 1 (outside the old 0). That
+      stall is the 542 pacing defer (retire_defers=1, retire_waits=0): a
+      rest frame composed 14 ms after a late wake and presented after
+      the VBlank, so the next frame was drawn at the following field. The
+      old path would wait in WaitTOF in that frame instead and show it at
+      the same field; the old runs did not hit a late present at all
+      (max done_us 17.4 ms). Not a code defect; noted for the owner (the
+      stall counter counts a defer, not a WaitTOF).
+- [x] Lesson: BreakTask finds a dock by task name only when Workbench
+      started it; a CLI-started test dock is named after its CLI, so the
+      second start ran beside the first ("PiP2 is already in use"; OK
+      clicked, rerun cleanly). Stop CLI docks with Status COM= + Break.
+- [x] End state: 550 started with WBRun from SYS:WBStartup (the user's
+      ENVARC config), FindTask finds it, Status shows no CLI dock; its
+      Downloads stack opened and closed. RAM: and RAM:T clean (tools,
+      configs, profiles, dumps, ENV:dpid deleted); scratch worktree
+      removed on the Mac. C:ApolloExplorerSrv (started this session) runs
+      until the next reboot.
+- [ ] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete (538, in
+      use) after the next ApolloOS boot.
+- [ ] NOT RUN on ApolloOS this time: drawer/volume drops (pins came from
+      the config), reorder and drag-out, Settings, --bench-sweep.

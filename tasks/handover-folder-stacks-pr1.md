@@ -267,3 +267,38 @@ One push of folder-stacks; PR opened as a draft and left a draft with a
 - End state AmiKit: installed 544 running (Run from a Stack 400000 script),
   the only dock; ENVARC:DockAwesome.json migrated by it; RAM: clean;
   scratch worktrees removed. No code change in this follow-up.
+
+## Follow-up: ApolloOS rerun with build 550 (2026-11-25)
+
+- Boot: ApolloOS R9.5 (Kickstart 51.3, core 12856, 16-bit 1280x720),
+  freshly rebooted, agent input. Build 550 = HEAD 2f42fad rebuilt clean
+  (build/ held a 549 from the AmiKit pad runs); no warnings; no code
+  change. Details: tasks/todo.md, "ApolloOS rerun with build 550".
+- The old Disabled/DockAwesome-locked-delete, -2, -3 were not locked and
+  are deleted. 550 installed in place; the running 538's file stayed in
+  use, so it is now Disabled/DockAwesome-locked-delete (delete after the
+  next ApolloOS boot).
+- §4.4 checks the fixes touch, all passed: --caps identical to v1.0b5 and
+  538; migration and a second start; no divider (41 px pitch); stack
+  switch both ways with quick clicks and 1 s holds; Editor started by a
+  quick click with a box open (2 of 2, fix 32e645f now verified on
+  ApolloOS); Archives: pin opens a window, Close closes it; stack menu row
+  and box tile open Workbench windows, no Close; Sort by rows, saving,
+  heading, persistence across a restart, Name removes "sorts"; A5.
+- §4.5 first open, v1.0b5 / 550 alternating (o1 n1 o2 n2 o3): Downloads
+  first paint 107.6 / 104.6 / 107.8 / 105.1 / 108.1 ms, entrance 130.9 /
+  133.9 / 131.7 / 141.2 / 149.8 ms; Games 107.7 / 107.4 and 146.1 /
+  145.7; Prefs (smaller box) 70.3 / 149.4. All new values under the old
+  maximum (108.1 / 149.8); prefetch evicted=0. A fifth entrance frame
+  (131 vs 141-150 ms) happens in both builds.
+- §4.5 hover agent sweep, same 15-pin row, ChangeTaskPri -30, old/new
+  alternating: render_us_avg old 10211 / 9185 / 9118 / 9077, new 9174 /
+  9236 / 9185; stalled old 0 / 0 / 0 / 0, new 0 / 1 / 0. The one new
+  stall is a 542 pacing defer after a late rest frame (retire_defers=1),
+  which the old path would spend in WaitTOF instead; noted for the owner,
+  not a code defect.
+- End state ApolloOS: 550 running from SYS:WBStartup (WBRun, the user's
+  ENVARC config, not written by the tests), the only dock; RAM: clean;
+  scratch worktree removed. C:ApolloExplorerSrv runs until reboot.
+- Not run on ApolloOS this time: drops, reorder/drag-out, Settings,
+  --bench-sweep (unchanged paths; run with 533/538).
