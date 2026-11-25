@@ -3026,3 +3026,148 @@ Disabled held only WBDock: no leftover to delete.
       desktop, --caps dopus no); the box order after Date Modified (PiP
       only); Sort by Kind and Name removing "sorts" on this boot (run with
       541).
+
+### AmiKit XE rerun with build 553 (2026-11-25)
+AmiKit XE 11.5 on the Vampire (KS 47.96 in the title bar, exec 47.7, graphics 47.4,
+intuition 47.51, workbench 47.33, dopus5.library 68.16, core 12856, 24-bit
+1280x720, Directory Opus 5 desktop; the clock says 02-Aug-25). Installed
+before: build 544, started from WBStartup (FindTask found it).
+ApolloExplorerSrv was not running and was started with Run. Build 553 = HEAD
+f47f5c5, not stale (`make -n amiga` compiles nothing; the binary is
+byte-identical to the 3.2.3 run's DockNew), built without warnings; baseline
+tag v1.0b5 built in a scratch worktree outside the repo (no warnings,
+identical to the earlier DockOld). Every destructive run used --config
+RAM:<file>.json; ENVARC:DockAwesome.json (424 bytes, 17:49:26, already
+migrated by 544) kept its size and date through every test. Agent input:
+warps land at screen = 2*w-4 (move to 322,152 -> pointer 640,300), so every
+click and drag was sent at ((X+4)/2, (Y+4)/2).
+- [x] Installed in place: 544 was not locked; 553 copied as .new, 544
+      deleted, renamed; Version 0.553 build 553. SYS:WBStartup/Disabled
+      holds no DockAwesome leftover.
+- [x] --caps: 553, v1.0b5 and the installed 544 identical (dopus yes,
+      workbench_port no, shaped_windows no, depth 24, error none).
+- [x] Break checks with 553 (installed dock stopped with BreakTask first;
+      FindTask, Status and Sems empty before every start):
+
+      | test | result |
+      | --- | --- |
+      | Ctrl-C pending through a whole start (CtrlCRun, migration config) | migrated and saved (424 bytes, no "folder", Downloads last), one frame, full profile, rc 0, ctrl_c_left 0, no lease, no leaked dock window (Wins) |
+      | Break sent at once after a start | migrated file saved, full profile, no lease |
+      | Break 3 s after starting --bench-sweep 8 | ended early in the sweep (redraws 10 of 113), full profile, no lease |
+      | Break 6 s after starting --bench-sweep 8 | ended near the sweep's end (redraws 111 of 113), full profile, no lease |
+      | pointer after the four tests | moves (322,152 -> 640,300) |
+
+- [x] §4.4 with 553 (configs: mig = the user's 9 pins + "folder"
+      Downloads, 1.0b5 format; t = the user's migrated 10 pins: 5 stacks
+      RiVA, AmigaAMP, Pictures, Demos, Downloads and the volumes AmiKit:,
+      Archives:):
+
+      | check | result |
+      | --- | --- |
+      | migration | no "folder", Personal:Downloads last; a second start left the file unchanged (same date) |
+      | A5 | "folder": "RAM:DoesNotExist" -> no requester (screenshot), dock running, file saved with [SYS:System/Shell, Personal:Pictures] and "sorts" kept |
+      | stack switch, quick click | Pictures -> Demos and Demos -> Pictures |
+      | stack switch, 1 s hold | Demos -> Pictures and Pictures -> Demos |
+      | program pin with a box open, quick click after the pointer rests on it | Shell started from an open Pictures box, Clock from an open Demos box (2 of 2), box closed |
+      | volume pin (Archives:) | DOpus lister "Archives" |
+      | Sort by | heading click keeps the menu; Date Modified saved "sorts" {Pictures: date} with the check moved, kept after a restart; Kind saved "kind"; Name removed "sorts" |
+      | Click to, Open Folder | "clicks" saved; a left click opens a DOpus lister "Personal:Downloads", no box, no DOS error; the menu with the lister open has the same 8 rows, no Close |
+      | Open Folder on Personal:Audio (the path of the old "dos device not mounted" report) | DOpus lister "Personal:Audio" with its 3 drawers and 4 files, no DOS error |
+      | box open + quick click on an Open Folder stack | Pictures box closed, Downloads lister opened |
+      | restart | Downloads still opens a lister; Pictures still Date Modified |
+      | Show Stack again | "clicks" entry removed; a left click opened the box (356x368) |
+      | box tile | Open in Workbench in the Demos box (slot 6 of 3x3) opened a DOpus lister "Personal:Demos" |
+      | no running dot | --pip-dump at exit, pointer off the dock, listers open for Downloads (Open Folder), Demos (box tile) and Archives: (volume): one dot, under Archives: only |
+      | drawer drop | Personal:Audio dragged from the Personal lister -> pinned at the drop slot as a stack, its box (185x156) opened |
+      | volume drop | Ram Disk dragged from the desktop -> "Ram Disk:" pinned, a click opened a DOpus lister "Ram Disk" |
+      | reorder | Audio (Open Folder) dragged to slot 0: first in "paths", "clicks" kept; a click there opened its lister |
+      | drag out | Audio dragged up off the dock: gone from "paths" with its "clicks" |
+      | Settings | Size, Scale, Position, Cancel/Save, no Folder Stack section; Save rewrote the file (new time) and kept "sorts" |
+
+- [x] Agent-input artifact, not a dock defect: a click warped straight from
+      a pin under a zoomed row to a pin far away (Pictures -> Shell, -> Clock)
+      pressed where the drawn row had no icon (`downs` not counted,
+      `presses_unarmed` +1): the press reaches the dock before the row has
+      zoomed around the new pointer position, and the far end icons are
+      shifted outward. The same clicks after a move to the pin (as a mouse
+      does) worked every time, and clicks from off the dock (row at rest)
+      always hit. Same geometry as the 3.2.3 lesson on the end icon. Not
+      rerun on v1.0b5.
+- [x] §4.5 first open after 45 s idle, pointer off the dock, fresh dock per
+      run, ChangeTaskPri -30, alternating oP / oD / n x 8. oP = the user's
+      paths without Pictures + "folder" Pictures; oD = the user's 1.0b5 file
+      ("folder" Downloads); n = the user's migrated file (5 stacks): Pictures
+      opened after 45 s, closed, then Downloads after another 45 s. First
+      paint / entrance ms:
+
+      | run | v1.0b5 Pictures (oP) | 553 Pictures (n) | v1.0b5 Downloads (oD) | 553 Downloads (n) |
+      | --- | --- | --- | --- | --- |
+      | 1 | 264.0 / 134.4 | 284.6 / 134.2 | 262.1 / 156.7 | 132.8 / 145.8 |
+      | 2 | 284.6 / 134.3 | 245.3 / 141.1 | 131.0 / 146.1 | 131.9 / 147.0 |
+      | 3 | 306.9 / 131.7 | 284.1 / 134.3 | 143.9 / 155.0 | 134.3 / 145.3 |
+      | 4 | 290.3 / 168.4 | 264.7 / 134.2 | 137.2 / 161.3 | 132.5 / 146.4 |
+      | 5 | 264.0 / 174.3 | 284.2 / 134.3 | 140.9 / 157.9 | 132.3 / 246.5 |
+      | 6 | 273.3 / 172.8 | 383.2 / 135.3 | 134.0 / 145.0 | 126.8 / 152.1 |
+      | 7 | 356.1 / 170.3 | 285.0 / 133.8 | 148.8 / 137.3 | 121.5 / 137.4 |
+      | 8 | 284.5 / 174.3 | 278.0 / 140.7 | 137.8 / 161.2 | 126.7 / 152.1 |
+
+      Medians: Pictures first paint old 284.6 / new 284.2, entrance old
+      169.4 / new 134.3 (old 4 of 8 runs have a 63-65 ms last frame, new
+      none: last frame 43 ms in every run); Downloads first paint old 139.4
+      / new 132.1, entrance old 155.9 / new 146.7. Box 584x527 and 356x368
+      in both builds. New prefetch in every run: stacks=5 pending=0
+      reads=153 cache=153/512 evicted=0. Every first open after idle
+      opened at the first click (24 of 24; the earlier 544 session lost 4
+      of 12).
+      Two single-run values above the old maximum, judged noise:
+      - n6 Pictures first paint 383.2 (old max 356.1): one stage, the glass
+        capture of the screen (prepare stage 3, 159 ms against 22-52 in
+        every other run of either build). The old build has single-stage
+        spikes of the same size elsewhere: oD1 OpenWindow 145 ms (first
+        paint 262 against 131-149), oP7 last stage 161 ms (356.1).
+      - n5 Downloads entrance 246.5 (old max 161.3): one present waited 7
+        fields (fields 0137, present_us_avg 33 ms); the motion code is
+        byte-identical to v1.0b5 (3.2.3 analysis). Not repeated in the
+        other 7 runs (137.4-152.1).
+      The earlier AmiKit entrance failure (544, Pictures 164.7 / 174.2
+      against an old maximum of 159.4) does not repeat: 553 133.8-141.1
+      against v1.0b5 131.7-174.3. No code change.
+- [x] §4.5 hover, agent sweep (relative moves to x 350, 500, 650, 800, 950
+      at y 690, then off, one per message, after 45 s idle), the same 10-pin
+      row for both builds (the user's migrated paths, no "folder"; v1.0b5
+      shows Downloads as a plain pin), ChangeTaskPri -30:
+
+      | run | build | render_us_avg | max us | stalled | redraws |
+      | --- | --- | --- | --- | --- | --- |
+      | ho1 | v1.0b5 | 12506 | 100510 | 2 | 41 |
+      | hn1 | 553 | 6960 | 14894 | 4 | 40 |
+      | ho2 | v1.0b5 | 10502 | 37030 | 3 | 40 |
+      | hn2 | 553 | 7005 | 14719 | 1 | 40 |
+      | ho3 | v1.0b5 | 7578 | 15114 | 3 | 41 |
+
+      render_us_avg: new below the old minimum. Stalled: new 4 and 1 against
+      old 2-3 (means 2.5 / 2.7, about 40 frames a run); within the noise.
+      553 retire_waits 0, retire_defers 0 / 1. Pass. (A first ho1 with the
+      five moves sent in one message, 9942 us, stalled 0, was discarded.)
+- [x] §4.5 --bench-sweep 8 (same row, ChangeTaskPri -30, one script,
+      113 redraws each): render_us_avg v1.0b5 / 553 / v1.0b5 / 553 /
+      v1.0b5 6221 / 5865 / 6214 / 5873 / 7039 (one 99 ms frame), compose
+      4576 / 4268 / 4559 / 4276 / 5393, stalled 40 / 40 / 40 / 38 / 40.
+      Pass. Compose is 0.3 ms faster in 553 here, slower on 3.2.3 and faster
+      on 3.1.4.1: it follows the binary's layout, as on 3.2.3.
+- [x] No defect found; no code change.
+- [x] Seen during the session, cause not found: the three Directory Opus
+      listers that were open at the start (Personal, Personal:Applications,
+      Personal:Applications/AmiMCP) were closed when the tests ended. They
+      were still open after the drag tests; no agent click was aimed at
+      their close gadgets. Reopened by ARexx at the same places and sizes
+      in icon mode.
+- [x] End state: 553 in SYS:WBStartup/DockAwesome (Version 0.553), started
+      with Run from a Stack 400000 script (WBRun does not work under DOpus),
+      the only dock (Status lists it once, no test dock); its Downloads stack
+      opened (356x368) and closed with the user's ENVARC config, which the
+      tests never wrote (424 bytes, 17:49:26). RAM: holds only Clipboards,
+      ENV, Logs and T (amiagent's own files); ENV:dpid deleted; the scratch
+      worktree is removed on the Mac. ApolloExplorerSrv runs until reboot.
+- [ ] NOT RUN on AmiKit: a v1.0b5 control for the warp-click artifact; the
+      box order after Date Modified (PiP only).

@@ -481,3 +481,54 @@ One push of folder-stacks; PR opened as a draft and left a draft with a
   the only dock; 542 deleted (not locked); ENVARC:DockAwesome.json not
   written by the tests. RAM: clean; scratch worktrees removed.
 - Not run on 3.2.3: DOpus lister (Workbench is the desktop).
+
+## Follow-up: AmiKit XE rerun with build 553 (2026-11-25)
+
+- Boot: AmiKit XE 11.5 (KS 47.96, Directory Opus 5 desktop), core 12856,
+  24-bit 1280x720, agent input at ((X+4)/2, (Y+4)/2). Build 553 = HEAD
+  f47f5c5, not stale, no warnings; no code change. Details and tables:
+  tasks/todo.md, "AmiKit XE rerun with build 553".
+- Installed in place over 544 (not locked). --caps identical to v1.0b5 and
+  544.
+- Break checks: Ctrl-C pending through a whole start, a Break right after a
+  start, Breaks 3 s and 6 s into --bench-sweep 8: full profile each time,
+  no PiP2 lease left, no leaked window, the pointer moves.
+- §4.4 all passed with --config RAM: copies: migration and a second start;
+  A5; stack switch both ways by quick click and 1 s hold; Shell and Clock
+  started by a quick click with a box open; Archives: opens a DOpus
+  lister; Sort by (heading, Date Modified, Kind, Name removes "sorts",
+  persistence); Click to Open Folder opens a DOpus lister on the drawer
+  with no box and no DOS error, also for Personal:Audio (the old "dos
+  device not mounted" path); box open + click on an Open Folder stack;
+  restart; Show Stack back; the box's Open in Workbench tile (DOpus
+  lister); no running dot under stacks (--pip-dump: one dot, under
+  Archives:); drawer and volume drops; reorder and drag-out keep
+  "clicks"; Settings Save keeps "sorts". This closes the last open AmiKit
+  items (box tile, no-dot, Click to).
+- Agent artifact noted: a click warped from a zoomed row straight to a far
+  pin can press where the drawn row has no icon; a move to the pin first
+  (as a mouse does) always works. Not a dock defect.
+- §4.5 first open, 8 runs each, alternating: Pictures entrance v1.0b5
+  131.7-174.3 (median 169.4) against 553 133.8-141.1 (median 134.3);
+  first paint 264.0-356.1 against 245.3-285.0 and once 383.2 (a slow
+  screen capture, one stage at 159 ms; v1.0b5 has single-stage spikes of
+  the same size). Downloads first paint 131.0-148.8 and once 262.1 (old)
+  against 121.5-134.3 (new); entrance 137.3-161.3 against 137.4-152.1 and
+  once 246.5 (one present waited 7 fields). Judged noise; the earlier 544
+  entrance failure does not repeat. Prefetch evicted=0; every first click
+  after idle opened its box (24 of 24).
+- §4.5 hover (same 10-pin row, -30): v1.0b5 12506 / 10502 / 7578 us,
+  stalled 2 / 3 / 3; 553 6960 / 7005, stalled 4 / 1: pass.
+  --bench-sweep 8: v1.0b5 6221 / 6214 / 7039, 553 5865 / 5873, stalled
+  38-40 both: pass.
+- Seen, cause not found: the three DOpus listers open at the start were
+  closed by the end of the tests; reopened by ARexx at the same places.
+- End state AmiKit: 553 running (Run from a Stack 400000 script), the only
+  dock, the user's ENVARC config untouched by the tests (424 bytes,
+  17:49:26); RAM: clean; scratch worktree removed.
+- All six systems now have their hardware runs. Open for the owner (none
+  blocks a merge decision by itself): single-run first-open outliers on
+  Coffin, 3.9, 3.1.4.1 and AmiKit (3.2.3 analysis: noise); the 3.2.3
+  --bench-sweep compose gap that follows the binary's layout; the P2 about
+  a press during the box motion; the lost first press after idle seen with
+  544 on AmiKit (0 of 24 this time).

@@ -12,9 +12,10 @@ Coffin, AmigaOS 3.2.3, AmigaOS 3.9, AmigaOS 3.1.4.1 and AmiKit XE.
   closes the open one and opens the one you clicked.
 - Right-click a stack to choose what a click on it does: **Show Stack**
   (its contents above the dock, the default) or **Open Folder** (its
-  drawer as a window, as a pinned drawer did in 1.0 beta 5). The choice is
-  saved per stack and kept when the stack is moved (checked on ApolloOS,
-  Coffin, AmigaOS 3.2.3, AmigaOS 3.9 and AmigaOS 3.1.4.1).
+  drawer as a window, as a pinned drawer did in 1.0 beta 5; a Directory
+  Opus lister on AmiKit). The choice is saved per stack and kept when the
+  stack is moved (checked on ApolloOS, Coffin, AmigaOS 3.2.3, AmigaOS 3.9,
+  AmigaOS 3.1.4.1 and AmiKit XE).
 - Each stack can be sorted by **Name**, **Date Modified** (newest first) or
   **Kind** (drawers first, then by file type) from its right-click menu;
   the choice is saved per stack.
@@ -29,22 +30,23 @@ Coffin, AmigaOS 3.2.3, AmigaOS 3.9, AmigaOS 3.1.4.1 and AmiKit XE.
 - With a Folder Stack open, a quick click on another pin closes the stack
   and starts that pin (or opens that stack). Before, only the stack closed
   (seen on Coffin, also in 1.0 beta 5; checked on Coffin, AmigaOS 3.2.3,
-  AmigaOS 3.9, AmigaOS 3.1.4.1 and ApolloOS).
+  AmigaOS 3.9, AmigaOS 3.1.4.1, ApolloOS and AmiKit XE).
 - Zoom: when one frame ran late, every later frame of the same motion
   waited up to 30 ms for the display, and the zoom stuttered until the row
   came to rest (also in 1.0 beta 5). The dock now draws such a frame at the
   next field and keeps pace (checked on AmigaOS 3.2.3 and Coffin).
 - AmiKit (Directory Opus 5 as the desktop): disk pins open a Directory
-  Opus lister again. Before, Directory Opus showed an
+  Opus lister again, and so do Open Folder stacks and a stack's Open in
+  Workbench tile. Before, Directory Opus showed an
   empty lister titled "DOS error: device (or volume) is not mounted" (also
   in 1.0 beta 5; checked on AmiKit XE).
 - A Ctrl-C (Break) that reaches the dock while it starts no longer makes
   it quit half closed. Before, it could quit without removing its input
   hook and display overlay: the mouse stopped moving and the next start
   said "PiP2 is already in use" until a reboot (seen on AmigaOS 3.1.4.1;
-  1.0 beta 5 quits the same way). Checked on AmigaOS 3.1.4.1 and AmigaOS
-  3.2.3: a Break during a start and during --bench-sweep leaves nothing
-  behind.
+  1.0 beta 5 quits the same way). Checked on AmigaOS 3.1.4.1, AmigaOS
+  3.2.3 and AmiKit XE: a Break during a start and during --bench-sweep
+  leaves nothing behind.
 
 ## 1.0 beta 5
 

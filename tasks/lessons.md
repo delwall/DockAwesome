@@ -673,3 +673,14 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
   regression, rebuild each with an unrelated change (and run one with a
   memory shift, tool Hold) and see whether the gap survives; diff the
   functions that run in the measured window.
+
+## A warp click from a zoomed row misses far pins (AmiKit, 2026-11-25)
+- With a box open and the row zoomed around a stack, amiga_click warped
+  straight to Shell or Clock: the press arrived before the row zoomed
+  around the new pointer position, where the drawn row had no icon
+  (`downs` not counted, `presses_unarmed` +1). It looked like the old
+  "program pin does not start from an open box" defect.
+- Rule: before a click on a pin away from where the pointer rests on the
+  dock, move the pointer onto it in its own call (as a mouse does), or
+  click from off the dock (row at rest). Check `Input: downs` before
+  calling a missed click a dock defect.
