@@ -68,6 +68,9 @@ static const ULONG menu_colors[MENU_COLORS] = {
     0xffaeb8c7UL
 };
 typedef struct { const char *label; int action; } MenuItem;
+/* The menu's Click to row and the Folder Stack box's last tile: both open
+   the drawer as a window (a lister under Directory Opus). */
+#define FOLDER_OPEN_LABEL "Open Folder"
 static const MenuItem menu_items[] = {
     {"Settings...", DOCK_UI_SETTINGS}, {"About...", DOCK_UI_ABOUT}, {"Quit", DOCK_UI_QUIT}
 };
@@ -80,7 +83,7 @@ static const MenuItem drawer_items[] = {
     {"Sort by", DOCK_UI_NONE}, {"Name", DOCK_UI_SORT_NAME},
     {"Date Modified", DOCK_UI_SORT_DATE}, {"Kind", DOCK_UI_SORT_KIND}, {NULL, DOCK_UI_NONE},
     {"Click to", DOCK_UI_NONE}, {"Show Stack", DOCK_UI_CLICK_STACK},
-    {"Open Folder", DOCK_UI_CLICK_FOLDER}
+    {FOLDER_OPEN_LABEL, DOCK_UI_CLICK_FOLDER}
 };
 enum { POPUP_MAX_ROWS = sizeof(drawer_items)/sizeof(*drawer_items),
     POPUP_SEPARATOR = 7, /* the separator row's height; its line is in the middle */
@@ -138,7 +141,7 @@ typedef struct {
     size_t count, page, root_length;
     int cols, rows, cell_width, cell_height, header, footer, read_ok;
     int body_left, body_width, body_height, tip;
-    int pad, label_gap, action_wrap;
+    int pad, label_gap;
     int next_icon, artwork_ready, needs_repaint;
     /* --profile: the icons of this page, EClock ticks from the first load
        to the last, and per icon read. */
@@ -251,6 +254,7 @@ struct DockUI {
     unsigned long icon_cache_evicted;
     FolderPrefetch prefetch[DOCK_MAX_ITEMS];
     FolderReveal *folder_reveal;
+    unsigned long folder_pages_shown; /* reset_folder_page calls, for --pip-dump */
     char folder_open_path[DOCK_PREFS_PATH_CAP];
     DockImage backdrop_carry;
     int carry_left, carry_top;
@@ -1048,7 +1052,7 @@ static int folder_grid(const DockUI *ui, FolderView *f, int *max_height, int *ex
     const FolderAnchor *anchor = &f->anchor;
     int font_height = folder_font(ui)->tf_YSize;
     int max_width, control = font_height+10;
-    int icon = anchor->icon_size, text_width;
+    int icon = anchor->icon_size, text_width, open_width;
     int screen_top = ui->screen->BarHeight+2;
     max_width = ui->screen->Width;
     *max_height = ui->screen->Height-screen_top;
@@ -1060,13 +1064,17 @@ static int folder_grid(const DockUI *ui, FolderView *f, int *max_height, int *ex
     f->pad = dock_clamp((icon+2)/5,6,24);
     f->label_gap = dock_clamp((icon+11)/22,2,8);
     f->cell_width = (icon*246+87)/174;
-    text_width = text_length32(&measure,"Workbench 0")+6;
+    /* A cell takes "Workbench 0" and the box's own "Open Folder" tile on
+       one line. */
+    text_width = text_length32(&measure,"Workbench 0");
+    open_width = text_length32(&measure,FOLDER_OPEN_LABEL);
+    if (text_width < open_width) text_width = open_width;
+    text_width += 6;
     if (f->cell_width < text_width) f->cell_width = text_width;
-    f->action_wrap = text_length32(&measure,"Open in Workbench")+6 > f->cell_width;
     f->cell_height = icon+f->label_gap+font_height+dock_clamp(icon/6,4,16);
     f->header = control+dock_clamp(icon/5,8,22);
     f->footer = control+8;
-    *extra_bottom = (f->action_wrap ? font_height : 0)+f->pad;
+    *extra_bottom = f->pad;
     f->cols = dock_clamp((max_width-2*f->pad)/f->cell_width,0,FOLDER_COLS);
     return dock_clamp((*max_height-f->header-f->footer-*extra_bottom)/f->cell_height,0,FOLDER_ROWS);
 }
@@ -1108,7 +1116,7 @@ static void fit_folder_text(struct RastPort *rp, const char *text, int width, ch
 
 
 static void centered_folder_text(DockUI *ui, struct RastPort *rp, DockImage *target,
-    const char *text, int center, int top, int width)
+    const char *text, int center, int top, int width, int color)
 {
     char label[DOCK_PREFS_PATH_CAP+3];
     int measured;
@@ -1116,9 +1124,9 @@ static void centered_folder_text(DockUI *ui, struct RastPort *rp, DockImage *tar
     measured = text_length32(rp,label);
     if (measured > width) return;
     if (target) {
-        amiga_font_aa_draw(ui->folder_aa,target,label,center-measured/2,top,menu_colors[MENU_TEXT]);
+        amiga_font_aa_draw(ui->folder_aa,target,label,center-measured/2,top,menu_colors[color]);
     } else {
-        popup_color(ui,rp,MENU_TEXT);
+        popup_color(ui,rp,color);
         Move(rp,center-measured/2,top+rp->TxBaseline);
         text32(rp,label);
     }
@@ -1155,9 +1163,22 @@ static void fill_arrow_part(struct RastPort *rp, int x, int y, int radius,
     }
 }
 
-static void folder_open_glyph(DockUI *ui, struct RastPort *rp, int x, int y, int radius)
+/* The Open Folder tile's ring: about 72% of an icon, so it has an icon's
+   margin in the cell, with the ring weight it had at icon/2-2. */
+static int folder_open_radius(int icon)
 {
-    int thickness = dock_clamp((radius+6)/13,1,radius), inset;
+    return (icon*36+50)/100;
+}
+
+static int folder_open_weight(int icon)
+{
+    int radius = icon/2-2;
+    return dock_clamp((radius+6)/13,1,folder_open_radius(icon)/2);
+}
+
+static void folder_open_glyph(DockUI *ui, struct RastPort *rp, int x, int y, int radius, int thickness)
+{
+    int inset;
     popup_color(ui,rp,FOLDER_MUTED);
     for (inset = 0; inset < thickness; ++inset)
         DrawEllipse(rp,x,y,radius-inset,radius-inset);
@@ -1199,12 +1220,12 @@ static int isqrt(int value)
 /* folder_open_glyph antialiased into an RGBA target: 4x4 samples per pixel.
    Each sample row is resolved to spans once (the ring, the arrow's tail and
    head), then the samples only compare positions. */
-static void folder_open_glyph_aa(DockImage *target, int cx, int cy, int radius, uint32_t color)
+static void folder_open_glyph_aa(DockImage *target, int cx, int cy, int radius, int thickness,
+    uint32_t color)
 {
     unsigned int red = (color>>16)&255, green = (color>>8)&255, blue = color&255;
-    /* The ring: one native pixel plus half a pixel wide, so it keeps its
-       weight once antialiased. Radii and positions in 1/16 px. */
-    int thickness = dock_clamp((radius+6)/13,1,radius);
+    /* The ring: thickness native pixels plus half a pixel wide, so it keeps
+       its weight once antialiased. Radii and positions in 1/16 px. */
     int outer = radius*16+8, inner = outer-thickness*16-8;
     unsigned char covered[2*DOCK_MAX_ICON_SIZE+4];
     int x, y, size = 2*radius+3;
@@ -1241,7 +1262,7 @@ static void folder_glyph(DockUI *ui, struct RastPort *rp, int x, int y, int draw
     int size = f->anchor.icon_size;
     int half = size/2-2, radius = size/16;
     if (open) {
-        folder_open_glyph(ui,rp,x,y,half);
+        folder_open_glyph(ui,rp,x,y,folder_open_radius(size),folder_open_weight(size));
     } else if (drawer) {
         popup_color(ui,rp,MENU_RIM);
         fill_rounded(rp,x-half,y-half*3/4,half,half/2,radius/2);
@@ -1293,7 +1314,7 @@ static int segment_distance2(int px, int py, int x0, int y0, int x1, int y1)
 
 /* folder_button antialiased into an RGBA target, 4x4 samples per pixel:
    a faint disc of the text colour over the glass and a round-capped
-   chevron stroke, the weight of the Open in Workbench ring. */
+   chevron stroke, the weight of the Open Folder ring. */
 static void folder_button_aa(DockImage *target, int direction, int x, int y, int width, int height)
 {
     ULONG color = menu_colors[MENU_TEXT];
@@ -1348,12 +1369,12 @@ static void paint_folder_content(DockUI *ui, struct RastPort *rp, int parts, Doc
     if (!target) SetDrMd(rp,JAM1);
     SetFont(rp,folder_font(ui));
     if (labels)
-        centered_folder_text(ui,rp,target,title,offset+width/2,(f->header-font_height)/2,width-4*control);
+        centered_folder_text(ui,rp,target,title,offset+width/2,(f->header-font_height)/2,width-4*control,MENU_TEXT);
     if (folder_nested(f))
         folder_control(ui,rp,target,parts,-1,offset+f->pad,(f->header-control)/2,control,control);
     if (labels && !f->count) {
         centered_folder_text(ui,rp,target,f->read_ok ? "Empty drawer" : "Cannot read drawer",
-            offset+width/2,f->header,width-2*f->pad);
+            offset+width/2,f->header,width-2*f->pad,MENU_TEXT);
     }
     for (i = 0; i <= visible; ++i) {
         int open = i == visible;
@@ -1363,17 +1384,14 @@ static void paint_folder_content(DockUI *ui, struct RastPort *rp, int parts, Doc
         /* The open glyph is antialiased wherever the labels are (into an
            RGBA target); a native pass draws it only with native labels. */
         if (open && labels && target)
-            folder_open_glyph_aa(target,center,top+icon/2,icon/2-2,menu_colors[FOLDER_MUTED]);
+            folder_open_glyph_aa(target,center,top+icon/2,folder_open_radius(icon),
+                folder_open_weight(icon),menu_colors[FOLDER_MUTED]);
         else if (glyphs && (open ? labels : !f->loaded[i].pixels))
             folder_glyph(ui,rp,center,top+icon/2,!open && f->entries[first+i].drawer,open);
         if (!labels) continue;
-        if (open && f->action_wrap) {
-            centered_folder_text(ui,rp,target,"Open in",center,label_top,f->cell_width-6);
-            centered_folder_text(ui,rp,target,"Workbench",center,label_top+font_height,f->cell_width-6);
-        } else {
-            centered_folder_text(ui,rp,target,open ? "Open in Workbench" : f->entries[first+i].name,
-                center,label_top,f->cell_width-6);
-        }
+        /* The tile in the headings' muted tone, behind the real icons. */
+        centered_folder_text(ui,rp,target,open ? FOLDER_OPEN_LABEL : f->entries[first+i].name,
+            center,label_top,f->cell_width-6,open ? FOLDER_MUTED : MENU_TEXT);
     }
     if (folder_last_page(f)) {
         int y = f->body_height-f->footer;
@@ -1381,7 +1399,7 @@ static void paint_folder_content(DockUI *ui, struct RastPort *rp, int parts, Doc
             char page[36];
             snprintf(page,sizeof(page),"%lu / %lu",(unsigned long)f->page+1,
                 (unsigned long)folder_last_page(f)+1);
-            centered_folder_text(ui,rp,target,page,offset+width/2,y+(control-font_height)/2,width);
+            centered_folder_text(ui,rp,target,page,offset+width/2,y+(control-font_height)/2,width,MENU_TEXT);
         }
         if (f->page) folder_control(ui,rp,target,parts,-1,offset+f->pad,y,control,control);
         if (f->page < folder_last_page(f))
@@ -1776,6 +1794,7 @@ static int copy_image(DockImage *out, const DockImage *in);
 static void reset_folder_page(DockUI *ui)
 {
     FolderView *f = &ui->folder;
+    ++ui->folder_pages_shown;
     f->next_icon = f->artwork_ready = f->needs_repaint = 0;
     f->fill_start = f->read_sum = f->read_max = 0;
     f->read_count = f->cache_hits = f->fill_reported = 0;
@@ -1994,10 +2013,11 @@ int dock_ui_folder_open(const DockUI *ui)
     return ui && ui->popup && ui->folder.path[0] && ui->folder.motion != FOLDER_CLOSING;
 }
 
-const DockImage *dock_ui_folder_artwork(const DockUI *ui)
+const DockImage *dock_ui_folder_artwork(const DockUI *ui, unsigned long *page)
 {
     if (!dock_ui_folder_open(ui) || ui->folder.motion || dock_ui_folder_pending(ui) ||
         !ui->folder.artwork_ready) return NULL;
+    *page = ui->folder_pages_shown;
     return &ui->folder.artwork;
 }
 

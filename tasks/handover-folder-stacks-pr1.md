@@ -532,3 +532,16 @@ One push of folder-stacks; PR opened as a draft and left a draft with a
   --bench-sweep compose gap that follows the binary's layout; the P2 about
   a press during the box motion; the lost first press after idle seen with
   544 on AmiKit (0 of 24 this time).
+
+## Follow-up in the same PR: Open Folder tile (2026-11-25)
+
+- Scope (owner's decision): the box's last tile reads **Open Folder** on
+  one line, its ring is about 72% of the icon size at the same centre with
+  the old ring weight, and ring and label use the muted heading colour.
+  The action, cell widths and every other cell are unchanged; the wrap row
+  is gone, so at small sizes the box is one text line shorter.
+- `--pip-dump` also writes `prefix-folder.ppm` for each settled box page.
+- Verified on AmiKit XE with build 556: before/after dumps at sizes 36, 48
+  and 72, the tile opens a DOpus lister, first open and hover within the
+  553 spread (tasks/todo.md, "Open Folder tile in the Folder Stack box").
+- Installed: 556 on AmiKit XE; the other boots still run 553.

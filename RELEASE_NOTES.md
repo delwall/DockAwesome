@@ -20,6 +20,11 @@ Coffin, AmigaOS 3.2.3, AmigaOS 3.9, AmigaOS 3.1.4.1 and AmiKit XE.
   **Kind** (drawers first, then by file type) from its right-click menu;
   the choice is saved per stack.
 - Stacks show no running dot.
+- The tile at the end of a stack's box is now **Open Folder** on one
+  line, with a smaller ring in the muted grey of the menu headings, so it
+  no longer outweighs the real icons; at small icon sizes the box is one
+  text line shorter (checked on AmiKit XE at sizes 36, 48 and 72; the tile
+  opens a Directory Opus lister there).
 - The Folder Stack setting is gone from **Settings**. A Folder Stack set in
   1.0 beta 5 becomes the last pin on the first start.
 - The divider before the last icon is gone: all icons are evenly spaced.
@@ -36,8 +41,8 @@ Coffin, AmigaOS 3.2.3, AmigaOS 3.9, AmigaOS 3.1.4.1 and AmiKit XE.
   came to rest (also in 1.0 beta 5). The dock now draws such a frame at the
   next field and keeps pace (checked on AmigaOS 3.2.3 and Coffin).
 - AmiKit (Directory Opus 5 as the desktop): disk pins open a Directory
-  Opus lister again, and so do Open Folder stacks and a stack's Open in
-  Workbench tile. Before, Directory Opus showed an
+  Opus lister again, and so do Open Folder stacks and the box's Open
+  Folder tile. Before, Directory Opus showed an
   empty lister titled "DOS error: device (or volume) is not mounted" (also
   in 1.0 beta 5; checked on AmiKit XE).
 - A Ctrl-C (Break) that reaches the dock while it starts no longer makes

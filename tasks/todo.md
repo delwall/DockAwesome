@@ -3171,3 +3171,75 @@ click and drag was sent at ((X+4)/2, (Y+4)/2).
       worktree is removed on the Mac. ApolloExplorerSrv runs until reboot.
 - [ ] NOT RUN on AmiKit: a v1.0b5 control for the warp-click artifact; the
       box order after Date Modified (PiP only).
+
+### Open Folder tile in the Folder Stack box (AmiKit XE, 2026-11-25)
+Owner's request: the box's last tile looked too large next to the real
+icons. Implemented exactly as decided: a smaller ring, one line "Open
+Folder", the muted heading colour. The action is unchanged.
+- [x] `src/amiga_ui.c`: `folder_open_radius` (icon*36/100, rounded: 13 px
+      at 36, 17 at 48, 26 at 72, about 72%) at the same centre;
+      `folder_open_weight` keeps the ring weight of the old radius
+      (icon/2-2), in the AA path and the native fallback; the arrow scales
+      with the ring (a filled shape). Label `FOLDER_OPEN_LABEL` "Open
+      Folder" (shared with the menu's Click to row), in `FOLDER_MUTED`
+      like the ring; `centered_folder_text` takes the colour. `action_wrap`
+      and its extra row removed; `folder_grid` makes cells wide enough for
+      "Workbench 0" and "Open Folder" (the wider + 6), so the label always
+      fits `cell_width-6`. No DOpus-specific label.
+- [x] `--pip-dump` writes `prefix-folder.ppm` when a box page settles with
+      its icons (`dock_ui_folder_artwork`, keyed by a page counter so
+      drawers opened inside and page flips dump again; Opus review P2).
+- [x] Builds: before = HEAD + dump (554), after (555), final with the
+      review fix 556; `make amiga` without warnings, `make host-test` and
+      `make host-sanitize` pass (the layout is in amiga_ui.c and not
+      host-tested; no test asserted the wrap).
+- [x] Review (Opus, fresh): no P0/P1; P2 dump not repeated for a page
+      shown in place -> fixed with the page counter, checked on the
+      Amiga (Pictures box dumped, then its Wallpapers drawer dumped again
+      as a 185x200 box).
+- [x] Before/after on AmiKit (Demos, 6 entries; Pictures, 89 entries) at
+      the user's settings with only the size changed, test configs in RAM:
+
+      | case | before | after |
+      | --- | --- | --- |
+      | Demos, size 36 | 185x209, ring fills the cell, "Open in" / "Workbench" white | 185x200, smaller muted ring, "Open Folder" muted on one line |
+      | Demos, size 48 | 224x255 | 224x246 |
+      | Demos, size 72 | 334x342 (one line already) | 334x342 |
+      | Pictures, size 36 | 584x527 | 584x518 |
+
+      Box widths and cells unchanged; at 36 and 48 the box is one text line
+      (9 px) shorter. "Open Folder" draws whole (no "...") in every case.
+- [x] Tile click: build 555 test dock and the installed 556 each opened a
+      DOpus lister "Personal:Demos" from the Demos box tile, box closed.
+- [x] First open after 45 s idle, Pictures, pointer off the dock, fresh
+      dock per run, ChangeTaskPri -30, alternating (first paint / entrance
+      ms; prefetch pending=0 reads=153 in every run):
+
+      | run | 553 | 556 |
+      | --- | --- | --- |
+      | 1 | 282.4 / 134.3 | 273.0 / 165.7 |
+      | 2 | 360.0 / 178.9 | 306.0 / 132.9 |
+      | 3 | 264.3 / 134.5 | 284.4 / 134.5 |
+
+      Medians 282.4 / 134.5 (553) and 284.4 / 134.5 (556); the earlier
+      AmiKit figures for 553 were 284.2 / 134.3. Each build has one slow
+      entrance (553 178.9, 556 165.7, a frame waiting 4 fields): within
+      the same-binary spread. Pass.
+- [x] Hover sweep (5 moves at y 690, one per call, 45 s idle, same row):
+      553 render_us_avg 7359, max 14546, stalled 0; 556 7283, 14535,
+      stalled 2 (553 had 4 and 1 in the earlier runs). Pass. A first 556
+      sweep sent the moves in one message and was discarded.
+- [x] End state: 556 in SYS:WBStartup/DockAwesome (copied as .new, 553
+      deleted, renamed; Version 0.556), started with Run from a Stack
+      400000 script, the only dock (Status lists it once); Disabled holds no
+      DockAwesome; ENVARC:DockAwesome.json untouched (424 bytes, 17:49:26);
+      RAM: holds only Clipboards, ENV, Logs and T; ENV:dpid deleted.
+      Images on the Mac in the session scratchpad `design/`.
+- [x] Seen: the box's "Demos" entry in Personal:Demos is an iGame project;
+      a test click on it opened iGame's "can't open ... library"
+      requester (iGame's own, closed with OK). Not a dock issue.
+- [ ] NOT RUN: the tile on ApolloOS, Coffin, 3.2.3, 3.9, 3.1.4.1 (same
+      code path on every system; not booted); the native (no AA) fallback
+      of the ring, which no booted system uses; a paged box (no drawer here
+      has more than one page at 36 px). docs/images/folder-stack.png still
+      shows the old tile (and the old divider).

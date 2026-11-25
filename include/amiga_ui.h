@@ -70,8 +70,9 @@ int dock_ui_folder_moving(const DockUI *ui);
    (x,y) on the screen; the box stays where it is. */
 void dock_ui_point_folder_tip(DockUI *ui, int x, int y);
 /* The still Folder Stack box as composed for the screen (glass, labels,
-   icons), or NULL while it moves, loads or is closed: for --pip-dump. */
-const DockImage *dock_ui_folder_artwork(const DockUI *ui);
+   icons), or NULL while it moves, loads or is closed: for --pip-dump.
+   *page counts the pages shown (openings, drawers inside, page flips). */
+const DockImage *dock_ui_folder_artwork(const DockUI *ui, unsigned long *page);
 /* How far the Folder Stack box is out on screen: 0 (hidden) to 256 (open). */
 int dock_ui_folder_progress(const DockUI *ui);
 ULONG dock_ui_folder_frame_delay(const DockUI *ui);

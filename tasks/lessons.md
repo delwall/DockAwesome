@@ -684,3 +684,14 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
   dock, move the pointer onto it in its own call (as a mouse does), or
   click from off the dock (row at rest). Check `Input: downs` before
   calling a missed click a dock defect.
+
+## See the PiP-only Folder Stack box with --pip-dump (AmiKit, 2026-11-25)
+- Screenshots do not show the box. `--pip-dump prefix` now writes
+  `prefix-folder.ppm` once a box page has settled with its icons; build
+  the "before" binary with the dump alone to compare a visual change.
+- At size 72 a test dock took over 10 s before its first press counted
+  (`Input: downs=0`, profile `elapsed_ms` 4 s of a 14 s run). Wait 20 s
+  after starting a large-size test dock, and check `downs` before calling
+  a missed click a defect.
+- Repeated: several amiga_move_mouse calls in one message are not a
+  sweep; the run was discarded and redone one move per call.

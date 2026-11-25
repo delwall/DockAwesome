@@ -197,13 +197,16 @@ static int dump_ppm(const char *prefix, const char *suffix, const DockImage *ima
     return !failed;
 }
 
-/* --pip-dump: the Folder Stack box once each opening has settled with
-   its icons, as prefix-folder.ppm (the latest opening wins). */
+/* --pip-dump: the Folder Stack box once each page it shows has settled
+   with its icons, as prefix-folder.ppm (the latest page wins). */
 static void dump_folder_box(App *app)
 {
-    const DockImage *box = dock_ui_folder_artwork(app->ui);
-    if (!box) app->folder_dumped = 0;
-    else if (!app->folder_dumped) app->folder_dumped = dump_ppm(app->pip_dump,"folder",box) ? 1 : -1;
+    unsigned long page = 0;
+    const DockImage *box = dock_ui_folder_artwork(app->ui,&page);
+    if (box && page != app->folder_dumped) {
+        app->folder_dumped = page;
+        dump_ppm(app->pip_dump,"folder",box);
+    }
 }
 
 int canonical_path(const char *path, char *absolute)

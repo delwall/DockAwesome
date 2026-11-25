@@ -28,6 +28,9 @@ Keep the original Workbench artwork, aspect ratio, and alpha.
   active one, a hairline separator, then a muted **Click to** heading,
   **Show Stack** and **Open Folder** with a check mark on what a left click
   does. All its labels start past the check column.
+- A Folder Stack box ends each page with an **Open Folder** tile below
+  the real icons: a ring about 72% of the icon size at the icon's centre,
+  ring and one-line label in the muted heading tone.
 - Keep **Size**, **Scale** and position in a compact native
   window. **Save** applies the draft. **Cancel** discards it.
 - Keep side icons upright. Use the same zoom and input rules on all edges.

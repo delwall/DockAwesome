@@ -257,7 +257,16 @@ stack keeps the stack menu, has no running dot and no Close row (it goes to
 the status worker as kind 0 like every stack), records no launch for an app
 to claim, and is not read ahead (`stack_box`); the profile's `stacks=`
 counts only Show Stack stacks. Choosing Show Stack again reads its first
-page ahead. The box's own Open in Workbench tile is unchanged.
+page ahead.
+
+The box ends every page with an Open Folder tile that opens the shown
+drawer the same way. It is drawn in the muted heading colour
+(`FOLDER_MUTED`): a ring about 72% of the icon size (`folder_open_radius`)
+at the icon's centre, with the ring weight it had at full size
+(`folder_open_weight`), and a one-line label. `folder_grid` makes every cell
+wide enough for "Open Folder" and "Workbench 0", so the label never wraps
+and the box has no extra row for it. `--pip-dump` also writes the settled
+box as `prefix-folder.ppm`, since screenshots do not show PiP.
 
 ## References
 
