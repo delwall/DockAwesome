@@ -332,6 +332,8 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
 ## AmiKit: Directory Opus is the desktop (2026-11-10)
 - Synthetic input from amiagent does not reach the dock or Intuition windows on
   AmiKit (`Input: downs=0`). Ask the user for clicks and drags there.
+  Pointer moves do reach it: hover reads the screen's pointer, so the agent
+  can run hover sweeps on AmiKit itself (2026-11-25).
 - `a || b` on bit flags collapses them to 1, which is RUNNING_WORKBENCH: a
   window's dot became Workbench evidence that is kept while the Workbench list
   cannot be read (no Workbench). Combine flags with `|`.

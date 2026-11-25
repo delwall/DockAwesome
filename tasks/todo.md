@@ -2102,3 +2102,71 @@ as its Folder Stack (divider, canvas 928), as in the earlier runs.
       path; Coffin's earlier sweep had stalled 3 / 3 / 4 with either
       build); AmiKit XE, plain 3.9, 3.1.4.1 not booted.
 
+
+### AmiKit XE: checks without gestures (2026-11-25)
+AmiKit XE 11.5 on the Vampire (Kickstart 47.96, Workbench 47.2, core
+12856, 24-bit 1280x720, Directory Opus desktop; the Amiga clock says
+02-Aug-25). Build 542 (HEAD 98bbf1a, `make amiga` had nothing to rebuild);
+baseline tag v1.0b5 (989cfa7) built in a scratch worktree outside the
+repo. All runs used --config RAM: copies; ENVARC:DockAwesome.json (1.0b5
+format, "folder": "Personal:Downloads") was only copied.
+- [x] Agent input: an amiga_click on a pin gave `Input: downs=0` (as
+      before on AmiKit). Agent pointer moves DO reach the dock: hover is
+      polled from the screen's pointer (redraws=20 after two moves), so
+      the hover sweep below was run by the agent.
+- [x] 1 --caps: installed 0.527, 542 and v1.0b5 identical (diff on the
+      Mac): dopus yes, workbench_port no, shaped_windows no, depth 24.
+- [x] 2 Migration: a copy of the user's file -> after start no "folder",
+      Personal:Downloads last in "paths"; a second start did not rewrite it
+      (date unchanged). Every pinned drawer is now a stack: 5 stacks
+      (AmiKit:Utilities/RiVA, AmiKit:Utilities/AmigaAMP, Personal:Pictures,
+      Personal:Demos, Personal:Downloads); RiVA and AmigaAMP opened a
+      window in 1.0 beta 5 (D3 as planned).
+- [x] A5 + Sort by persistence: "folder": "RAM:DoesNotExist", paths
+      [SYS:System/Shell, Personal:Pictures], "sorts": {"Personal:Pictures":
+      "kind"} -> no requester (screenshot), dock running, file saved with
+      the two paths, no "folder", "sorts" kept.
+- [x] 3 No divider (--pip-dump, 10 icons, canvas 704x114): icon lefts
+      151 + 41k (36 + 5), the last two (Demos, Downloads) 41 px apart;
+      v1.0b5 with the same file: 41 px up to Demos, then 53 px (12 px
+      divider) to its Folder Stack.
+- [x] --bench-sweep 8 at ChangeTaskPri -30 (render_us_avg / compose_us_avg
+      / stalled):
+
+      | config | v1.0b5 | 542 |
+      | --- | --- | --- |
+      | user's file (old: divider + Folder Stack) | 7112/5248/42, 7061/5224/39, 7052/5222/37 | 7359/5716/38, 7382/5737/37 |
+      | same 10-pin row (old: Downloads a plain pin) | 6524/4826/40, 6521/4832/36, 7348*/4832/36 | 7391/5737/38, 7374/5732/41 |
+      | 5 pins, no drawers (no stacks) | 5567/4164/20, 5580/4176/20 | 6248/4860/20, 6237/4840/20 |
+
+      (*one 100 ms frame.) Stalled frames equal. FINDING: compose is
+      ~0.7-0.9 ms (+16-19 %) slower per frame in 542 with the same row,
+      also with no stack at all; the installed 0.527 matches v1.0b5
+      (4177 / 4837). Same 5-pin row per commit: v1.0b5 4164, 3f1fe03 4269,
+      70cc053 4444, 10843c9 4767, 32e645f 4779, 98bbf1a 4867. The compose
+      code itself changed only by the divider's removal, and 70cc053 (+175
+      us) touches only amiga_main.c/amiga_app.h, which link before
+      dock_compose.o: points to code or data placement, not to stack
+      logic. Cause not found; open for the owner.
+- [x] Hover, agent sweep (relative moves to x 350, 500, 650, 800, 950 at
+      y 690, then off, one per message, after 45 s idle; x 350 and 950 lie
+      beside this 10-pin plate), old (same row) / new / old / new / old:
+      render_us_avg 7034 / 8497 / 10629* / 10700* / 6914, stalled 1 / 0 /
+      2 / 1 / 1, redraws 41 / 41 / 41 / 41 / 39 (*one ~100 ms frame each;
+      without it 6849 / 8301 / 8421 / 8452 / 6715). 542 retire_waits=0,
+      prefetch stacks=5 pending=0 reads=153 cache=153/512 evicted=0.
+      Stalled within the old spread; the first new run's average lies
+      inside the old spread, the second 71 us above it (both runs with the
+      100 ms frame); without that frame new is at the top of the old
+      spread, consistent with the compose finding above.
+- [x] Build 542 installed in place: SYS:WBStartup/DockAwesome.new copied,
+      0.527 deleted (not locked), renamed; Version says 0.542 build 542.
+      v1.0b5 and bisect binaries deleted from RAM:, worktrees removed.
+- [ ] Gesture batch (user, physical mouse): 542 runs from the installed
+      binary with --profile, --config RAM:ak.json (user's paths migrated +
+      "sorts": {"Personal:Demos": "date"}), output RAM:ak.prof. Steps 4-8,
+      menu rows, first open of each stack (reference from the brief for
+      1.0 beta 5 on AmiKit: first paint 109-127 ms, opening 132-150 ms).
+- [ ] After the batch: stop the test dock, read RAM:ak.prof/ak.json,
+      WBRun the installed dock (migrates ENVARC:DockAwesome.json), clean
+      RAM: (ak.json, ak.prof, run.s, stop.s, FindTask, ENV:dpid).
