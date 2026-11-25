@@ -3226,7 +3226,10 @@ static int popup_poll(DockUI *ui, DockUIAction *result)
             int previous = ui->popup_selected;
             ui->popup_selected = hit < 0 ? -1 : hit; paint_popup_hover(ui,previous);
         } else if (cls == IDCMP_MOUSEBUTTONS && hit == POPUP_INERT) {
-            /* A heading or separator: the menu stays, as a native one does. */
+            /* A heading or separator: the menu stays, as a native one does.
+               A press here disarms an earlier one: a row reacts only to a
+               press and release both on it. */
+            if (code == SELECTDOWN) ui->popup_pressed = -1;
         } else if (cls == IDCMP_MOUSEBUTTONS && code == SELECTDOWN) {
             if (hit < 0) close = 1;
             else {
