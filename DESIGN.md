@@ -31,6 +31,10 @@ Keep the original Workbench artwork, aspect ratio, and alpha.
 - A Folder Stack box ends each page with an **Open Folder** tile below
   the real icons: a ring about 72% of the icon size at the icon's centre,
   ring and one-line label in the muted heading tone.
+- A box's page buttons show **<** and **>** in a faint disc 5/6 of the
+  button (its click area stays the full button); inside a drawer, the
+  header's button to the parent drawer shows an up arrow (stem and head)
+  in the same disc. Each glyph sits exactly in the middle of its disc.
 - Keep **Size**, **Scale** and position in a compact native
   window. **Save** applies the draft. **Cancel** discards it.
 - Keep side icons upright. Use the same zoom and input rules on all edges.

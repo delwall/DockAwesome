@@ -3306,3 +3306,72 @@ AOS32:Prefs + Personal:Downloads, three stacks); exactly one dock at a time.
       deleted. Scratch upload/download folders removed on the Mac.
 - [ ] NOT RUN on 3.2.3: DOpus lister (Workbench is the desktop); the tile on
       a paged box.
+
+### Folder Stack box buttons: centred glyphs, smaller disc, parent-drawer arrow (AmigaOS 3.2.3, 2026-11-26)
+Owner's report: the back button's "<" was not centred in its circle; the
+page buttons "<" ">" share the code. Follow-up requests in the same task:
+draw the buttons smaller; make the parent-drawer button look different
+from the page-back button (an up chevron, then a "Back"/"BACK" pill, both
+rejected; the owner now chooses from candidates A-E, the build carries A).
+- [x] Measured before the fix (build 556, `--pip-dump` box images of a
+      RAM: test drawer with a Sub drawer of 360 files, page 2 of 4-8, icon
+      sizes 36, 41, 48, 72; the control is 19 px at every size, Helvetica 9
+      + 10). The chevron's pixel bounding box sat 0.50 px toward its open
+      side in every button (back and page-back right, page-forward left),
+      the ink centroid 0.70-0.73 px; vertical 0.00 (footer readings
+      within +-0.1 of the glass gradient). Host model: the end points were
+      shifted radius/16 (0.56 px at 19 px, 0.50 at 18 px).
+- [x] Fix (`dock_button_glyph`/`dock_button_coverage`/`dock_button_pixels`
+      in dock_geometry.c, host-tested): the glyph is up to three
+      round-capped segments whose ink box is centred on the disc; disc and
+      glyph drawn at 5/6 of the control (12 px floor), stroke half width
+      11/16 px (was 13/16, scaled with the glyph); hit rectangles, layout
+      and actions unchanged. The header button shows a stemmed up arrow
+      (`DOCK_BUTTON_PARENT`, candidate A). Native fallback: same disc
+      inset, chevrons two pixels wide, the arrow's stem one pixel; centred
+      exactly along the pointing direction, half a pixel across at even
+      controls.
+- [x] After (build 563 dumps, sizes 36/48/72; 41 with 559, same page-button
+      code): page buttons bbox offset 0.00 px both axes (footer y +0.00 to
+      +0.08 = glass-gradient noise of the measurement), ink centroid
+      0.16-0.17 px toward the open side; disc 15.9 px (was 19.0). Parent
+      arrow bbox 0.00/0.00, ink centroid 0.54 px up (the head carries more
+      ink; the bounding box is centred). The 72 px page-forward button lies
+      over the bright backdrop logo in the glass and does not measure
+      (before and after alike). Host: exact for every control 8-24 px,
+      both pixel phases; within half a pixel above 24 px.
+- [x] Clicks with 559/560/563 test docks: the header button opens the
+      parent drawer, ">" and "<" turn pages.
+- [x] Host tests: `test_button_glyph` (centring, mirror symmetry, size
+      5/6, native polylines) in test_geometry; `make host-test`,
+      `make host-sanitize` pass; `make amiga` without warnings.
+- [x] Reviews (Opus, fresh): first diff no P0/P1, four P2 fixed (native
+      arm clamp before the parity step, native size guard, one direction
+      rule, test comment); second review (arrow diff): no P0/P1, page
+      chevrons byte-identical to the first fix for sizes 6-60; three P2
+      fixed (native arrow direction asserted, head comment, control capped
+      at 96 px for the 32-bit distance math).
+- [x] First open (3 runs, 45 s idle, pl copies, -30, build 559, the paint
+      code of the page buttons is the same): first paint 90.3 / 103.8 /
+      90.1 ms, entrance 149.4 / 136.1 / 149.8 ms (556: 90.1-103.6 /
+      136.0-149.6). Hover sweep: render_us_avg 9857, max 18667, stalled 1
+      (556: 9626 / 18342 / 2). Pass.
+- [x] Images: scratchpad `design/btn-compare-{36,48,72}.png` (10x, before
+      556 / after 563, cross-hair on the control centre),
+      `design/btn-{before,after}-36-nested-p2-2x.png`, candidates
+      `design/parent-candidates-sheet.png` (A-E at 4x and real size beside
+      the page buttons, sizes 36/48/72) and `design/parent-*-1x.png`.
+- [x] Installed: build 564 (HEAD = the arrow commit) in
+      SYS:WBStartup/DockAwesome (copied as .new, 560 deleted, renamed),
+      started with WBRun; FindTask finds it, one DockAwesome.PiP2 lease, no
+      CLI dock. The same file run from the CLI with a RAM: test config and
+      --pip-dump gave a box image byte-identical to 563's (arrow bbox
+      0.00/0.00, page buttons 0.00); its arrow opened the parent drawer.
+      ENVARC:DockAwesome.json untouched (568 bytes, 17:36:48). RAM: holds
+      only Clipboards, ENV, T; ENV:dpid deleted.
+- [ ] Owner: choose the parent-drawer glyph (A stemmed up arrow, in the
+      build; B folder + up arrow; C return arrow up then left; D stemmed
+      left arrow; E up arrow from a floor line).
+- [ ] NOT RUN: the native (no AA) path on hardware (no booted system uses
+      it; host-tested only); an 18 px control (topaz 8 fallback; host
+      only); other OSes.

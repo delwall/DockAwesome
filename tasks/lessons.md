@@ -695,3 +695,16 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
   a missed click a defect.
 - Repeated: several amiga_move_mouse calls in one message are not a
   sweep; the run was discarded and redone one move per call.
+
+## AmigaDOS script loops ran away (3.2.3, 2026-11-26)
+- A test-file loop `Set i 100 / Lab / Echo >f$i / Set i \`Eval $i + 1\` /
+  If $i LT 400 / Skip BACK` never stopped: If compared the numbers as
+  strings ("1000" < "400"), and `If VAL` did not stop the next version
+  either. It wrote about 17000 files to RAM:, amiga_break did not reach
+  it, and two unbounded `List` calls of the result flooded the session.
+- What stopped it: `Status` to find the script's CLI (a "No command
+  loaded" process with the agent's 262144 stack), then `Break <n> D`
+  (Ctrl-D ends a script; Ctrl-C did not).
+- Rule: generate test files with a straight-line script written on the
+  Mac (one Echo per file), never an AmigaDOS counting loop; bound every
+  listing of a test drawer with a narrow PAT and NOHEAD.

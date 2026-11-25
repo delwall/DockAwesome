@@ -564,3 +564,25 @@ One push of folder-stacks; PR opened as a draft and left a draft with a
   AmigaOS 3.2.3 with build 556".
 - Installed now: 556 on AmigaOS 3.2.3 and AmiKit XE; 553 on 3.1.4.1; 551
   on ApolloOS, Coffin, 3.9.
+
+## Follow-up: centred box buttons and the parent-drawer arrow (AmigaOS 3.2.3, 2026-11-26)
+
+- Owner's report: the back button's "<" was off centre in its circle.
+  Measured on 556 (`--pip-dump`, sizes 36/41/48/72, control 19 px at every
+  size): every chevron's pixel box sat 0.50 px toward its open side (ink
+  centroid 0.70-0.73 px), vertical 0.00. Cause: the end points were shifted
+  radius/16.
+- Fix: button geometry in dock_geometry.c (`dock_button_glyph`,
+  `dock_button_coverage`, `dock_button_pixels`, host-tested in
+  test_geometry): glyph ink box centred on the disc; disc and glyph 5/6 of
+  the control (owner: "a bit smaller"), stroke scaled with it; hit
+  rectangles, layout and actions unchanged. After (563/564): 0.00 px both
+  axes for the page buttons and the header button.
+- The header button (to the parent drawer) now shows a stemmed up arrow
+  (candidate A). An up chevron and a "Back"/"BACK" pill were tried and
+  rejected by the owner; the final glyph is the owner's choice from the
+  contact sheet (scratchpad `design/parent-candidates-sheet.png`, A-E).
+- First open and hover with 559 within the 556 spread (tasks/todo.md,
+  "Folder Stack box buttons").
+- Installed: 564 on AmigaOS 3.2.3 (WBRun, the only dock); 556 on AmiKit
+  XE; 553 on 3.1.4.1; 551 on ApolloOS, Coffin, 3.9.
