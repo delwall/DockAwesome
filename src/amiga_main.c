@@ -13,6 +13,13 @@ struct IntuitionBase *IntuitionBase;
 struct GfxBase *GfxBase;
 struct Library *IconBase, *WorkbenchBase, *LayersBase, *UtilityBase;
 struct Device *InputBase, *TimerBase;
+
+/* libnix's read() and write() call __chkabort, which takes a pending Ctrl-C,
+   prints "***Break" and exits without main's cleanup (a Break at startup
+   leaked the input handler, the PiP lease and a window). Leave Ctrl-C to
+   the event loop. */
+void __chkabort(void) {}
+
 /* Paired with -Wl,-u,___stkinit: libnix swaps small CLI/Workbench stacks before main. */
 long __stack = 32768;
 
@@ -2871,7 +2878,7 @@ static void bench_sweep(App *app)
         app->placement[0].x+app->placement[0].size/2;
     along = start;
     app->bench_active = 1;
-    while (!(SetSignal(0,0) & SIGBREAKF_CTRL_C)) {
+    while (!(SetSignal(0,SIGBREAKF_CTRL_C) & SIGBREAKF_CTRL_C)) {
         int changed = 0;
         if (phase < 2) {
             app->bench_x = bottom ? along : centre;
@@ -3171,5 +3178,7 @@ done:
     if (IntuitionBase) CloseLibrary((struct Library *)IntuitionBase);
     if (app->priority_changed) SetTaskPri(FindTask(NULL), app->saved_priority);
     free(app);
+    /* A Break the loop never took is the dock's, not the next command's. */
+    SetSignal(0, SIGBREAKF_CTRL_C);
     return status;
 }
