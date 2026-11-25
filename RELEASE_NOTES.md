@@ -13,7 +13,8 @@ Coffin, AmigaOS 3.2.3 and AmiKit XE only.
 - Right-click a stack to choose what a click on it does: **Show Stack**
   (its contents above the dock, the default) or **Open Folder** (its
   drawer as a window, as a pinned drawer did in 1.0 beta 5). The choice is
-  saved per stack and kept when the stack is moved (checked on ApolloOS).
+  saved per stack and kept when the stack is moved (checked on ApolloOS
+  and Coffin).
 - Each stack can be sorted by **Name**, **Date Modified** (newest first) or
   **Kind** (drawers first, then by file type) from its right-click menu;
   the choice is saved per stack.
@@ -32,7 +33,7 @@ Coffin, AmigaOS 3.2.3 and AmiKit XE only.
 - Zoom: when one frame ran late, every later frame of the same motion
   waited up to 30 ms for the display, and the zoom stuttered until the row
   came to rest (also in 1.0 beta 5). The dock now draws such a frame at the
-  next field and keeps pace (checked on AmigaOS 3.2.3).
+  next field and keeps pace (checked on AmigaOS 3.2.3 and Coffin).
 - AmiKit (Directory Opus 5 as the desktop): disk pins open a Directory
   Opus lister again. Before, Directory Opus showed an
   empty lister titled "DOS error: device (or volume) is not mounted" (also

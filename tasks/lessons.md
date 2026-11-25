@@ -620,3 +620,15 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
 - Rule: stop CLI-started docks with `Status COM=<binary>` + `Break <n>`
   (stop.s) and check that Status lists none before the next start; use
   BreakTask only for the Workbench-started dock.
+
+## A relative amiga_drag is not a hold; first-open runs need quiet (Coffin, 2026-11-25)
+- amiga_drag with relative:true and from == to homes the pointer with the
+  button down, so the dock saw a drag of the pin, not a 1 s hold: the box
+  closed and nothing opened. Send holds as an absolute amiga_drag (settle
+  50) once a relative click has put the pointer on the dock.
+- At ChangeTaskPri -30 every task an agent command starts runs above the
+  dock. The only slow last entrance frames (one 60 ms, two 3 ms over)
+  came in runs that sent "Wait 1" right after the click, though one such
+  run was clean; the cause is not proven. Time first-open clicks alone
+  (the next agent call seconds later) and repeat a run before calling it
+  a regression.

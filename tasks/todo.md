@@ -1934,8 +1934,8 @@ runs used --config RAM:<file>.json; the user's ENVARC:DockAwesome.json
       other dock. ENVARC:DockAwesome.json migrated by it (no "folder",
       Personal:Downloads last); the tests only copied it. RAM: clean; the
       v1.0b5 binary deleted from RAM:, its worktree removed on the Mac.
-- [ ] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete (0.527) on
-      Coffin after its next boot.
+- [x] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete (0.527) on
+      Coffin after its next boot (done 2026-11-25, not locked).
 - [ ] NOT RUN on Coffin: nothing of §4.4/§4.5 is left; AmigaOS 3.2.3,
       3.9 (plain), 3.1.4.1 and AmiKit XE not booted; ApolloOS not rerun
       with build 540.
@@ -2501,3 +2501,110 @@ Close row. The box's Open in Workbench tile stays.
       is the one 4ed4e32 verified there for the old menu row), no-dot
       check of an Open Folder stack (PiP only, ask the user), the box's
       Open in Workbench tile (unchanged).
+
+### Coffin rerun with build 551 (2026-11-25)
+Coffin r65 (Kickstart 45.57, Workbench 45.5, core 12856, 24-bit 1280x720),
+agent input. Build 551 = HEAD 5cc7184 (no source newer than
+build/DockAwesome; not rebuilt, no code change in this follow-up). Baseline
+tag v1.0b5 built in a scratch worktree outside the repo; build 542
+(98bbf1a) built the same way as a control. Every test dock used
+--config RAM: copies; ENVARC:DockAwesome.json (migrated by 541, 18 paths,
+Downloads last) kept its date (10:03:46 on the Amiga clock) throughout.
+- [x] Old leftover SYS:WBStartup/Disabled/DockAwesome-locked-delete
+      (0.527) was not locked and is deleted.
+- [x] §4.4 checks for what changed since 541 (configs: the user's 17
+      paths + "folder" Downloads; t.json adds Archives:Games, System:Prefs
+      and Archives:, so three stacks and a volume after migration):
+
+      | check | result |
+      | --- | --- |
+      | --caps | 551, installed 541 and v1.0b5 identical (Diff) |
+      | migration | no "folder", Downloads last; a second start left the file unchanged (Diff, same date) |
+      | A5 | "folder": "RAM:DoesNotExist" -> no requester, dock running, file saved with paths [EditPad] only |
+      | no divider | --pip-dump, 18 icons at lefts 135 + 37k, the last (Downloads) at 764: last two 5 px apart |
+      | stack switch, quick click | Downloads -> Games and Games -> Downloads |
+      | stack switch, 1 s hold | Downloads -> Games and Games -> Downloads |
+      | program pin with a box open, quick click | EditPad started, box closed |
+      | volume pin (Archives:) | Workbench window; its menu shows Close, which closed it |
+      | Sort by | Date Modified saved "sorts": {"Personal:Downloads": "date"}; menu check moved; Games kept Name; after a restart Downloads still Date Modified |
+      | Click to, Open Folder | Downloads -> "clicks": {"Personal:Downloads": "folder"}; left click opened Workbench window "Downloads", no box window; menu with the window open has no Close row |
+      | box open + quick click on an Open Folder stack | Prefs box closed, window "Games" opened |
+      | no running dot | --pip-dump at exit with the Games and Downloads windows open (both stacks) and the Archives: window open: a dot under Archives: only |
+      | restart | Games menu checked Open Folder, Downloads Date Modified + Open Folder |
+      | Show Stack again | Downloads left "clicks"; left click opened the box (354x337) |
+      | reorder | Games dragged to slot 0: paths start with Archives:Games, "clicks" kept for Games, "sorts" kept for Downloads; a click at slot 0 opened window "Games"; Prefs (Show Stack) still opened its box |
+      | drag out | Downloads dragged out: gone from paths with its "sorts"; Games kept "folder" |
+      | Settings | Size, Scale, Position, Cancel/Save, no Folder Stack section; Save rewrote the file and kept "clicks" |
+
+      Test note: amiga_drag with relative:true and from == to is not a
+      hold (it homes the pointer, so the dock saw a drag of the pin; the
+      file was unchanged and nothing opened); the 1 s holds were sent as
+      absolute amiga_drag with settle 50 after a relative click had placed
+      the pointer. Coffin's Prefs icon is a flat bar: hit at y 680, not 692.
+- [x] §4.5 first open after 45 s idle, pointer off the dock, fresh dock
+      per run, ChangeTaskPri -30, config = the user's 17 paths + Archives:Games
+      + System:Prefs + "folder" Downloads (old: 19 pins + Folder Stack;
+      new: migrated, 3 stacks). n1, n2, n3 and o1, o2 sent the next agent
+      command at once after each click; n4, o3, o4 had seconds between
+      clicks:
+
+      | run | build | Downloads first paint / entrance ms | Games ms | frames (fields) |
+      | --- | --- | --- | --- | --- |
+      | o1 | v1.0b5 | 89.4 / 130.7 | - | 4 (0112) |
+      | n1 | 551 | 85.1 / 149.7 | 86.1 / 153.8 | 4 (0122) / 5 (01122) |
+      | o2 | v1.0b5 | 89.8 / 150.3 | - | 5 (01121) |
+      | n2 | 551 | 86.1 / 168.6 | 86.5 / 153.4 | 4 (0114) / 5 (01122) |
+      | c1 | 541 (control) | 87.7 / 132.3 | 88.4 / 131.3 | 4 (0112) |
+      | c2 | 542 (control) | 102.4 / 137.5 | 88.5 / 130.5 | 5 (01112) / 4 |
+      | n3 | 551 | 90.2 / 144.4 | 89.0 / 131.3 | 5 (01121) / 4 |
+      | o3 | v1.0b5 | 90.0 / 149.8 | - | 5 (01121) |
+      | n4 | 551 | 90.8 / 143.8 | 89.3 / 130.3 | 5 (01121) / 4 |
+      | o4 | v1.0b5 | 89.8 / 150.0 | - | 5 (01121) |
+
+      n1 Prefs (larger box, 468x433, exempt): 140.1 / 199.8. New prefetch
+      in every run: stacks=3 pending=0 reads=120 cache=120/512 evicted=0.
+      Old maximum 90.0 / 150.3. Against it:
+      - Entrance: n3 and n4 (Downloads 144.4 / 143.8, Games 131.3 / 130.3)
+        pass. n2 Downloads 168.6 FAILS: its last frame took 60.3 ms (25 ms
+        in every old run); n1 and n2 Games 153.8 / 153.4 are 3 ms over.
+      - First paint: n1 and n2 pass (85-86 ms); n3 and n4 are 0.2 and 0.8
+        ms over (90.2 / 90.8); the step is the "layer" prepare stage
+        (19.3 ms in n3/n4, 15.1 in n1/n2, 15.2-15.6 in the old runs).
+      Not fixed, open for the owner: no slow final frame or 3 ms Games
+      excess came back in n3/n4 or in the 541/542 controls, and the open
+      and entrance code is the same in 542 and 551 (84def22 changed the
+      menu rows, the check mask and the click routing only). The dock
+      runs at -30 here, below every task an agent command starts.
+- [x] §4.5 hover, agent sweep (relative moves to x 350, 500, 650, 800,
+      950 at y 692, then off, one per message, after 45 s idle), the same
+      20-pin row for both builds (pl.json: the user's 17 paths +
+      Archives:Games, System:Prefs, Personal:Downloads, no "folder";
+      canvas 992), ChangeTaskPri -30:
+
+      | run | build | render_us_avg | max us | stalled | redraws |
+      | --- | --- | --- | --- | --- | --- |
+      | ho1 | v1.0b5 | 13966 | 101512 | 11 | 102 |
+      | hn1 | 551 | 9284 | 18788 | 4 | 100 |
+      | ho2 | v1.0b5 | 10526 | 35374 | 6 | 102 |
+
+      Pass: new render_us_avg and stalled below both old runs. The old
+      runs show the pacing cascade at the x 950 rest (stalls of 35 ms with
+      a 29-32 ms present, the 3.2.3 finding); 551 has retire_waits=0
+      retire_defers=2 and no such stall (its 4 stalls are 12-13 ms frames
+      at the start of a motion). First check of the 542 pacing fix on
+      Coffin.
+- [x] No defect found that needs a code change; no commit to src/.
+- [x] End state: 551 copied to SYS:WBStartup/DockAwesome.new; the 541
+      file was "in use" (WBRun), so it is now
+      SYS:WBStartup/Disabled/DockAwesome-locked-delete; .new renamed into
+      place, Version 0.551; started with WBRun, FindTask finds it, Status
+      lists no CLI dock; its Downloads stack opened and closed with the
+      user's ENVARC config. RAM: and RAM:T clean (tools, configs,
+      profiles, dumps, binaries), ENV:dpid deleted; scratch worktrees
+      (v1.0b5, 542) removed on the Mac. ApolloExplorerSrv was already
+      running at boot.
+- [ ] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete (541, in
+      use) on Coffin after its next boot.
+- [ ] NOT RUN on Coffin this time: drawer/volume drops (pins came from the
+      config), the box's Open in Workbench tile (unchanged), --bench-sweep;
+      Open Folder as a DOpus lister (Workbench is Coffin's desktop).

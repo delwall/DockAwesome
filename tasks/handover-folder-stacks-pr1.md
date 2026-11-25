@@ -338,3 +338,38 @@ One push of folder-stacks; PR opened as a draft and left a draft with a
   after the next ApolloOS boot. RAM: clean.
 - Not run: the other boots; Open Folder as a DOpus lister on AmiKit (same
   launch_pin path the old menu row used there); the no-dot look (PiP).
+
+## Follow-up: Coffin rerun with build 551 (2026-11-25)
+
+- Boot: Coffin r65 (Kickstart 45.57, Workbench 45.5), agent input. Build
+  551 = HEAD 5cc7184, not rebuilt (no source newer than the binary); no
+  code change. Details: tasks/todo.md, "Coffin rerun with build 551".
+- §4.4 for what changed since 541, all passed with --config RAM: copies:
+  --caps identical to 541 and v1.0b5; migration and a second start; A5;
+  no divider (37 px pitch); stack switch both ways with quick clicks and
+  1 s holds; EditPad started by a quick click with a box open; Archives:
+  pin opens a Workbench window, Close closes it; Sort by rows, check and
+  persistence; Click to: Open Folder opens a Workbench window and no box,
+  no Close row, no running dot (--pip-dump: a dot under the Archives:
+  volume only, none under the two stacks with their windows open), Show
+  Stack brings the box back, both survive a restart, reorder to slot 0
+  and drag-out keep each stack's "clicks"/"sorts"; Settings without the
+  Folder Stack section, Save keeps "clicks".
+- §4.5 hover, same 20-pin row, ChangeTaskPri -30: render_us_avg v1.0b5 /
+  551 / v1.0b5 13966 / 9284 / 10526, stalled 11 / 4 / 6: pass. The old
+  runs show the 3.2.3 pacing cascade at the x 950 rest; 551 does not
+  (retire_waits=0, retire_defers=2). First check of 98bbf1a on Coffin.
+- §4.5 first open, v1.0b5 x4 / 551 x4 (+ 541 and 542 controls): old
+  max 90.0 / 150.3 ms. 551 n3/n4 entrance 144.4 / 143.8 (Games 131.3 /
+  130.3) pass, first paint 90.2 / 90.8 (0.2-0.8 ms over); n1/n2 first
+  paint 85-86 pass, but n2 entrance 168.6 (one 60 ms last frame) and n1/n2
+  Games 153.8 / 153.4 are over. Not reproduced in n3/n4 or the 541/542
+  controls (130-137 ms); the open and entrance code is the same in 542
+  and 551. Not fixed; open for the owner.
+- Installed on Coffin: 551 in SYS:WBStartup/DockAwesome, running (WBRun,
+  the user's ENVARC config, not written by the tests), the only dock.
+  Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete (541, in use)
+  after the next Coffin boot; the older 0.527 one is deleted. RAM: clean;
+  scratch worktrees removed.
+- Not run on Coffin: drops (pins from config), the box's Open in
+  Workbench tile, --bench-sweep.
