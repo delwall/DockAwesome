@@ -420,9 +420,23 @@ One push of folder-stacks; PR opened as a draft and left a draft with a
   clears a Break that --bench-sweep or an early exit never took. Proven by
   running the dock in-process with Ctrl-C pending (CtrlCRun): v1.0b5 and
   551 print only "***Break" (rc 20) for --caps, 552 and 553 the full
-  output (rc 0; 553 leaves no Ctrl-C pending). 553 is installed in place in
-  SYS:WBStartup (1.0 beta 4 in Disabled/DockAwesome-locked-delete, in
-  use) but not started: the machine needs a reboot (the user). The user's
-  ENVARC file is untouched. Not run on 3.1.4.1: the rest of §4.4 and all
-  of §4.5; details in tasks/todo.md, "AmigaOS 3.1.4.1 with build
-  551/553".
+  output (rc 0; 553 leaves no Ctrl-C pending).
+- 3.1.4.1 after the user's reboot, build 553 (agent input lands 1:1):
+  553 started from WBStartup and migrated the user's ENVARC file at boot
+  (tests never wrote it); the 1.0 beta 4 leftover is deleted. Break
+  checks: Ctrl-C pending through a whole start, a Break right after a
+  start and Breaks during --bench-sweep all end with the full profile and
+  no PiP2 lease left; the pointer keeps moving. §4.4 all passed (--caps,
+  migration and a second start, A5, no divider 41 px pitch with the last
+  two 5 px apart, stack switch both ways by quick click and 1 s hold,
+  Editor started from a box, Archives: window and Close, Sort by, Click to
+  Open Folder and back, no running dot under stacks, persistence after a
+  restart, box tile, reorder, drag-out, drawer and volume drops,
+  Settings). §4.5: every first paint under the old maximum (101.4 ms);
+  entrance not a clean pass (Downloads up to 0.6 ms over 135.9, Games
+  once 143.3 and once 153.5, Prefs 142.5-146.4), open for the owner like
+  the Coffin and 3.9 outliers; hover 9529 / 9610 / 10719 us (pass);
+  --bench-sweep 8 6753 / 6440 / 6736 us, stalled 41 / 41 / 43 (pass).
+  Installed: 553, running (WBRun), the only dock; RAM: clean; scratch
+  worktree removed. Not run: DOpus lister (Workbench is the desktop).
+  Details: tasks/todo.md, "AmigaOS 3.1.4.1 with builds 551 and 553".

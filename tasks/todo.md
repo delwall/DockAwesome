@@ -2707,7 +2707,7 @@ menus are real windows, so screenshots show them).
 - [ ] NOT RUN on 3.9: --bench-sweep; Open Folder as a DOpus lister
       (Workbench is the desktop here).
 
-### AmigaOS 3.1.4.1 with build 551/553 (2026-11-25)
+### AmigaOS 3.1.4.1 with builds 551 and 553 (2026-11-25)
 AmigaOS 3.1.4.1 on the Vampire (Kickstart 46.143, exec 46.45, Workbench
 45.194, graphics 45.27, intuition 40.87, layers 45.30, icon 51.4,
 workbench 45.194, cybergraphics 41.4, input.device 45.2: the dock's
@@ -2773,15 +2773,97 @@ scratch worktree outside the repo, no warnings.
       ENV:dpid deleted; scratch worktree removed on the Mac. The leaked
       1x1 window, the PiP2 lease and the frozen input stay until the
       reboot.
-- [ ] Reboot 3.1.4.1 (the user; a software reboot needs their consent).
-      Then: delete SYS:WBStartup/Disabled/DockAwesome-locked-delete
-      (1.0 beta 4), check that 553 started from WBStartup (FindTask) and
-      migrated the user's file, and run on 553 a Break during startup
-      (stop.s at once) and a Break during --bench-sweep: both must leave
-      no "DockAwesome.PiP2" semaphore (tool Sems) and working input.
-- [ ] NOT RUN on 3.1.4.1 (blocked by the frozen input until reboot): the
-      whole §4.4 matrix after --caps (migration end to end, A5, no
-      divider, stack switch, program pin, volume pin, Sort by, Click to,
-      box tile, reorder/drag-out, Settings) and all of §4.5 (first open,
-      hover, --bench-sweep 8). Unknown whether agent input reaches the
-      dock on this boot: the first agent click came after the freeze.
+- [x] Rebooted by the user. 553 started from WBStartup and migrated
+      ENVARC:DockAwesome.json at boot (no "folder", Personal:Downloads
+      last, 582 bytes; stamped 02-Aug-25 15:35:16 because the clock was
+      not yet set); the tests never wrote it. The 1.0 beta 4 file in
+      Disabled was no longer locked and is deleted. Agent input reaches
+      the dock here: warps land 1:1 (move to 640,300 -> pointer 640,300).
+      Before every start: Status (CLI docks), FindTask, tool Sems (PiP
+      leases); each test dock got 5 s or more before stop.s.
+- [x] Break checks with 553 (installed dock stopped first; Sems empty):
+
+      | test | result |
+      | --- | --- |
+      | Ctrl-C pending through a whole start (CtrlCRun, migration config) | migrated and saved (582 bytes), one frame drawn, normal exit with the full profile, rc 0, no Ctrl-C left, no lease, no leaked window |
+      | Break sent at once after a start (stop.s right after Run) | migrated file saved, full profile, no lease, pointer moves |
+      | Break 3 s after starting --bench-sweep 8 | ended at the sweep's start (redraws 0), full profile, no lease |
+      | Break 5 s after starting --bench-sweep 8 | ended mid-sweep (redraws 50 of 165), full profile, no lease, pointer moves |
+
+- [x] §4.4 with 553 (configs: m = the user's 1.0b5 file; t = its 12
+      paths + Archives:Games, AOS3141:Prefs, Archives: + "folder"
+      Downloads, so three stacks and a volume after migration):
+
+      | check | result |
+      | --- | --- |
+      | --caps | 551, v1.0b5 and 1.0 beta 4 identical (before the fix; 553 prints the same) |
+      | migration | no "folder", Personal:Downloads last; a second start left the file unchanged (same date) |
+      | A5 | "folder": "RAM:DoesNotExist" -> no requester, dock running, file saved with paths [AOS3141:Tools/Editor] only |
+      | no divider | --pip-dump, 16 icons, slots 140 + 41k on the 928 canvas, last two (Archives:, Downloads) at 714 and 755: 5 px apart |
+      | stack switch, quick click | Downloads -> Games and Games -> Downloads |
+      | stack switch, 1 s hold | Downloads -> Games and Games -> Downloads |
+      | program pin with a box open, quick click | Editor started, box closed |
+      | volume pin (Archives:) | Workbench window; its menu shows Close, which closed it |
+      | Sort by | heading click kept the menu; Date Modified saved "sorts": {"Personal:Downloads": "date"}, check moved, box newest first (SAGA readme/lha first); Games kept Name |
+      | Click to, Open Folder | "clicks" saved; left click opened Workbench window "Downloads", no box; menu with the window open has no Close row |
+      | box open + quick click on an Open Folder stack | Prefs box closed, window "Games" opened |
+      | no running dot | --pip-dump at exit, pointer off the dock, with the Games, Downloads (both stacks) and Archives: windows open: one dot, under Archives: only |
+      | restart | Downloads Date Modified + Open Folder, Games Name + Open Folder |
+      | Show Stack again | Downloads left "clicks"; left click opened the box (356x368) |
+      | box tile | Open in Workbench in the Downloads box opened its Workbench window |
+      | reorder | Games dragged to slot 0: paths start with Archives:Games, "clicks" kept; a click at slot 0 opened window "Games"; Prefs (Show Stack) still opened its box |
+      | drag out | Downloads dragged out: gone from paths with its "sorts" |
+      | drawer drop | Personal:Audio dropped from the Personal window -> pinned at the drop slot as a stack; its box opened and closed |
+      | volume drop | Ram Disk: dropped -> pinned at the drop slot; click opened its window |
+      | Settings | Size, Scale, Position, Cancel/Save, no Folder Stack section; Save rewrote the file (new time) and kept "clicks" |
+
+- [x] §4.5 first open after 45 s idle, pointer off the dock, fresh dock per
+      run, ChangeTaskPri -30, config o = the user's 12 paths +
+      Archives:Games + AOS3141:Prefs + "folder" Downloads (old: 14 pins +
+      Folder Stack; new: migrated, 3 stacks), clicks seconds apart:
+
+      | run | build | Downloads first paint / entrance ms | Games ms | Prefs ms (smaller box 299x315) |
+      | --- | --- | --- | --- | --- |
+      | o1 | v1.0b5 | 101.4 / 135.6 | - | - |
+      | n1 | 553 | 99.2 / 136.1 (1 frame) | 95.7 / 143.3 | 72.3 / 142.5 |
+      | o2 | v1.0b5 | 101.3 / 135.9 | - | - |
+      | n2 | 553 | 98.9 / 136.5 | 96.4 / 133.9 | 72.6 / 142.7 |
+      | o3 | v1.0b5 | 101.2 / 135.6 | - | - |
+      | n3 | 553 | 99.5 / 135.6 | 96.5 / 153.5 (fields 01113) | 72.5 / 146.4 |
+
+      New prefetch in every run: stacks=3 pending=0 reads=84 cache=84/512
+      evicted=0. Old maximum 101.4 / 135.9. Every new first paint is
+      under it. Entrance: NOT a clean pass, open for the owner like the
+      Coffin and 3.9 outliers: Downloads 135.6-136.5 (up to 0.6 ms over),
+      Games 133.9 once but 143.3 and 153.5 (a slow last frame), Prefs
+      142.5-146.4 (6.6-10.5 ms over) although its box is smaller. The
+      old runs are very steady (135.6-135.9, fields 01112).
+- [x] §4.5 hover, agent sweep (relative moves to x 350, 500, 650, 800,
+      950 at y 692, then off, one per message, after 45 s idle), the same
+      15-pin row for both builds (pl: the 12 paths + Archives:Games,
+      AOS3141:Prefs, Personal:Downloads, no "folder"; canvas 896),
+      ChangeTaskPri -30:
+
+      | run | build | render_us_avg | max us | stalled | redraws |
+      | --- | --- | --- | --- | --- | --- |
+      | ho1 | v1.0b5 | 9529 | 18392 | 1 | 98 |
+      | hn1 | 553 | 9610 | 18504 | 1 | 98 |
+      | ho2 | v1.0b5 | 10719 | 100610 | 0 | 98 |
+
+      Pass: render_us_avg and stalled within the old spread; 553
+      retire_waits=0 retire_defers=1.
+- [x] §4.5 --bench-sweep 8 (same row, ChangeTaskPri -30), v1.0b5 / 553 /
+      v1.0b5: render_us_avg 6753 / 6440 / 6736, stalled 41 / 41 / 43 of
+      165 redraws (553 retire_waits=0). Pass.
+- [x] No defect beyond the startup Break; no further code change.
+- [x] End state: 553 in SYS:WBStartup (Version 0.553), started with WBRun
+      after the tests, FindTask finds it, Status lists no CLI dock, one
+      "DockAwesome.PiP2" lease (its own); its Downloads stack opened and
+      closed with the user's ENVARC config. SYS:WBStartup/Disabled holds
+      only WBDock. RAM: clean (tools, scripts, configs, profiles, dumps,
+      binaries, Editor's RAM:T/JanoRecentFiles), ENV:dpid deleted;
+      scratch worktree removed on the Mac. ApolloExplorerSrv runs until
+      reboot.
+- [ ] NOT RUN on 3.1.4.1: Open Folder as a DOpus lister (Workbench is the
+      desktop here); Break during startup with the old build beyond the
+      in-process --caps proof.

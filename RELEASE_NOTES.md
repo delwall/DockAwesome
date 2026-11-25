@@ -3,8 +3,7 @@
 ## 1.0 beta 6
 
 Draft, not released. Changes since 1.0 beta 5, so far run on ApolloOS,
-Coffin, AmigaOS 3.2.3, AmigaOS 3.9 and AmiKit XE (on AmigaOS 3.1.4.1 only
---caps and the Ctrl-C fix below).
+Coffin, AmigaOS 3.2.3, AmigaOS 3.9, AmigaOS 3.1.4.1 and AmiKit XE.
 
 **Folder Stacks**
 - Every drawer you pin is a Folder Stack: a click opens its contents above
@@ -15,7 +14,7 @@ Coffin, AmigaOS 3.2.3, AmigaOS 3.9 and AmiKit XE (on AmigaOS 3.1.4.1 only
   (its contents above the dock, the default) or **Open Folder** (its
   drawer as a window, as a pinned drawer did in 1.0 beta 5). The choice is
   saved per stack and kept when the stack is moved (checked on ApolloOS,
-  Coffin and AmigaOS 3.9).
+  Coffin, AmigaOS 3.9 and AmigaOS 3.1.4.1).
 - Each stack can be sorted by **Name**, **Date Modified** (newest first) or
   **Kind** (drawers first, then by file type) from its right-click menu;
   the choice is saved per stack.
@@ -30,7 +29,7 @@ Coffin, AmigaOS 3.2.3, AmigaOS 3.9 and AmiKit XE (on AmigaOS 3.1.4.1 only
 - With a Folder Stack open, a quick click on another pin closes the stack
   and starts that pin (or opens that stack). Before, only the stack closed
   (seen on Coffin, also in 1.0 beta 5; checked on Coffin, AmigaOS 3.2.3,
-  AmigaOS 3.9 and ApolloOS).
+  AmigaOS 3.9, AmigaOS 3.1.4.1 and ApolloOS).
 - Zoom: when one frame ran late, every later frame of the same motion
   waited up to 30 ms for the display, and the zoom stuttered until the row
   came to rest (also in 1.0 beta 5). The dock now draws such a frame at the
@@ -43,8 +42,8 @@ Coffin, AmigaOS 3.2.3, AmigaOS 3.9 and AmiKit XE (on AmigaOS 3.1.4.1 only
   it quit half closed. Before, it could quit without removing its input
   hook and display overlay: the mouse stopped moving and the next start
   said "PiP2 is already in use" until a reboot (seen on AmigaOS 3.1.4.1;
-  1.0 beta 5 quits the same way). Checked on AmigaOS 3.1.4.1 with Ctrl-C
-  already pending at start.
+  1.0 beta 5 quits the same way). Checked on AmigaOS 3.1.4.1: a Break
+  during a start and during --bench-sweep leaves nothing behind.
 
 ## 1.0 beta 5
 
