@@ -349,6 +349,13 @@ static int drawer_is_stack(const char *path)
     return ok;
 }
 
+/* A stack whose left click shows its box (Show Stack), not its drawer as
+   a window (Open Folder). Only these are read ahead. */
+static int stack_box(const Item *item)
+{
+    return item->stack && item->click == DOCK_CLICK_STACK;
+}
+
 /* A deferred report waits until the caller has replied to its Workbench
    message and released the drop receiver. The first report is kept. */
 static void pin_report(App *app, int defer, const char *text)
@@ -465,6 +472,7 @@ static __attribute__((noinline)) int save_config(App *app)
     for (i = 0; i < app->count; ++i)
         if (!app->items[i].temporary) {
             prefs->sorts[prefs->count] = app->items[i].sort;
+            prefs->clicks[prefs->count] = app->items[i].click;
             strcpy(prefs->paths[prefs->count++],app->items[i].path);
         }
     snprintf(temp, sizeof(temp), "%s.new", app->config);
@@ -1248,7 +1256,8 @@ static void profile_report(App *app)
         ticks_us(app,app->stats.folder_dock_ticks,app->stats.folder_dock_draws));
     {
         int stacks = 0, pending = 0, i;
-        for (i = 0; i < app->count; ++i) if (app->items[i].stack) {
+        /* Open Folder stacks show no box: not read ahead, not counted. */
+        for (i = 0; i < app->count; ++i) if (stack_box(&app->items[i])) {
             ++stacks;
             pending += app->items[i].prefetch;
         }
@@ -1909,7 +1918,7 @@ static void stack_anchor(const App *app, int index, int *x, int *y)
 static void arm_prefetch(App *app)
 {
     int i;
-    for (i = 0; i < app->count; ++i) if (app->items[i].stack) {
+    for (i = 0; i < app->count; ++i) if (stack_box(&app->items[i])) {
         app->items[i].prefetch = 1;
         app->items[i].prefetch_turns = 0;
         app->prefetch_pending = 1;
@@ -1930,7 +1939,7 @@ static int prefetch_stack_icons(App *app)
     for (i = 0; i < app->count; ++i) {
         const Item *item = &app->items[i];
         int centre, distance;
-        if (!item->stack || !item->prefetch) continue;
+        if (!stack_box(item) || !item->prefetch) continue;
         centre = (app->edge == DOCK_EDGE_BOTTOM ? rest[i].x : rest[i].y)+rest[i].size/2;
         distance = abs(centre-pointer);
         if (best < 0 || item->prefetch_turns < app->items[best].prefetch_turns ||
@@ -1945,7 +1954,7 @@ static int prefetch_stack_icons(App *app)
     if (!dock_ui_prefetch_folder(app->ui,best,app->edge,x,y,app->items[best].path,
             app->items[best].sort,app->settings.base_size,read_folder_icon,app))
         app->items[best].prefetch = 0;
-    for (i = 0; i < app->count; ++i) pending += app->items[i].stack && app->items[i].prefetch;
+    for (i = 0; i < app->count; ++i) pending += stack_box(&app->items[i]) && app->items[i].prefetch;
     return pending > 0;
 }
 
@@ -2035,23 +2044,30 @@ static void apply_gesture(App *app, const DockGestureInput *in, int *redraw, int
     }
     if ((effect.flags & DOCK_EFFECT_LAUNCH) && index >= 0) {
         Item *item = &app->items[index];
+        int box = stack_box(item);
         int focused = item->running && (item->kind == PIN_PROGRAM || item->owner) &&
             item_window_action(app,item,WINDOW_FOCUS);
         /* A click on the open stack's close button (native modes; PiP
            consumes it in the handler) closes it rather than reopening. A
            click on another stack while a box is open or moving closes that
            box, and the event loop opens this one once it is gone. */
-        if (item->stack && app->stack_close_press) {
+        if (box && app->stack_close_press) {
             dock_ui_dismiss_popup(app->ui);
             if (item->pin_id != app->open_stack_pin) app->stack_next_pin = item->pin_id;
-        } else if (item->stack) open_stack_view(app,index);
+        } else if (box) open_stack_view(app,index);
         /* A click on another pin closes the open stack, as on the Mac. */
         else if (dock_ui_folder_open(app->ui)) {
             dock_ui_dismiss_popup(app->ui);
             if (app->timer_failed) dock_ui_finish_folder_motion(app->ui);
             sync_input_ui(app);
         }
-        if (!item->stack && !focused && !item->temporary) {
+        /* An Open Folder stack opens its drawer as a window (a lister under
+           Directory Opus), as a drawer pin did in 1.0 beta 5. It has no
+           running state (no dot), so no launch is recorded for an app to
+           claim. */
+        if (item->stack && !box) {
+            if (launch_pin(app,item->path,1)) status_changed(app);
+        } else if (!item->stack && !focused && !item->temporary) {
             if (launch_pin(app,item->path,1)) {
                 record_launch(app,item->pin_id);
                 status_changed(app);
@@ -2317,6 +2333,7 @@ static void sync_input_ui(App *app)
 static void open_menu(App *app, int x, int y, uint32_t pin_id)
 {
     int opened, can_keep = 0, stack = 0, action = DOCK_UI_NONE, sort = DOCK_SORT_NAME;
+    int click = DOCK_CLICK_STACK;
     app->stack_next_pin = 0;
     if (pin_id) {
         int index = pin_index(app,pin_id);
@@ -2325,6 +2342,7 @@ static void open_menu(App *app, int x, int y, uint32_t pin_id)
         item = &app->items[index];
         stack = item->stack;
         sort = item->sort;
+        click = item->click;
         /* Only an app with a program file can become a pin. */
         can_keep = item->temporary && strchr(item->path,':') != NULL;
         if (item->kind == PIN_SHELL) {
@@ -2353,7 +2371,7 @@ static void open_menu(App *app, int x, int y, uint32_t pin_id)
     app->input_context.active = NULL;
     Enable();
     opened = dock_ui_open_popup(app->ui,app->edge,x,y,NULL,
-        action,can_keep,stack,sort);
+        action,can_keep,stack,sort,click);
     sync_input_ui(app);
     if (opened) {
         app->menu_pin_id = pin_id;
@@ -2391,6 +2409,26 @@ static void sort_menu_item(App *app, DockSort sort)
     item->prefetch = 1;
     item->prefetch_turns = 0;
     app->prefetch_pending = 1;
+}
+
+/* The menu's "Click to" choice for its stack, saved at once (reverted if
+   the save fails). Show Stack reads its first page ahead again; Open
+   Folder needs no read-ahead. */
+static void click_menu_item(App *app, DockClick click)
+{
+    int index = pin_index(app,app->menu_pin_id);
+    Item *item;
+    DockClick previous;
+    if (index < 0 || !app->items[index].stack || app->items[index].click == click) return;
+    item = &app->items[index];
+    previous = item->click;
+    item->click = click;
+    if (!item->temporary && !save_config(app)) { item->click = previous; return; }
+    if (click == DOCK_CLICK_STACK) {
+        item->prefetch = 1;
+        item->prefetch_turns = 0;
+        app->prefetch_pending = 1;
+    }
 }
 
 static void keep_menu_item(App *app)
@@ -2615,19 +2653,13 @@ static __attribute__((noinline)) void event_loop(App *app)
             } else if (action.type == DOCK_UI_QUIT) running = 0;
             else if (action.type == DOCK_UI_CLOSE_ITEM || action.type == DOCK_UI_QUIT_ITEM)
                 close_menu_item(app);
-            else if (action.type == DOCK_UI_SHOW_CONTENTS) {
-                int index = pin_index(app,app->menu_pin_id);
-                if (index >= 0 && app->items[index].stack) open_stack_view(app,index);
-            } else if (action.type == DOCK_UI_OPEN_PATH) {
+            else if (action.type == DOCK_UI_OPEN_PATH) {
                 if (launch_pin(app,action.path,0)) status_changed(app);
-            } else if (action.type == DOCK_UI_OPEN_DRAWER) {
-                /* The stack's drawer as a window (a lister under Directory Opus). */
-                int index = pin_index(app,app->menu_pin_id);
-                if (index >= 0 && app->items[index].stack && launch_pin(app,app->items[index].path,1))
-                    status_changed(app);
             }
             else if (action.type >= DOCK_UI_SORT_NAME && action.type <= DOCK_UI_SORT_KIND)
                 sort_menu_item(app,(DockSort)(action.type-DOCK_UI_SORT_NAME));
+            else if (action.type == DOCK_UI_CLICK_STACK || action.type == DOCK_UI_CLICK_FOLDER)
+                click_menu_item(app,(DockClick)(action.type-DOCK_UI_CLICK_STACK));
             else if (action.type == DOCK_UI_KEEP_ITEM) keep_menu_item(app);
             else if (action.type >= DOCK_UI_NEW_SHELL && action.type <= DOCK_UI_QUIT_SHELL)
                 shell_menu_action(app,action.type);
@@ -2730,7 +2762,7 @@ static __attribute__((noinline)) void event_loop(App *app)
             !dock_ui_busy(app->ui) && !dock_ui_folder_pending(app->ui)) {
             int index = pin_index(app,app->stack_next_pin);
             app->stack_next_pin = 0;
-            if (index >= 0 && app->items[index].stack) { open_stack_view(app,index); redraw = 1; }
+            if (index >= 0 && stack_box(&app->items[index])) { open_stack_view(app,index); redraw = 1; }
         }
         /* The Folder Stack pin swaps to its close button and back. */
         if (dock_ui_folder_open(app->ui) != app->stack_button_shown) redraw = 1;
@@ -3048,7 +3080,10 @@ int main(int argc, char **argv)
         loaded = pin_path(app,app->prefs.paths[i],0);
         if (loaded < 0) goto done;
         if (!loaded) app->incomplete_pins = 1;
-        else app->items[loaded-1].sort = app->prefs.sorts[i];
+        else {
+            app->items[loaded-1].sort = app->prefs.sorts[i];
+            app->items[loaded-1].click = app->prefs.clicks[i];
+        }
     }
     initial_count = app->count;
     for (i = 1; i < argc; ++i) {

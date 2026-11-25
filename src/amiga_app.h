@@ -78,6 +78,7 @@ typedef struct {
        it has had (prefetch_stack_icons). */
     int prefetch, prefetch_turns;
     DockSort sort; /* a stack's order, saved with its path */
+    DockClick click; /* a stack's left click: its box or its drawer as a window */
 } Item;
 typedef struct {
     struct Screen *screen;

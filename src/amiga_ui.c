@@ -72,14 +72,15 @@ static const MenuItem menu_items[] = {
     {"Settings...", DOCK_UI_SETTINGS}, {"About...", DOCK_UI_ABOUT}, {"Quit", DOCK_UI_QUIT}
 };
 static const MenuItem close_item = {"Close", DOCK_UI_CLOSE_ITEM};
-/* A Folder Stack's menu, after the macOS Dock's: its order (a muted
-   heading, the active one checked), a separator, then its box or the
-   drawer as a window. A NULL label is the separator; DOCK_UI_NONE rows
-   do not react. */
+/* A Folder Stack's menu, after the macOS Dock's: its order and what a
+   left click does (Display as Stack / Folder there), each under a muted
+   heading with the active one checked, between them a separator. A NULL
+   label is the separator; DOCK_UI_NONE rows do not react. */
 static const MenuItem drawer_items[] = {
     {"Sort by", DOCK_UI_NONE}, {"Name", DOCK_UI_SORT_NAME},
     {"Date Modified", DOCK_UI_SORT_DATE}, {"Kind", DOCK_UI_SORT_KIND}, {NULL, DOCK_UI_NONE},
-    {"Show Contents", DOCK_UI_SHOW_CONTENTS}, {"Open in Workbench", DOCK_UI_OPEN_DRAWER}
+    {"Click to", DOCK_UI_NONE}, {"Show Stack", DOCK_UI_CLICK_STACK},
+    {"Open Folder", DOCK_UI_CLICK_FOLDER}
 };
 enum { POPUP_MAX_ROWS = sizeof(drawer_items)/sizeof(*drawer_items),
     POPUP_SEPARATOR = 7, /* the separator row's height; its line is in the middle */
@@ -230,9 +231,10 @@ struct DockUI {
     int popup_rows;
     /* Each row's top in the window and the bottom of the last; the labels'
        left edge (past the check column in a stack's menu); the checked
-       row, or -1. */
+       rows, a bit each. */
     int popup_top[POPUP_MAX_ROWS+1];
-    int popup_text_left, popup_checked;
+    int popup_text_left;
+    unsigned int popup_checked;
     AmigaDisplay *popup_display;
     DockConvertRGB24 encode;
     DockConvertRGB565 encode565;
@@ -972,7 +974,7 @@ static void paint_popup_item(DockUI *ui, int i)
         popup_color(ui,rp,MENU_HOVER);
         fill_rounded(rp,3,top,ui->popup->Width-6,height,4);
     }
-    if (i == ui->popup_checked) paint_check(ui,rp,top,color);
+    if (ui->popup_checked & 1U<<i) paint_check(ui,rp,top,color);
     paint_ui_text(ui,rp,ui->chrome_aa,item->label,ui->popup_text_left,
         top+(height-ui->font_height)/2,color);
 }
@@ -2630,7 +2632,7 @@ static int open_popup_window(DockUI *ui, int left, int top, int width, int heigh
 
 int dock_ui_open_popup(DockUI *ui, DockEdge edge, int anchor_x, int anchor_y,
     const struct Window *native_dock,
-    int item_action, int can_keep, int drawer, int sort)
+    int item_action, int can_keep, int drawer, int sort, int click)
 {
     struct RastPort measure;
     DockRect dock;
@@ -2638,13 +2640,14 @@ int dock_ui_open_popup(DockUI *ui, DockEdge edge, int anchor_x, int anchor_y,
     enum { POINTER_GAP = 4 };
     if (!ui || ui->dialog) return 0;
     close_popup(ui,0);
-    ui->popup_checked = -1;
+    ui->popup_checked = 0;
     ui->popup_text_left = 10;
     if (drawer) {
         ui->popup_items = drawer_items;
         ui->popup_rows = POPUP_MAX_ROWS;
         for (i = 0; i < ui->popup_rows; ++i)
-            if (drawer_items[i].action == DOCK_UI_SORT_NAME+sort) ui->popup_checked = i;
+            if (drawer_items[i].action == DOCK_UI_SORT_NAME+sort ||
+                drawer_items[i].action == DOCK_UI_CLICK_STACK+click) ui->popup_checked |= 1U<<i;
         /* Every label past the check column, as in a native menu with a
            checked item. */
         ui->popup_text_left = 10+(ui->font_height*3+2)/4+6;

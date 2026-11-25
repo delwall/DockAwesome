@@ -4,23 +4,28 @@
 #include <string.h>
 
 enum { VERSION, SIZE, ZOOM, SCALE_PERCENT, LEVELS, EDGE, SNAPSHOT, PIP,
-       PIP_X_OFFSET, PIP_Y_OFFSET, PATHS, FOLDER, SORTS, FIELD_COUNT };
+       PIP_X_OFFSET, PIP_Y_OFFSET, PATHS, FOLDER, SORTS, CLICKS, FIELD_COUNT };
 
 static const char *const keys[FIELD_COUNT] = {
     "version", "size", "zoom", "scale_percent", "levels", "edge", "snapshot", "pip",
-    "pip_x_offset", "pip_y_offset", "paths", "folder", "sorts"
+    "pip_x_offset", "pip_y_offset", "paths", "folder", "sorts", "clicks"
 };
 
-/* "sorts" may come before "paths": its entries wait here until the whole
-   object is read. */
+/* "sorts" and "clicks" may come before "paths": their entries wait here
+   until the whole object is read. */
 typedef struct {
     char path[DOCK_PREFS_PATH_CAP];
-    DockSort sort;
-} PendingSort;
+    int value;
+} PendingEntry;
 typedef struct {
-    PendingSort entry[DOCK_MAX_ITEMS];
+    PendingEntry entry[DOCK_MAX_ITEMS];
     int count;
-} PendingSorts;
+} PendingMap;
+typedef struct { PendingMap sorts, clicks; } PendingMaps;
+/* A map's value for a key; 0 for a key this build does not know. */
+typedef int (*ParseKey)(const char *key, int *value);
+
+static const char *const click_keys[DOCK_CLICK_COUNT] = {"stack", "folder"};
 
 static const char *const edge_names[] = {"bottom", "left", "right"};
 
@@ -53,7 +58,8 @@ static int valid_prefs(const DockPrefs *prefs)
     for (i = 0; i < prefs->count; ++i)
         if (!prefs->paths[i][0] ||
             !memchr(prefs->paths[i], 0, DOCK_PREFS_PATH_CAP) ||
-            (unsigned)prefs->sorts[i] >= DOCK_SORT_COUNT) return 0;
+            (unsigned)prefs->sorts[i] >= DOCK_SORT_COUNT ||
+            (unsigned)prefs->clicks[i] >= DOCK_CLICK_COUNT) return 0;
     return 1;
 }
 
@@ -206,10 +212,27 @@ static int read_paths(FILE *file, DockPrefs *prefs)
     return c == ']';
 }
 
-/* An object of path: key. Keys this build does not know, values that are
-   not strings, and entries past DOCK_MAX_ITEMS are skipped: they read as
-   name. Not an object at all: a newer build's format, skipped too. */
-static int read_sorts(FILE *file, PendingSorts *pending)
+static int parse_sort(const char *key, int *value)
+{
+    DockSort sort;
+    if (!dock_sort_parse(key,&sort)) return 0;
+    *value = (int)sort;
+    return 1;
+}
+
+static int parse_click(const char *key, int *value)
+{
+    int i;
+    for (i = 0; i < DOCK_CLICK_COUNT; ++i)
+        if (!strcmp(key,click_keys[i])) { *value = i; return 1; }
+    return 0;
+}
+
+/* An object of path: key ("sorts", "clicks"). Keys this build does not
+   know, values that are not strings, and entries past DOCK_MAX_ITEMS are
+   skipped: they read as the default. Not an object at all: a newer
+   build's format, skipped too. */
+static int read_map(FILE *file, PendingMap *pending, ParseKey parse)
 {
     char path[DOCK_PREFS_PATH_CAP], key[64];
     int c = next_token(file);
@@ -220,23 +243,23 @@ static int read_sorts(FILE *file, PendingSorts *pending)
     if (c == '}') return 1;
     if (c == EOF || ungetc(c,file) == EOF) return 0;
     do {
-        DockSort sort;
+        int value;
         if (!read_string(file,path,sizeof(path)) || next_token(file) != ':') return 0;
         c = next_token(file);
         if (c == EOF || ungetc(c,file) == EOF) return 0;
         if (c != '"') {
             if (!skip_value(file,1)) return 0;
         } else if (!read_string(file,key,sizeof(key))) return 0;
-        else if (dock_sort_parse(key,&sort) && pending->count < DOCK_MAX_ITEMS) {
+        else if (parse(key,&value) && pending->count < DOCK_MAX_ITEMS) {
             strcpy(pending->entry[pending->count].path,path);
-            pending->entry[pending->count++].sort = sort;
+            pending->entry[pending->count++].value = value;
         }
         c = next_token(file);
     } while (c == ',');
     return c == '}';
 }
 
-static int read_object(FILE *file, DockPrefs *prefs, PendingSorts *pending)
+static int read_object(FILE *file, DockPrefs *prefs, PendingMaps *pending)
 {
     unsigned int seen = 0;
     int c;
@@ -274,7 +297,8 @@ static int read_object(FILE *file, DockPrefs *prefs, PendingSorts *pending)
         case PIP_Y_OFFSET: ok = read_integer(file,&prefs->pip_y_offset); break;
         case PATHS: ok = read_paths(file,prefs); break;
         case FOLDER: ok = read_string(file,prefs->folder,sizeof(prefs->folder)); break;
-        case SORTS: ok = read_sorts(file,pending); break;
+        case SORTS: ok = read_map(file,&pending->sorts,parse_sort); break;
+        case CLICKS: ok = read_map(file,&pending->clicks,parse_click); break;
         }
         if (!ok) return 0;
         c = next_token(file);
@@ -289,26 +313,35 @@ static int read_object(FILE *file, DockPrefs *prefs, PendingSorts *pending)
 
 static int same_path(const char *a, const char *b);
 
+/* The value a map gives path (a path listed twice: the later entry), or
+   fallback. */
+static int map_value(const PendingMap *map, const char *path, int fallback)
+{
+    int j;
+    for (j = 0; j < map->count; ++j)
+        if (same_path(path,map->entry[j].path)) fallback = map->entry[j].value;
+    return fallback;
+}
+
 int dock_prefs_read(FILE *file, DockPrefs *prefs)
 {
     DockPrefs *parsed;
-    PendingSorts *pending;
-    int ok, i, j;
+    PendingMaps *pending;
+    int ok, i;
     if (!file || !prefs) return 0;
     parsed = malloc(sizeof(*parsed));
     pending = malloc(sizeof(*pending));
     ok = parsed && pending;
     if (ok) {
         dock_prefs_defaults(parsed);
-        pending->count = 0;
+        pending->sorts.count = pending->clicks.count = 0;
         ok = read_object(file,parsed,pending);
     }
     if (ok) {
-        /* A path listed twice: the later entry counts. */
-        for (i = 0; i < parsed->count; ++i)
-            for (j = 0; j < pending->count; ++j)
-                if (same_path(parsed->paths[i],pending->entry[j].path))
-                    parsed->sorts[i] = pending->entry[j].sort;
+        for (i = 0; i < parsed->count; ++i) {
+            parsed->sorts[i] = (DockSort)map_value(&pending->sorts,parsed->paths[i],DOCK_SORT_NAME);
+            parsed->clicks[i] = (DockClick)map_value(&pending->clicks,parsed->paths[i],DOCK_CLICK_STACK);
+        }
         *prefs = *parsed;
     }
     free(pending);
@@ -331,9 +364,38 @@ static int write_string(FILE *file, const char *string)
     return fputc('"',file) != EOF;
 }
 
+/* ",\n  \"<name>\": {path: key, ...}" for the pins whose key is not NULL
+   (not the default); nothing when every pin has the default, so a file
+   without the map is the same as before it existed. Older builds skip
+   the key. */
+static int write_map(FILE *file, const DockPrefs *prefs, const char *name,
+    const char *(*key)(const DockPrefs *prefs, int i))
+{
+    int i, written = 0;
+    for (i = 0; i < prefs->count; ++i) {
+        const char *value = key(prefs,i);
+        if (!value) continue;
+        if ((written++ ? fputs(",\n    ",file) == EOF :
+                fprintf(file,",\n  \"%s\": {\n    ",name) < 0) ||
+            !write_string(file,prefs->paths[i]) ||
+            fprintf(file,": \"%s\"",value) < 0) return 0;
+    }
+    return !written || fputs("\n  }",file) != EOF;
+}
+
+static const char *sort_key_at(const DockPrefs *prefs, int i)
+{
+    return prefs->sorts[i] == DOCK_SORT_NAME ? NULL : dock_sort_key(prefs->sorts[i]);
+}
+
+static const char *click_key_at(const DockPrefs *prefs, int i)
+{
+    return prefs->clicks[i] == DOCK_CLICK_STACK ? NULL : click_keys[prefs->clicks[i]];
+}
+
 int dock_prefs_write(FILE *file, const DockPrefs *prefs)
 {
-    int i, sorted;
+    int i;
     if (!file || !prefs || !valid_prefs(prefs)) return 0;
     if (fprintf(file,
             "{\n  \"version\": 1,\n  \"size\": %d,\n  \"%s\": %d,\n  \"levels\": %d,\n"
@@ -347,16 +409,9 @@ int dock_prefs_write(FILE *file, const DockPrefs *prefs)
         if (fputs(i ? ",\n    " : "\n    ",file) == EOF ||
             !write_string(file,prefs->paths[i])) return 0;
     }
-    if (fputs(prefs->count ? "\n  ]" : "]",file) == EOF) return 0;
-    /* Only stacks not sorted by name: a file without them is the same as
-       before "sorts" existed. Older builds skip the key. */
-    for (i = 0, sorted = 0; i < prefs->count; ++i) {
-        if (prefs->sorts[i] == DOCK_SORT_NAME) continue;
-        if (fputs(sorted++ ? ",\n    " : ",\n  \"sorts\": {\n    ",file) == EOF ||
-            !write_string(file,prefs->paths[i]) ||
-            fprintf(file,": \"%s\"",dock_sort_key(prefs->sorts[i])) < 0) return 0;
-    }
-    if (sorted && fputs("\n  }",file) == EOF) return 0;
+    if (fputs(prefs->count ? "\n  ]" : "]",file) == EOF ||
+        !write_map(file,prefs,"sorts",sort_key_at) ||
+        !write_map(file,prefs,"clicks",click_key_at)) return 0;
     return fputs("\n}\n",file) != EOF && !ferror(file);
 }
 
@@ -379,7 +434,8 @@ int dock_prefs_migrate(DockPrefs *prefs)
     for (i = 0; i < prefs->count; ++i) if (same_path(prefs->paths[i],prefs->folder)) break;
     if (i == prefs->count && prefs->count < DOCK_MAX_ITEMS) {
         memcpy(prefs->paths[prefs->count],prefs->folder,sizeof(prefs->folder));
-        prefs->sorts[prefs->count++] = DOCK_SORT_NAME;
+        prefs->sorts[prefs->count] = DOCK_SORT_NAME;
+        prefs->clicks[prefs->count++] = DOCK_CLICK_STACK;
     }
     memset(prefs->folder,0,sizeof(prefs->folder));
     return 1;

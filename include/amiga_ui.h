@@ -17,12 +17,12 @@ enum {
     DOCK_UI_NONE, DOCK_UI_SETTINGS, DOCK_UI_ABOUT, DOCK_UI_QUIT,
     DOCK_UI_SAVE, DOCK_UI_CANCEL, DOCK_UI_REFRESH, DOCK_UI_CLOSE_ITEM, DOCK_UI_QUIT_ITEM,
     DOCK_UI_KEEP_ITEM, DOCK_UI_NEW_SHELL, DOCK_UI_SHOW_SHELL, DOCK_UI_QUIT_SHELL,
-    DOCK_UI_SHOW_CONTENTS, DOCK_UI_OPEN_PATH,
-    /* A Folder Stack's menu: open its drawer as a window (a Directory Opus
-       lister when Directory Opus is the desktop). */
-    DOCK_UI_OPEN_DRAWER,
+    DOCK_UI_OPEN_PATH,
     /* A Folder Stack's menu: sort it; minus DOCK_UI_SORT_NAME a DockSort. */
-    DOCK_UI_SORT_NAME, DOCK_UI_SORT_DATE, DOCK_UI_SORT_KIND
+    DOCK_UI_SORT_NAME, DOCK_UI_SORT_DATE, DOCK_UI_SORT_KIND,
+    /* A Folder Stack's menu: what its left click does; minus
+       DOCK_UI_CLICK_STACK a DockClick. */
+    DOCK_UI_CLICK_STACK, DOCK_UI_CLICK_FOLDER
 };
 typedef struct {
     int type;
@@ -50,10 +50,11 @@ void dock_ui_set_fit_hook(DockUI *ui, DockUIFit hook, void *context);
 void dock_ui_set_field_counter(DockUI *ui, const volatile ULONG *fields);
 void dock_ui_destroy(DockUI *ui);
 ULONG dock_ui_signal_mask(const DockUI *ui);
-/* drawer: a Folder Stack's menu, with sort (a DockSort) checked. */
+/* drawer: a Folder Stack's menu, with sort (a DockSort) and click (a
+   DockClick) checked. */
 int dock_ui_open_popup(DockUI *ui, DockEdge edge, int anchor_x, int anchor_y,
     const struct Window *native_dock,
-    int item_action, int can_keep, int drawer, int sort);
+    int item_action, int can_keep, int drawer, int sort, int click);
 /* sort (a DockSort) orders the drawer and the drawers opened inside it. */
 int dock_ui_open_folder(DockUI *ui, DockEdge edge, int x, int y, const char *path, int sort,
     int icon_size, DockUIReadIcon read_icon, const void *context, int profile);

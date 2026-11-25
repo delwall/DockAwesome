@@ -223,6 +223,91 @@ static void test_sorts(void)
     assert(fclose(file) == 0);
 }
 
+/* Each stack's left click is kept like its sort: by path, only "folder"
+   written, files without "clicks" read as Show Stack, and a reorder, a
+   removal or the migration never moves it to another stack. */
+static void test_clicks(void)
+{
+    DockPrefs before, after;
+    char json[4096];
+    FILE *file;
+    dock_prefs_defaults(&before);
+    before.count = 3;
+    strcpy(before.paths[0],"Work:Downloads");
+    strcpy(before.paths[1],"SYS:Prefs");
+    strcpy(before.paths[2],"Work:Games \"new\"");
+    /* All Show Stack: no "clicks" key. */
+    written_json(&before,json,sizeof(json));
+    assert(!strstr(json,"clicks"));
+    before.clicks[1] = DOCK_CLICK_FOLDER;
+    written_json(&before,json,sizeof(json));
+    assert(strstr(json,"\n  ],\n  \"clicks\": {\n    \"SYS:Prefs\": \"folder\"\n  }\n}\n"));
+    /* With a sort too: "sorts" first, then "clicks". */
+    before.sorts[0] = DOCK_SORT_DATE;
+    before.clicks[2] = DOCK_CLICK_FOLDER;
+    written_json(&before,json,sizeof(json));
+    assert(strstr(json,"\n  ],\n  \"sorts\": {\n    \"Work:Downloads\": \"date\"\n  },\n"
+        "  \"clicks\": {\n    \"SYS:Prefs\": \"folder\",\n    \"Work:Games \\\"new\\\"\": \"folder\"\n  }\n}\n"));
+    file = tmpfile();
+    assert(file && dock_prefs_write(file,&before));
+    rewind(file);
+    assert(dock_prefs_read(file,&after));
+    assert(fclose(file) == 0);
+    assert(!memcmp(&before,&after,sizeof(before)));
+    /* "clicks" before "paths", another case, a key for no pin, a newer
+       build's value, a value that is no string, "stack" written by hand. */
+    assert(read_text("{\"version\":1,\"clicks\":{\"sys:PREFS\":\"folder\",\"RAM:Gone\":\"folder\","
+        "\"Work:A\":\"list\",\"Work:B\":{\"as\":\"folder\"},\"Work:C\":1,\"Work:D\":\"stack\"},"
+        "\"paths\":[\"Work:A\",\"SYS:Prefs\",\"Work:B\",\"Work:C\",\"Work:D\"]}",&after));
+    assert(after.count == 5 && after.clicks[1] == DOCK_CLICK_FOLDER);
+    assert(after.clicks[0] == DOCK_CLICK_STACK && after.clicks[2] == DOCK_CLICK_STACK);
+    assert(after.clicks[3] == DOCK_CLICK_STACK && after.clicks[4] == DOCK_CLICK_STACK);
+    /* The later entry counts; an empty or other-shaped "clicks" reads as
+       Show Stack. */
+    assert(read_text("{\"version\":1,\"paths\":[\"Work:A\"],\"clicks\":{\"Work:A\":\"folder\",\"work:a\":\"stack\"}}",&after));
+    assert(after.clicks[0] == DOCK_CLICK_STACK);
+    assert(read_text("{\"version\":1,\"paths\":[\"Work:A\"],\"clicks\":{}}",&after));
+    assert(after.clicks[0] == DOCK_CLICK_STACK);
+    assert(read_text("{\"version\":1,\"paths\":[\"Work:A\"],\"clicks\":[\"Work:A\"]}",&after));
+    assert(after.count == 1 && after.clicks[0] == DOCK_CLICK_STACK);
+    /* A reorder (save_config writes the items in their new order with
+       their clicks and sorts): each path keeps its own. */
+    dock_prefs_defaults(&before);
+    before.count = 2;
+    strcpy(before.paths[0],"Work:Games");
+    strcpy(before.paths[1],"Work:Downloads");
+    before.clicks[0] = DOCK_CLICK_FOLDER;
+    before.sorts[1] = DOCK_SORT_KIND;
+    written_json(&before,json,sizeof(json));
+    assert(read_text(json,&after));
+    assert(!strcmp(after.paths[0],"Work:Games") && after.clicks[0] == DOCK_CLICK_FOLDER &&
+        after.sorts[0] == DOCK_SORT_NAME);
+    assert(!strcmp(after.paths[1],"Work:Downloads") && after.clicks[1] == DOCK_CLICK_STACK &&
+        after.sorts[1] == DOCK_SORT_KIND);
+    /* A removed stack takes its click along. */
+    before.count = 1;
+    strcpy(before.paths[0],"Work:Downloads");
+    before.clicks[0] = DOCK_CLICK_STACK;
+    before.sorts[0] = DOCK_SORT_KIND;
+    written_json(&before,json,sizeof(json));
+    assert(!strstr(json,"clicks") && !strstr(json,"Work:Games") && read_text(json,&after));
+    assert(after.count == 1 && after.clicks[0] == DOCK_CLICK_STACK);
+    /* An edit by hand that reorders "paths" alone. */
+    assert(read_text("{\"version\":1,\"paths\":[\"Work:B\",\"Work:A\"],\"clicks\":{\"Work:A\":\"folder\"}}",&after));
+    assert(after.clicks[0] == DOCK_CLICK_STACK && after.clicks[1] == DOCK_CLICK_FOLDER);
+    /* The migrated Folder Stack shows its box; the others keep theirs. */
+    assert(read_text("{\"version\":1,\"folder\":\"Work:Stack\",\"paths\":[\"Work:A\"],"
+        "\"clicks\":{\"Work:A\":\"folder\"}}",&after));
+    after.clicks[1] = DOCK_CLICK_FOLDER; /* stale value past count */
+    assert(dock_prefs_migrate(&after) == 1);
+    assert(after.count == 2 && after.clicks[0] == DOCK_CLICK_FOLDER && after.clicks[1] == DOCK_CLICK_STACK);
+    /* An out-of-range click is not written. */
+    before.clicks[0] = DOCK_CLICK_COUNT;
+    file = tmpfile();
+    assert(file && !dock_prefs_write(file,&before));
+    assert(fclose(file) == 0);
+}
+
 static void test_bad_file(void)
 {
     static const char *const bad[] = {
@@ -252,7 +337,10 @@ static void test_bad_file(void)
         "{\"version\":1,\"sorts\":{\"SYS:One\"}}",
         "{\"version\":1,\"sorts\":{\"SYS:One\":\"date\",}}",
         "{\"version\":1,\"sorts\":{\"SYS:One\":\"date\"},\"sorts\":{}}",
-        "{\"version\":1,\"sorts\":{\"SYS:One\":\"date\"}"
+        "{\"version\":1,\"sorts\":{\"SYS:One\":\"date\"}",
+        "{\"version\":1,\"clicks\":{\"SYS:One\"}}",
+        "{\"version\":1,\"clicks\":{\"SYS:One\":\"folder\",}}",
+        "{\"version\":1,\"clicks\":{},\"clicks\":{}}"
     };
     DockPrefs current, original;
     char long_path[DOCK_PREFS_PATH_CAP+64];
@@ -327,6 +415,7 @@ int main(void)
     test_bad_file();
     test_folder_migration();
     test_sorts();
+    test_clicks();
     puts("JSON preferences: ordered paths, escapes, bounds, unknown keys and transactional read PASS");
     return 0;
 }
