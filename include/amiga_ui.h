@@ -20,7 +20,9 @@ enum {
     DOCK_UI_SHOW_CONTENTS, DOCK_UI_OPEN_PATH,
     /* A Folder Stack's menu: open its drawer as a window (a Directory Opus
        lister when Directory Opus is the desktop). */
-    DOCK_UI_OPEN_DRAWER
+    DOCK_UI_OPEN_DRAWER,
+    /* A Folder Stack's menu: sort it; minus DOCK_UI_SORT_NAME a DockSort. */
+    DOCK_UI_SORT_NAME, DOCK_UI_SORT_DATE, DOCK_UI_SORT_KIND
 };
 typedef struct {
     int type;
@@ -48,10 +50,12 @@ void dock_ui_set_fit_hook(DockUI *ui, DockUIFit hook, void *context);
 void dock_ui_set_field_counter(DockUI *ui, const volatile ULONG *fields);
 void dock_ui_destroy(DockUI *ui);
 ULONG dock_ui_signal_mask(const DockUI *ui);
+/* drawer: a Folder Stack's menu, with sort (a DockSort) checked. */
 int dock_ui_open_popup(DockUI *ui, DockEdge edge, int anchor_x, int anchor_y,
     const struct Window *native_dock,
-    int item_action, int can_keep, int drawer);
-int dock_ui_open_folder(DockUI *ui, DockEdge edge, int x, int y, const char *path,
+    int item_action, int can_keep, int drawer, int sort);
+/* sort (a DockSort) orders the drawer and the drawers opened inside it. */
+int dock_ui_open_folder(DockUI *ui, DockEdge edge, int x, int y, const char *path, int sort,
     int icon_size, DockUIReadIcon read_icon, const void *context, int profile);
 void dock_ui_dismiss_popup(DockUI *ui);
 int dock_ui_popup_bounds(const DockUI *ui, DockRect *bounds);
@@ -72,13 +76,14 @@ int dock_ui_folder_loading(const DockUI *ui);
 /* Reads one more icon of path's first page into the icon cache, for a
    Folder Stack that opens with its icons. Call while the dock is idle.
    slot: 0..DOCK_MAX_ITEMS-1, one read-ahead state each; it starts over
-   (and rereads the drawer) when path, icon_size or the anchor differ.
+   (and rereads the drawer) when path, sort, icon_size or the anchor differ.
+   sort: the stack's DockSort, so the page read is the one it opens with.
    (edge,x,y): the anchor the box would open at, for the real page size.
    1 while icons of the first page remain (or a popup is open); 0 when the
    page is read, the drawer cannot be read, or the cache has no free entry
    (the prefetch never evicts). */
 int dock_ui_prefetch_folder(DockUI *ui, int slot, DockEdge edge, int x, int y,
-    const char *path, int icon_size, DockUIReadIcon read_icon, const void *context);
+    const char *path, int sort, int icon_size, DockUIReadIcon read_icon, const void *context);
 /* The Folder Stack icon cache: live entries, entries, and the live entries
    of another path an open box overwrote. */
 void dock_ui_folder_cache_stats(const DockUI *ui, int *used, int *capacity, unsigned long *evicted);

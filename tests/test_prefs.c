@@ -130,6 +130,99 @@ static void test_scale(void)
     assert(dock_scaled_size(96,200) == 192);
 }
 
+static void written_json(const DockPrefs *prefs, char *json, size_t capacity)
+{
+    FILE *file = tmpfile();
+    size_t length;
+    assert(file);
+    assert(dock_prefs_write(file,prefs));
+    rewind(file);
+    length = fread(json,1,capacity-1,file);
+    json[length] = 0;
+    assert(fclose(file) == 0);
+}
+
+/* Each stack's sort is kept by its path: only stacks not sorted by name
+   are written, files without "sorts" read as name, and the order of
+   "paths" (a reorder, a removal, an edit by hand) never moves a sort to
+   another stack. */
+static void test_sorts(void)
+{
+    DockPrefs before, after;
+    char json[4096];
+    FILE *file;
+    dock_prefs_defaults(&before);
+    before.count = 3;
+    strcpy(before.paths[0],"Work:Downloads");
+    strcpy(before.paths[1],"SYS:Prefs");
+    strcpy(before.paths[2],"Work:Games \"new\"");
+    /* All by name: byte for byte the file of 1.0 beta 5's writer. */
+    written_json(&before,json,sizeof(json));
+    assert(!strstr(json,"sorts"));
+    assert(strstr(json,"\"Work:Games \\\"new\\\"\"\n  ]\n}\n"));
+    before.sorts[0] = DOCK_SORT_DATE;
+    before.sorts[2] = DOCK_SORT_KIND;
+    written_json(&before,json,sizeof(json));
+    assert(strstr(json,"\n  ],\n  \"sorts\": {\n    \"Work:Downloads\": \"date\",\n"
+        "    \"Work:Games \\\"new\\\"\": \"kind\"\n  }\n}\n"));
+    assert(!strstr(json,"\"SYS:Prefs\": "));
+    file = tmpfile();
+    assert(file && dock_prefs_write(file,&before));
+    rewind(file);
+    assert(dock_prefs_read(file,&after));
+    assert(fclose(file) == 0);
+    assert(!memcmp(&before,&after,sizeof(before)));
+    /* "sorts" before "paths", a path in another case, a key for no pin,
+       a value from a newer build, a value that is no string. */
+    assert(read_text("{\"version\":1,\"sorts\":{\"work:DOWNLOADS\":\"date\",\"RAM:Gone\":\"kind\","
+        "\"SYS:Prefs\":\"size\",\"Work:C\":{\"by\":\"kind\"},\"Work:D\":3},"
+        "\"paths\":[\"SYS:Prefs\",\"Work:Downloads\",\"Work:C\",\"Work:D\"]}",&after));
+    assert(after.count == 4);
+    assert(after.sorts[0] == DOCK_SORT_NAME && after.sorts[1] == DOCK_SORT_DATE);
+    assert(after.sorts[2] == DOCK_SORT_NAME && after.sorts[3] == DOCK_SORT_NAME);
+    /* A path listed twice: the later entry counts. */
+    assert(read_text("{\"version\":1,\"paths\":[\"Work:A\"],\"sorts\":{\"Work:A\":\"kind\",\"work:a\":\"date\"}}",&after));
+    assert(after.sorts[0] == DOCK_SORT_DATE);
+    assert(read_text("{\"version\":1,\"paths\":[\"Work:A\"],\"sorts\":{}}",&after));
+    assert(after.sorts[0] == DOCK_SORT_NAME);
+    /* A newer build's "sorts" in another shape is skipped. */
+    assert(read_text("{\"version\":1,\"paths\":[\"Work:A\"],\"sorts\":[\"date\"]}",&after));
+    assert(after.count == 1 && after.sorts[0] == DOCK_SORT_NAME);
+    /* save_config writes the items in their new order with their sorts:
+       swapped, each path keeps its own. */
+    before.count = 2;
+    strcpy(before.paths[0],"Work:Games");
+    strcpy(before.paths[1],"Work:Downloads");
+    before.sorts[0] = DOCK_SORT_KIND;
+    before.sorts[1] = DOCK_SORT_DATE;
+    before.sorts[2] = DOCK_SORT_NAME;
+    written_json(&before,json,sizeof(json));
+    assert(read_text(json,&after));
+    assert(!strcmp(after.paths[1],"Work:Downloads") && after.sorts[1] == DOCK_SORT_DATE);
+    assert(!strcmp(after.paths[0],"Work:Games") && after.sorts[0] == DOCK_SORT_KIND);
+    /* A removed stack takes its sort along; the rest keep theirs. */
+    before.count = 1;
+    strcpy(before.paths[0],"Work:Downloads");
+    before.sorts[0] = DOCK_SORT_DATE;
+    written_json(&before,json,sizeof(json));
+    assert(!strstr(json,"Work:Games") && read_text(json,&after));
+    assert(after.count == 1 && after.sorts[0] == DOCK_SORT_DATE);
+    /* An edit by hand that reorders "paths" alone. */
+    assert(read_text("{\"version\":1,\"paths\":[\"Work:B\",\"Work:A\"],\"sorts\":{\"Work:A\":\"kind\"}}",&after));
+    assert(after.sorts[0] == DOCK_SORT_NAME && after.sorts[1] == DOCK_SORT_KIND);
+    /* The migrated Folder Stack is sorted by name; the others keep theirs. */
+    assert(read_text("{\"version\":1,\"folder\":\"Work:Stack\",\"paths\":[\"Work:A\"],"
+        "\"sorts\":{\"Work:A\":\"date\"}}",&after));
+    after.sorts[1] = DOCK_SORT_KIND; /* stale value past count */
+    assert(dock_prefs_migrate(&after) == 1);
+    assert(after.count == 2 && after.sorts[0] == DOCK_SORT_DATE && after.sorts[1] == DOCK_SORT_NAME);
+    /* An out-of-range sort is not written. */
+    before.sorts[0] = DOCK_SORT_COUNT;
+    file = tmpfile();
+    assert(file && !dock_prefs_write(file,&before));
+    assert(fclose(file) == 0);
+}
+
 static void test_bad_file(void)
 {
     static const char *const bad[] = {
@@ -155,7 +248,11 @@ static void test_bad_file(void)
         "{\"version\":1,\"pip_x_offset\":129}",
         "{\"version\":1,\"edge\":\"top\"}",
         "{\"version\":1,}",
-        "{\"version\":1} trailing"
+        "{\"version\":1} trailing",
+        "{\"version\":1,\"sorts\":{\"SYS:One\"}}",
+        "{\"version\":1,\"sorts\":{\"SYS:One\":\"date\",}}",
+        "{\"version\":1,\"sorts\":{\"SYS:One\":\"date\"},\"sorts\":{}}",
+        "{\"version\":1,\"sorts\":{\"SYS:One\":\"date\"}"
     };
     DockPrefs current, original;
     char long_path[DOCK_PREFS_PATH_CAP+64];
@@ -229,6 +326,7 @@ int main(void)
     test_scale();
     test_bad_file();
     test_folder_migration();
+    test_sorts();
     puts("JSON preferences: ordered paths, escapes, bounds, unknown keys and transactional read PASS");
     return 0;
 }

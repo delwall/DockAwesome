@@ -461,8 +461,10 @@ static __attribute__((noinline)) int save_config(App *app)
     prefs->pip_y_offset = app->pip_y_offset;
     prefs->count = 0;
     for (i = 0; i < app->count; ++i)
-        if (!app->items[i].temporary)
+        if (!app->items[i].temporary) {
+            prefs->sorts[prefs->count] = app->items[i].sort;
             strcpy(prefs->paths[prefs->count++],app->items[i].path);
+        }
     snprintf(temp, sizeof(temp), "%s.new", app->config);
     snprintf(backup, sizeof(backup), "%s.bak", app->config);
     memset(&claim, 0, sizeof(claim));
@@ -1938,7 +1940,7 @@ static int prefetch_stack_icons(App *app)
     ++app->items[best].prefetch_turns;
     ++app->stats.prefetch_reads;
     if (!dock_ui_prefetch_folder(app->ui,best,app->edge,x,y,app->items[best].path,
-            app->settings.base_size,read_folder_icon,app))
+            app->items[best].sort,app->settings.base_size,read_folder_icon,app))
         app->items[best].prefetch = 0;
     for (i = 0; i < app->count; ++i) pending += app->items[i].stack && app->items[i].prefetch;
     return pending > 0;
@@ -1951,7 +1953,7 @@ static void open_stack_view(App *app, int index)
     stack_anchor(app,index,&x,&y);
     reset_hover_label(app);
     interaction_cancel(app);
-    if (dock_ui_open_folder(app->ui,app->edge,x,y,app->items[index].path,
+    if (dock_ui_open_folder(app->ui,app->edge,x,y,app->items[index].path,app->items[index].sort,
             app->settings.base_size,read_folder_icon,app,app->profile)) {
         app->open_stack_pin = app->items[index].pin_id;
         if (app->timer_failed) dock_ui_finish_folder_motion(app->ui);
@@ -2311,7 +2313,7 @@ static void sync_input_ui(App *app)
 
 static void open_menu(App *app, int x, int y, uint32_t pin_id)
 {
-    int opened, can_keep = 0, stack = 0, action = DOCK_UI_NONE;
+    int opened, can_keep = 0, stack = 0, action = DOCK_UI_NONE, sort = DOCK_SORT_NAME;
     app->stack_next_pin = 0;
     if (pin_id) {
         int index = pin_index(app,pin_id);
@@ -2319,6 +2321,7 @@ static void open_menu(App *app, int x, int y, uint32_t pin_id)
         if (index < 0) return;
         item = &app->items[index];
         stack = item->stack;
+        sort = item->sort;
         /* Only an app with a program file can become a pin. */
         can_keep = item->temporary && strchr(item->path,':') != NULL;
         if (item->kind == PIN_SHELL) {
@@ -2347,7 +2350,7 @@ static void open_menu(App *app, int x, int y, uint32_t pin_id)
     app->input_context.active = NULL;
     Enable();
     opened = dock_ui_open_popup(app->ui,app->edge,x,y,NULL,
-        action,can_keep,stack);
+        action,can_keep,stack,sort);
     sync_input_ui(app);
     if (opened) {
         app->menu_pin_id = pin_id;
@@ -2367,6 +2370,24 @@ static void close_menu_item(App *app)
     else if (item->kind == PIN_DRAWER) { if (item->lister) dopus_close_lister(app,item->lister); }
     else item_window_action(app,item,WINDOW_CLOSE);
     status_changed(app);
+}
+
+/* The menu's choice for its stack: saved at once, and its first page read
+   ahead again in the new order. The menu shares the box's window, so no
+   box is open now; the next opening shows the new order. */
+static void sort_menu_item(App *app, DockSort sort)
+{
+    int index = pin_index(app,app->menu_pin_id);
+    Item *item;
+    DockSort previous;
+    if (index < 0 || !app->items[index].stack || app->items[index].sort == sort) return;
+    item = &app->items[index];
+    previous = item->sort;
+    item->sort = sort;
+    if (!item->temporary && !save_config(app)) { item->sort = previous; return; }
+    item->prefetch = 1;
+    item->prefetch_turns = 0;
+    app->prefetch_pending = 1;
 }
 
 static void keep_menu_item(App *app)
@@ -2602,6 +2623,8 @@ static __attribute__((noinline)) void event_loop(App *app)
                 if (index >= 0 && app->items[index].stack && launch_pin(app,app->items[index].path,1))
                     status_changed(app);
             }
+            else if (action.type >= DOCK_UI_SORT_NAME && action.type <= DOCK_UI_SORT_KIND)
+                sort_menu_item(app,(DockSort)(action.type-DOCK_UI_SORT_NAME));
             else if (action.type == DOCK_UI_KEEP_ITEM) keep_menu_item(app);
             else if (action.type >= DOCK_UI_NEW_SHELL && action.type <= DOCK_UI_QUIT_SHELL)
                 shell_menu_action(app,action.type);
@@ -2999,6 +3022,7 @@ int main(int argc, char **argv)
         loaded = pin_path(app,app->prefs.paths[i],0);
         if (loaded < 0) goto done;
         if (!loaded) app->incomplete_pins = 1;
+        else app->items[loaded-1].sort = app->prefs.sorts[i];
     }
     initial_count = app->count;
     for (i = 1; i < argc; ++i) {

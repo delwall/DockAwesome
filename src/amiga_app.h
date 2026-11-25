@@ -77,6 +77,7 @@ typedef struct {
     /* A stack: its first page is not read ahead yet, and the prefetch turns
        it has had (prefetch_stack_icons). */
     int prefetch, prefetch_turns;
+    DockSort sort; /* a stack's order, saved with its path */
 } Item;
 typedef struct {
     struct Screen *screen;

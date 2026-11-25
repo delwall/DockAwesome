@@ -27,14 +27,7 @@ static int compare_names(const void *left, const void *right)
 {
     const DockFolderEntry *a = left;
     const DockFolderEntry *b = right;
-    return Stricmp((STRPTR)a->name,(STRPTR)b->name);
-}
-
-static int compare_entries(const void *left, const void *right)
-{
-    const DockFolderEntry *a = left, *b = right;
-    int folded = compare_names(a,b);
-    return folded ? folded : strcmp(a->name,b->name);
+    return dock_sort_compare_names(a->name,b->name);
 }
 
 static size_t sidecar_base_length(const DockFolderEntry *entry)
@@ -81,7 +74,7 @@ static int link_is_drawer(BPTR directory, const char *name, struct FileInfoBlock
     return drawer;
 }
 
-static int read_folder(const char *path, DockFolderEntry **entries, size_t *count)
+static int read_folder(const char *path, DockSort sort, DockFolderEntry **entries, size_t *count)
 {
     DockFolderEntry *result = NULL;
     size_t used = 0, capacity = 0;
@@ -140,16 +133,18 @@ done:
         free(result);
         return 0;
     }
-    if (used > 1) qsort(result, used, sizeof(*result), compare_entries);
+    /* Icons find their entries by name; then the stack's own order. */
+    dock_sort_entries(result, used, DOCK_SORT_NAME);
     *entries = result;
     *count = drop_sidecars(result,used);
+    if (sort != DOCK_SORT_NAME) dock_sort_entries(result, *count, sort);
     return 1;
 }
 
-int amiga_folder_read(const char *path, DockFolderEntry **entries, size_t *count)
+int amiga_folder_read(const char *path, DockSort sort, DockFolderEntry **entries, size_t *count)
 {
     void *requesters = amiga_requesters_off();
-    int ok = read_folder(path, entries, count);
+    int ok = read_folder(path, sort, entries, count);
     amiga_requesters_restore(requesters);
     return ok;
 }

@@ -4,12 +4,23 @@
 #include <string.h>
 
 enum { VERSION, SIZE, ZOOM, SCALE_PERCENT, LEVELS, EDGE, SNAPSHOT, PIP,
-       PIP_X_OFFSET, PIP_Y_OFFSET, PATHS, FOLDER, FIELD_COUNT };
+       PIP_X_OFFSET, PIP_Y_OFFSET, PATHS, FOLDER, SORTS, FIELD_COUNT };
 
 static const char *const keys[FIELD_COUNT] = {
     "version", "size", "zoom", "scale_percent", "levels", "edge", "snapshot", "pip",
-    "pip_x_offset", "pip_y_offset", "paths", "folder"
+    "pip_x_offset", "pip_y_offset", "paths", "folder", "sorts"
 };
+
+/* "sorts" may come before "paths": its entries wait here until the whole
+   object is read. */
+typedef struct {
+    char path[DOCK_PREFS_PATH_CAP];
+    DockSort sort;
+} PendingSort;
+typedef struct {
+    PendingSort entry[DOCK_MAX_ITEMS];
+    int count;
+} PendingSorts;
 
 static const char *const edge_names[] = {"bottom", "left", "right"};
 
@@ -41,7 +52,8 @@ static int valid_prefs(const DockPrefs *prefs)
         !memchr(prefs->folder,0,sizeof(prefs->folder))) return 0;
     for (i = 0; i < prefs->count; ++i)
         if (!prefs->paths[i][0] ||
-            !memchr(prefs->paths[i], 0, DOCK_PREFS_PATH_CAP)) return 0;
+            !memchr(prefs->paths[i], 0, DOCK_PREFS_PATH_CAP) ||
+            (unsigned)prefs->sorts[i] >= DOCK_SORT_COUNT) return 0;
     return 1;
 }
 
@@ -194,7 +206,37 @@ static int read_paths(FILE *file, DockPrefs *prefs)
     return c == ']';
 }
 
-static int read_object(FILE *file, DockPrefs *prefs)
+/* An object of path: key. Keys this build does not know, values that are
+   not strings, and entries past DOCK_MAX_ITEMS are skipped: they read as
+   name. Not an object at all: a newer build's format, skipped too. */
+static int read_sorts(FILE *file, PendingSorts *pending)
+{
+    char path[DOCK_PREFS_PATH_CAP], key[64];
+    int c = next_token(file);
+    if (c == EOF || ungetc(c,file) == EOF) return 0;
+    if (c != '{') return skip_value(file,0);
+    next_token(file);
+    c = next_token(file);
+    if (c == '}') return 1;
+    if (c == EOF || ungetc(c,file) == EOF) return 0;
+    do {
+        DockSort sort;
+        if (!read_string(file,path,sizeof(path)) || next_token(file) != ':') return 0;
+        c = next_token(file);
+        if (c == EOF || ungetc(c,file) == EOF) return 0;
+        if (c != '"') {
+            if (!skip_value(file,1)) return 0;
+        } else if (!read_string(file,key,sizeof(key))) return 0;
+        else if (dock_sort_parse(key,&sort) && pending->count < DOCK_MAX_ITEMS) {
+            strcpy(pending->entry[pending->count].path,path);
+            pending->entry[pending->count++].sort = sort;
+        }
+        c = next_token(file);
+    } while (c == ',');
+    return c == '}';
+}
+
+static int read_object(FILE *file, DockPrefs *prefs, PendingSorts *pending)
 {
     unsigned int seen = 0;
     int c;
@@ -232,6 +274,7 @@ static int read_object(FILE *file, DockPrefs *prefs)
         case PIP_Y_OFFSET: ok = read_integer(file,&prefs->pip_y_offset); break;
         case PATHS: ok = read_paths(file,prefs); break;
         case FOLDER: ok = read_string(file,prefs->folder,sizeof(prefs->folder)); break;
+        case SORTS: ok = read_sorts(file,pending); break;
         }
         if (!ok) return 0;
         c = next_token(file);
@@ -244,16 +287,31 @@ static int read_object(FILE *file, DockPrefs *prefs)
         !ferror(file) && valid_prefs(prefs);
 }
 
+static int same_path(const char *a, const char *b);
+
 int dock_prefs_read(FILE *file, DockPrefs *prefs)
 {
     DockPrefs *parsed;
-    int ok;
+    PendingSorts *pending;
+    int ok, i, j;
     if (!file || !prefs) return 0;
     parsed = malloc(sizeof(*parsed));
-    if (!parsed) return 0;
-    dock_prefs_defaults(parsed);
-    ok = read_object(file,parsed);
-    if (ok) *prefs = *parsed;
+    pending = malloc(sizeof(*pending));
+    ok = parsed && pending;
+    if (ok) {
+        dock_prefs_defaults(parsed);
+        pending->count = 0;
+        ok = read_object(file,parsed,pending);
+    }
+    if (ok) {
+        /* A path listed twice: the later entry counts. */
+        for (i = 0; i < parsed->count; ++i)
+            for (j = 0; j < pending->count; ++j)
+                if (same_path(parsed->paths[i],pending->entry[j].path))
+                    parsed->sorts[i] = pending->entry[j].sort;
+        *prefs = *parsed;
+    }
+    free(pending);
     free(parsed);
     return ok;
 }
@@ -275,7 +333,7 @@ static int write_string(FILE *file, const char *string)
 
 int dock_prefs_write(FILE *file, const DockPrefs *prefs)
 {
-    int i;
+    int i, sorted;
     if (!file || !prefs || !valid_prefs(prefs)) return 0;
     if (fprintf(file,
             "{\n  \"version\": 1,\n  \"size\": %d,\n  \"%s\": %d,\n  \"levels\": %d,\n"
@@ -289,7 +347,17 @@ int dock_prefs_write(FILE *file, const DockPrefs *prefs)
         if (fputs(i ? ",\n    " : "\n    ",file) == EOF ||
             !write_string(file,prefs->paths[i])) return 0;
     }
-    return fputs(prefs->count ? "\n  ]\n}\n" : "]\n}\n",file) != EOF && !ferror(file);
+    if (fputs(prefs->count ? "\n  ]" : "]",file) == EOF) return 0;
+    /* Only stacks not sorted by name: a file without them is the same as
+       before "sorts" existed. Older builds skip the key. */
+    for (i = 0, sorted = 0; i < prefs->count; ++i) {
+        if (prefs->sorts[i] == DOCK_SORT_NAME) continue;
+        if (fputs(sorted++ ? ",\n    " : ",\n  \"sorts\": {\n    ",file) == EOF ||
+            !write_string(file,prefs->paths[i]) ||
+            fprintf(file,": \"%s\"",dock_sort_key(prefs->sorts[i])) < 0) return 0;
+    }
+    if (sorted && fputs("\n  }",file) == EOF) return 0;
+    return fputs("\n}\n",file) != EOF && !ferror(file);
 }
 
 /* ASCII letters compare without case, as AmigaDOS names do. */
@@ -309,8 +377,10 @@ int dock_prefs_migrate(DockPrefs *prefs)
     int i;
     if (!prefs || !prefs->folder[0]) return 0;
     for (i = 0; i < prefs->count; ++i) if (same_path(prefs->paths[i],prefs->folder)) break;
-    if (i == prefs->count && prefs->count < DOCK_MAX_ITEMS)
-        memcpy(prefs->paths[prefs->count++],prefs->folder,sizeof(prefs->folder));
+    if (i == prefs->count && prefs->count < DOCK_MAX_ITEMS) {
+        memcpy(prefs->paths[prefs->count],prefs->folder,sizeof(prefs->folder));
+        prefs->sorts[prefs->count++] = DOCK_SORT_NAME;
+    }
     memset(prefs->folder,0,sizeof(prefs->folder));
     return 1;
 }

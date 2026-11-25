@@ -72,10 +72,18 @@ static const MenuItem menu_items[] = {
     {"Settings...", DOCK_UI_SETTINGS}, {"About...", DOCK_UI_ABOUT}, {"Quit", DOCK_UI_QUIT}
 };
 static const MenuItem close_item = {"Close", DOCK_UI_CLOSE_ITEM};
-/* A Folder Stack's menu: its box, or the drawer as a window. */
+/* A Folder Stack's menu, after the macOS Dock's: its order (a muted
+   heading, the active one checked), a separator, then its box or the
+   drawer as a window. A NULL label is the separator; DOCK_UI_NONE rows
+   do not react. */
 static const MenuItem drawer_items[] = {
+    {"Sort by", DOCK_UI_NONE}, {"Name", DOCK_UI_SORT_NAME},
+    {"Date Modified", DOCK_UI_SORT_DATE}, {"Kind", DOCK_UI_SORT_KIND}, {NULL, DOCK_UI_NONE},
     {"Show Contents", DOCK_UI_SHOW_CONTENTS}, {"Open in Workbench", DOCK_UI_OPEN_DRAWER}
 };
+enum { POPUP_MAX_ROWS = sizeof(drawer_items)/sizeof(*drawer_items),
+    POPUP_SEPARATOR = 7, /* the separator row's height; its line is in the middle */
+    POPUP_INERT = -2 };  /* popup_hit: a heading or separator */
 static const MenuItem quit_item = {"Quit", DOCK_UI_QUIT_ITEM};
 static const MenuItem temporary_items[] = {
     {"Keep in Dock", DOCK_UI_KEEP_ITEM}, {"Quit", DOCK_UI_QUIT_ITEM}
@@ -115,6 +123,7 @@ typedef struct {
     int icon_size, profile;
     DockUIReadIcon read_icon;
     const void *context;
+    DockSort sort;
 } FolderAnchor;
 typedef struct {
     struct Layer *layer;
@@ -177,6 +186,7 @@ typedef struct {
     char path[DOCK_PREFS_PATH_CAP];
     int icon_size, x, y;
     DockEdge edge;
+    DockSort sort;
     DockFolderEntry *entries;
     size_t count, next;
 } FolderPrefetch;
@@ -218,6 +228,11 @@ struct DockUI {
     int label_metrics; /* 0 unmeasured, 1 measured, 2 measured with label_tall */
     const MenuItem *popup_items;
     int popup_rows;
+    /* Each row's top in the window and the bottom of the last; the labels'
+       left edge (past the check column in a stack's menu); the checked
+       row, or -1. */
+    int popup_top[POPUP_MAX_ROWS+1];
+    int popup_text_left, popup_checked;
     AmigaDisplay *popup_display;
     DockConvertRGB24 encode;
     DockConvertRGB565 encode565;
@@ -634,8 +649,11 @@ int dock_ui_holds_dock(const DockUI *ui)
 
 static int popup_hit(const DockUI *ui, int x, int y)
 {
-    if (x < 3 || x >= ui->popup->Width-3 || y < 3 || y >= 3+ui->popup_rows*ui->popup_row) return -1;
-    return (y-3)/ui->popup_row;
+    int i;
+    if (x < 3 || x >= ui->popup->Width-3 || y < ui->popup_top[0] || y >= ui->popup_top[ui->popup_rows])
+        return -1;
+    for (i = 0; y >= ui->popup_top[i+1]; ++i) {}
+    return ui->popup_items[i].action ? i : POPUP_INERT;
 }
 
 static int rounded_inset(int radius, int row)
@@ -925,17 +943,38 @@ static void paint_popup_surface(DockUI *ui, const DockImage *surface)
     }
 }
 
+/* A check mark in the check column, two pixels thick, sized by the font:
+   a short stroke down to the foot, a long one up to the right. */
+static void paint_check(DockUI *ui, struct RastPort *rp, int top, int color)
+{
+    int h = (ui->font_height*3+2)/4, x = 10, y = top+(ui->popup_row-h)/2, t;
+    popup_color(ui,rp,color);
+    for (t = 0; t < 2; ++t) {
+        Move(rp,x+t,y+h/2);
+        Draw(rp,x+t+h/3,y+h-1);
+        Draw(rp,x+t+h,y);
+    }
+}
+
 static void paint_popup_item(DockUI *ui, int i)
 {
     struct RastPort *rp = ui->popup->RPort;
-    int top = 3+i*ui->popup_row;
+    const MenuItem *item = &ui->popup_items[i];
+    int top = ui->popup_top[i], height = ui->popup_top[i+1]-top;
+    int color = i == ui->popup_selected ? MENU_HOVER_TEXT : item->action ? MENU_TEXT : FOLDER_MUTED;
+    if (!item->label) {
+        popup_color(ui,rp,MENU_RIM);
+        /* Inset like the labels on both sides: a hairline between groups. */
+        RectFill(rp,10,top+height/2,ui->popup->Width-11,top+height/2);
+        return;
+    }
     if (i == ui->popup_selected) {
         popup_color(ui,rp,MENU_HOVER);
-        fill_rounded(rp,3,top,ui->popup->Width-6,ui->popup_row,4);
+        fill_rounded(rp,3,top,ui->popup->Width-6,height,4);
     }
-    paint_ui_text(ui,rp,ui->chrome_aa,ui->popup_items[i].label,10,
-        top+(ui->popup_row-ui->font_height)/2,
-        i == ui->popup_selected ? MENU_HOVER_TEXT : MENU_TEXT);
+    if (i == ui->popup_checked) paint_check(ui,rp,top,color);
+    paint_ui_text(ui,rp,ui->chrome_aa,item->label,ui->popup_text_left,
+        top+(height-ui->font_height)/2,color);
 }
 
 static void paint_popup(DockUI *ui)
@@ -962,7 +1001,8 @@ static void paint_popup_hover(DockUI *ui, int previous)
         ui->popup_selected != previous) rows[count++] = ui->popup_selected;
     for (i = 0; i < count; ++i)
         if (!amiga_display_present_tile(ui->popup_display,ui->popup,&ui->popup_glass,
-                0,3+rows[i]*ui->popup_row,ui->popup->Width,ui->popup_row)) {
+                0,ui->popup_top[rows[i]],ui->popup->Width,
+                ui->popup_top[rows[i]+1]-ui->popup_top[rows[i]])) {
             paint_popup(ui); return;
         }
     SetFont(ui->popup->RPort,ui->draw->dri_Font);
@@ -2159,14 +2199,16 @@ int dock_ui_folder_step(DockUI *ui)
 }
 
 int dock_ui_prefetch_folder(DockUI *ui, int slot, DockEdge edge, int x, int y,
-    const char *path, int icon_size, DockUIReadIcon read_icon, const void *context)
+    const char *path, int sort, int icon_size, DockUIReadIcon read_icon, const void *context)
 {
     FolderPrefetch *p;
     if (!ui || slot < 0 || slot >= DOCK_MAX_ITEMS || !path[0] ||
         strlen(path) >= sizeof(ui->prefetch[slot].path)) return 0;
     p = &ui->prefetch[slot];
-    /* A moved anchor (another Scale, a reordered pin) can change the page. */
-    if (strcmp(p->path,path) || p->icon_size != icon_size || p->edge != edge || p->x != x || p->y != y) {
+    /* A moved anchor (another Scale, a reordered pin) can change the page,
+       another sort its entries. */
+    if (strcmp(p->path,path) || p->sort != (DockSort)sort || p->icon_size != icon_size ||
+        p->edge != edge || p->x != x || p->y != y) {
         /* The first page the box would show at (edge,x,y): show_folder's
            grid, in its order. */
         FolderView grid = {0};
@@ -2176,10 +2218,11 @@ int dock_ui_prefetch_folder(DockUI *ui, int slot, DockEdge edge, int x, int y,
         strcpy(p->path,path);
         p->icon_size = icon_size;
         p->edge = edge;
+        p->sort = (DockSort)sort;
         p->x = x; p->y = y;
-        grid.anchor = (FolderAnchor){edge,x,y,icon_size,0,read_icon,context};
+        grid.anchor = (FolderAnchor){edge,x,y,icon_size,0,read_icon,context,(DockSort)sort};
         rows = folder_grid(ui,&grid,&max_height,&extra_bottom);
-        if (!grid.cols || !rows || !amiga_folder_read(path,&p->entries,&p->count)) {
+        if (!grid.cols || !rows || !amiga_folder_read(path,(DockSort)sort,&p->entries,&p->count)) {
             p->entries = NULL; p->count = 0;
             return 0;
         }
@@ -2587,7 +2630,7 @@ static int open_popup_window(DockUI *ui, int left, int top, int width, int heigh
 
 int dock_ui_open_popup(DockUI *ui, DockEdge edge, int anchor_x, int anchor_y,
     const struct Window *native_dock,
-    int item_action, int can_keep, int drawer)
+    int item_action, int can_keep, int drawer, int sort)
 {
     struct RastPort measure;
     DockRect dock;
@@ -2595,9 +2638,16 @@ int dock_ui_open_popup(DockUI *ui, DockEdge edge, int anchor_x, int anchor_y,
     enum { POINTER_GAP = 4 };
     if (!ui || ui->dialog) return 0;
     close_popup(ui,0);
+    ui->popup_checked = -1;
+    ui->popup_text_left = 10;
     if (drawer) {
         ui->popup_items = drawer_items;
-        ui->popup_rows = 2;
+        ui->popup_rows = POPUP_MAX_ROWS;
+        for (i = 0; i < ui->popup_rows; ++i)
+            if (drawer_items[i].action == DOCK_UI_SORT_NAME+sort) ui->popup_checked = i;
+        /* Every label past the check column, as in a native menu with a
+           checked item. */
+        ui->popup_text_left = 10+(ui->font_height*3+2)/4+6;
     } else if (item_action >= DOCK_UI_NEW_SHELL && item_action <= DOCK_UI_QUIT_SHELL) {
         ui->popup_items = shell_items;
         ui->popup_rows = item_action-DOCK_UI_NEW_SHELL+1;
@@ -2608,13 +2658,16 @@ int dock_ui_open_popup(DockUI *ui, DockEdge edge, int anchor_x, int anchor_y,
             item_action ? 1 : sizeof(menu_items)/sizeof(*menu_items);
     }
     InitRastPort(&measure); SetFont(&measure, ui->draw->dri_Font);
-    for (i = 0; i < ui->popup_rows; ++i) {
-        int label_width = text_length32(&measure,ui->popup_items[i].label);
-        if (label_width > width) width = label_width;
-    }
-    width += 24;
     ui->popup_row = ui->font_height+10;
-    height = 6+ui->popup_rows*ui->popup_row;
+    ui->popup_top[0] = 3;
+    for (i = 0; i < ui->popup_rows; ++i) {
+        const char *label = ui->popup_items[i].label;
+        int label_width = label ? text_length32(&measure,label) : 0;
+        if (label_width > width) width = label_width;
+        ui->popup_top[i+1] = ui->popup_top[i]+(label ? ui->popup_row : POPUP_SEPARATOR);
+    }
+    width += ui->popup_text_left+14;
+    height = ui->popup_top[ui->popup_rows]+3;
     screen_top = ui->screen->BarHeight+2;
     if (width > ui->screen->Width || height > ui->screen->Height-screen_top) return 0;
     if (edge == DOCK_EDGE_BOTTOM) {
@@ -2651,7 +2704,7 @@ static int show_folder(DockUI *ui, FolderAnchor anchor, const char *path, size_t
     rows = folder_grid(ui,&next,&max_height,&extra_bottom);
     if (!next.cols || !rows) return 0;
     folder_stamp(anchor.profile && entrance,1);
-    next.read_ok = amiga_folder_read(path,&next.entries,&next.count);
+    next.read_ok = amiga_folder_read(path,anchor.sort,&next.entries,&next.count);
     folder_stamp(anchor.profile && entrance,0);
     folder_fit_count(&next,rows);
     if (next.count && !folder_page_size(&next)) {
@@ -2721,11 +2774,12 @@ static int show_folder(DockUI *ui, FolderAnchor anchor, const char *path, size_t
     return 1;
 }
 
-int dock_ui_open_folder(DockUI *ui, DockEdge edge, int x, int y, const char *path,
+int dock_ui_open_folder(DockUI *ui, DockEdge edge, int x, int y, const char *path, int sort,
     int icon_size, DockUIReadIcon read_icon, const void *context, int profile)
 {
     return ui && !ui->dialog && *path &&
-        show_folder(ui,(FolderAnchor){edge,x,y,icon_size,profile,read_icon,context},path,strlen(path),1);
+        show_folder(ui,(FolderAnchor){edge,x,y,icon_size,profile,read_icon,context,(DockSort)sort},
+            path,strlen(path),1);
 }
 
 void dock_ui_point_folder_tip(DockUI *ui, int x, int y)
@@ -3168,9 +3222,11 @@ static int popup_poll(DockUI *ui, DockUIAction *result)
                 if (action) return action;
             }
         }
-        else if (cls == IDCMP_MOUSEMOVE && hit != ui->popup_selected) {
+        else if (cls == IDCMP_MOUSEMOVE && (hit < 0 ? -1 : hit) != ui->popup_selected) {
             int previous = ui->popup_selected;
-            ui->popup_selected = hit; paint_popup_hover(ui,previous);
+            ui->popup_selected = hit < 0 ? -1 : hit; paint_popup_hover(ui,previous);
+        } else if (cls == IDCMP_MOUSEBUTTONS && hit == POPUP_INERT) {
+            /* A heading or separator: the menu stays, as a native one does. */
         } else if (cls == IDCMP_MOUSEBUTTONS && code == SELECTDOWN) {
             if (hit < 0) close = 1;
             else {

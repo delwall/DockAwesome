@@ -68,7 +68,7 @@ HOST_CORE := src/dock_core.c src/dock_compose.c src/dock_renderer.c src/dock_geo
 HOST_HEADERS := include/dock_core.h include/dock_compose.h include/dock_renderer.h include/dock_geometry.h include/dock_interaction.h src/dock_pixel.h
 
 SANITIZE := -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer
-HOST_TESTS := build/test_core build/test_interaction build/test_geometry build/test_prefs build/test_profile build/test_bob build/test_text
+HOST_TESTS := build/test_core build/test_interaction build/test_geometry build/test_prefs build/test_sort build/test_profile build/test_bob build/test_text
 HOST_SANITIZE_TESTS := $(HOST_TESTS:=_sanitize)
 
 $(HOST_TESTS) build/bench_core: build/%: $(HOST_CORE) $(HOST_HEADERS) tests/%.c Makefile
@@ -77,7 +77,8 @@ $(HOST_TESTS) build/bench_core: build/%: $(HOST_CORE) $(HOST_HEADERS) tests/%.c 
 $(HOST_SANITIZE_TESTS): build/%_sanitize: $(HOST_CORE) $(HOST_HEADERS) tests/%.c Makefile
 	@mkdir -p build
 	$(HOST_CC) $(HOST_FLAGS) $(SANITIZE) $(filter %.c,$^) -o "$@"
-build/test_prefs build/test_prefs_sanitize: src/dock_prefs.c include/dock_prefs.h
+build/test_prefs build/test_prefs_sanitize: src/dock_prefs.c include/dock_prefs.h src/dock_sort.c include/dock_sort.h
+build/test_sort build/test_sort_sanitize: src/dock_sort.c include/dock_sort.h
 build/test_profile build/test_profile_sanitize: src/dock_profile.c include/dock_profile.h
 build/test_bob build/test_bob_sanitize: src/dock_bob.c include/dock_bob.h
 build/test_text build/test_text_sanitize: src/dock_text.c include/dock_text.h
@@ -85,7 +86,7 @@ build/test_core_be: $(HOST_CORE) $(HOST_HEADERS) tests/test_core.c
 	@mkdir -p build
 	$(HOST_CC) $(HOST_FLAGS) -DDOCK_EMULATE_BIG_ENDIAN $(filter %.c,$^) -o "$@"
 
-host-test: build/test_core build/test_core_be build/test_interaction build/test_geometry build/test_prefs build/test_profile build/test_bob build/test_text
+host-test: build/test_core build/test_core_be build/test_interaction build/test_geometry build/test_prefs build/test_sort build/test_profile build/test_bob build/test_text
 	for t in $^; do ./$$t || exit 1; done
 host-bench: build/bench_core
 	./build/bench_core
