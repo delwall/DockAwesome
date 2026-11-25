@@ -14,7 +14,7 @@ Coffin, AmigaOS 3.2.3, AmigaOS 3.9, AmigaOS 3.1.4.1 and AmiKit XE.
   (its contents above the dock, the default) or **Open Folder** (its
   drawer as a window, as a pinned drawer did in 1.0 beta 5). The choice is
   saved per stack and kept when the stack is moved (checked on ApolloOS,
-  Coffin, AmigaOS 3.9 and AmigaOS 3.1.4.1).
+  Coffin, AmigaOS 3.2.3, AmigaOS 3.9 and AmigaOS 3.1.4.1).
 - Each stack can be sorted by **Name**, **Date Modified** (newest first) or
   **Kind** (drawers first, then by file type) from its right-click menu;
   the choice is saved per stack.
@@ -42,8 +42,9 @@ Coffin, AmigaOS 3.2.3, AmigaOS 3.9, AmigaOS 3.1.4.1 and AmiKit XE.
   it quit half closed. Before, it could quit without removing its input
   hook and display overlay: the mouse stopped moving and the next start
   said "PiP2 is already in use" until a reboot (seen on AmigaOS 3.1.4.1;
-  1.0 beta 5 quits the same way). Checked on AmigaOS 3.1.4.1: a Break
-  during a start and during --bench-sweep leaves nothing behind.
+  1.0 beta 5 quits the same way). Checked on AmigaOS 3.1.4.1 and AmigaOS
+  3.2.3: a Break during a start and during --bench-sweep leaves nothing
+  behind.
 
 ## 1.0 beta 5
 

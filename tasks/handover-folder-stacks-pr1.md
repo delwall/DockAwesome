@@ -440,3 +440,44 @@ One push of folder-stacks; PR opened as a draft and left a draft with a
   Installed: 553, running (WBRun), the only dock; RAM: clean; scratch
   worktree removed. Not run: DOpus lister (Workbench is the desktop).
   Details: tasks/todo.md, "AmigaOS 3.1.4.1 with builds 551 and 553".
+
+## Follow-up: AmigaOS 3.2.3 rerun with build 553 (2026-11-25)
+
+- Boot: AmigaOS 3.2.3 (Kickstart 47.115, Workbench 47.5), core 12856,
+  24-bit 1280x720, agent input. Build 553 = HEAD 24573c0, not stale, no
+  code change. Details and tables: tasks/todo.md, "AmigaOS 3.2.3 rerun
+  with build 553".
+- Break checks with 553: Ctrl-C pending through a whole start, a Break
+  right after a start, Breaks 3 s and 6 s into --bench-sweep 8: full
+  profile every time, no PiP2 lease left, no leaked window, the pointer
+  moves.
+- §4.4 all passed with --config RAM: copies: --caps identical to v1.0b5
+  and 542; migration and a second start; A5; no divider (41 px pitch);
+  stack switch both ways by quick click and 1 s hold; TextEdit started by
+  a quick click with a box open; Archives: window and Close; Sort by
+  (heading, Date Modified saved and kept); Click to Open Folder (window,
+  no box, no Close row, no dot under stacks by --pip-dump), Show Stack
+  back, both after a restart; box tile; reorder and drag-out keep
+  "sorts"/"clicks"; drawer and volume drops; Settings Save.
+- §4.5 first open, v1.0b5 / 553 alternating, 8 runs each with per-frame
+  data: entrance v1.0b5 130.0-201.1 ms (median 148.6), 553 143.6-147.0
+  (median 144.4); first paint 96.4-112.3 against 92.8-95.9 and once 116.2
+  (a slow screen capture, bimodal in both builds). Verdict on the open
+  entrance finding: noise. The motion code is byte-identical to v1.0b5;
+  the length is 4 or 5 frames in both builds; the session's first three
+  553 runs had one 43-47 ms frame (the 3/4-fade frame) that the same
+  binary did not have with a 32 KB memory shift (19.7 ms) or later in the
+  session (28.6 ms); diagnostic builds of both versions: 25-27.5 ms. The
+  memory-state cause of the 43 ms frame was not found.
+- §4.5 hover (same 15-pin row, -30): v1.0b5 / 553 / v1.0b5 13374 / 10378
+  / 13868 us, stalled 9 / 4 / 8: pass.
+- §4.5 --bench-sweep 8: stalled 41-42 both, but render_us_avg 553 7432-
+  8018 against v1.0b5 6481-7035 (compose +0.9 ms, frame for frame on the
+  same damage). Same compose code; the cost follows the binary's layout
+  (v1.0b5 + an unrelated diagnostic 5154 us compose, 553 variants 4943-
+  6597 us; alignment flags do not pin it; on 3.1.4.1 553 was faster than
+  v1.0b5). Open for the owner, not fixed.
+- Installed on 3.2.3: 553 in SYS:WBStartup/DockAwesome, running (WBRun),
+  the only dock; 542 deleted (not locked); ENVARC:DockAwesome.json not
+  written by the tests. RAM: clean; scratch worktrees removed.
+- Not run on 3.2.3: DOpus lister (Workbench is the desktop).

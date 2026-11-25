@@ -652,3 +652,24 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
 - A requester that frozen input cannot reach can still be answered: send
   its window the IDCMP_GADGETUP its OK gadget would send (PutMsg to the
   window's UserPort with your own reply port).
+
+## The end icon moves when the row zooms (3.2.3, 2026-11-25)
+- Five agent clicks at the last stack's rest centre did nothing
+  (`downs=0`, `presses_unarmed=1`; an input spy showed the press passing
+  through): the zoomed row shifts the end icon about 8 px outward, so the
+  rest centre lies in the gap. At rest the centres are 640 + 41*(k-(n-1)/2)
+  on a 1280 px screen at size 36.
+- Rule: aim at an end icon from a --pip-dump taken with the pointer on it,
+  or a few px outward; a right-click there that opens the plate menu
+  (Settings/About/Quit) says "gap".
+
+## A per-binary timing gap is not a code regression until a rebuild agrees (3.2.3, 2026-11-25)
+- 553 composed --bench-sweep frames 0.9 ms (20%) slower than v1.0b5 on the
+  same damage, frame for frame, while the compose code was unchanged; a
+  30-line diagnostic in another file moved the same code by -1.5 to +0.9 ms,
+  and -falign-* flags did not pin it. The 43 ms entrance frame followed the
+  memory state (gone with a 32 KB shift and later in the session).
+- Rule: before calling a performance difference between two builds a
+  regression, rebuild each with an unrelated change (and run one with a
+  memory shift, tool Hold) and see whether the gap survives; diff the
+  functions that run in the measured window.

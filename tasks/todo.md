@@ -2867,3 +2867,162 @@ scratch worktree outside the repo, no warnings.
 - [ ] NOT RUN on 3.1.4.1: Open Folder as a DOpus lister (Workbench is the
       desktop here); Break during startup with the old build beyond the
       in-process --caps proof.
+
+### AmigaOS 3.2.3 rerun with build 553 (2026-11-25)
+AmigaOS 3.2.3 on the Vampire (Kickstart 47.115, Workbench 47.5; exec 47.13,
+intuition 47.53, graphics 47.10), core 12856, 24-bit 1280x720, agent input
+(warps land 1:1). Installed before: build 542 (running from WBStartup).
+Build 553 = HEAD 24573c0, not stale (`make amiga`: nothing to rebuild; built
+without warnings); baseline tag v1.0b5 built in a scratch worktree outside
+the repo. No code change in this rerun. All destructive runs used
+--config RAM:<file>.json; ENVARC:DockAwesome.json kept its date (10:45:25,
+from 541's migration) through every test and the install. SYS:WBStartup/
+Disabled held only WBDock: no leftover to delete.
+- [x] Aiming on this boot: at rest the icon centres are 640 + 41*(k-(n-1)/2).
+      The last icon moves about 8 px right when the row zooms, so a press at
+      its rest centre lands in the gap (`downs=0`, `presses_unarmed=1`, an
+      input spy showed the press passed through): Downloads at x 955, not 931,
+      with 16 icons. Not a defect; the same in every build.
+- [x] Break checks with 553 (installed dock stopped first; Sems empty, no CLI
+      dock before each start):
+
+      | test | result |
+      | --- | --- |
+      | Ctrl-C pending through a whole start (CtrlCRun, migration config) | migrated and saved (568 bytes), one frame, full profile, rc 0, ctrl_c_left 0, no lease, no leaked window (Wins), pointer moves |
+      | Break sent at once after a start | migrated file saved, full profile, no lease |
+      | Break 3 s after starting --bench-sweep 8 | ended at the sweep's start (redraws 0), full profile, no lease |
+      | Break 6 s after starting --bench-sweep 8 | ended mid-sweep (redraws 91 of 165), full profile, no lease, pointer moves |
+
+- [x] §4.4 with 553 (configs: m = the user's paths without Downloads +
+      "folder" Downloads, 1.0b5 format; t = m + Archives:Games, AOS32:Prefs,
+      Archives:, so three stacks and a volume after migration):
+
+      | check | result |
+      | --- | --- |
+      | --caps | 553, v1.0b5 and the installed 542 identical (diff on the Mac); dopus no |
+      | migration | no "folder", Personal:Downloads last; a second start left the file unchanged (same date) |
+      | A5 | "folder": "RAM:DoesNotExist" -> no requester, dock running, file saved with paths [AOS32:Tools/TextEdit] only |
+      | no divider | --pip-dump, 13 icons on the 832 canvas: centres 169.5 + 41k, last two (SD-Card, Downloads) 620 / 661.5 |
+      | stack switch, quick click | Downloads -> Games and Games -> Downloads |
+      | stack switch, 1 s hold | Downloads -> Games and Games -> Downloads |
+      | program pin with a box open, quick click | TextEdit started, box closed |
+      | volume pin (Archives:) | Workbench window; its menu shows Close, which closed it |
+      | Sort by | heading click kept the menu; Date Modified saved "sorts": {"Personal:Downloads": "date"}, check moved, kept after a restart; Games kept Name (box order not looked at: PiP only) |
+      | Click to, Open Folder | "clicks" saved; left click opened Workbench window "Downloads", no box; the menu with the window open has the same 8 rows, no Close |
+      | box open + quick click on an Open Folder stack | Prefs box closed, window "Games" opened |
+      | no running dot | --pip-dump at exit, pointer off the dock, with the Prefs (stack), Downloads (Open Folder) and Archives: windows open: one dot, under Archives: only |
+      | restart | Downloads kept Date Modified + Open Folder; Show Stack removed "clicks" and brought the box back |
+      | box tile | Prefs box (299x315, 23 entries): Open in Workbench (last tile) opened Workbench window "Prefs" |
+      | reorder | Downloads dragged to slot 0: first in "paths", "sorts" kept; a click at slot 0 opened its box |
+      | drag out | Games (Open Folder) dragged past the row's left end: gone from "paths" with its "clicks" |
+      | drawer drop | Personal:Audio dropped from the Personal window -> pinned at the drop slot (7) as a stack; its box (185x156) opened and closed |
+      | volume drop | RAM Disk icon -> "RAM Disk:" pinned at the drop slot; a click opened its window |
+      | Settings | Size, Scale, Position, Cancel/Save, no Folder Stack section; Save rewrote the file (new time) and kept "sorts" |
+
+- [x] §4.5 first open after 45 s idle, pointer off the dock, fresh dock per
+      run, ChangeTaskPri -30, config o = the user's paths + Archives:Games +
+      AOS32:Prefs + "folder" Downloads (old: 14 pins + Folder Stack; new:
+      migrated, 3 stacks), Downloads opened and closed, v1.0b5 / 553
+      alternating, 8 runs each (fields = fields between frames; last = the
+      last motion frame's time):
+
+      | run | build | first paint ms | entrance ms | frames | fields | compose / present us avg | frame_us |
+      | --- | --- | --- | --- | --- | --- | --- | --- |
+      | o1 | v1.0b5 | 109.7 | 130.3 | 4 | 0112 | 13193 / 3281 | 7978 12857 18235 26748 |
+      | n1 | 553 | 93.1 | 146.8 | 4 | 0113 | 18003 / 2791 | 7795 13813 18396 43092 |
+      | o2 | v1.0b5 | 96.4 | 201.1 | 4 | 0111 | 9630 / 2685 | 4916 10586 14960 18719 |
+      | n2 | 553 | 93.0 | 146.8 | 4 | 0113 | 18064 / 2835 | 7968 13814 18561 43174 |
+      | o3 | v1.0b5 | 110.0 | 149.8 | 5 | 01121 | 11228 / 3602 | 7881 12792 18289 26479 8613 |
+      | n3 | 553 | 92.8 | 147.0 | 4 | 0113 | 18060 / 2888 | 8064 13807 18533 43312 |
+      | o4 | v1.0b5 | 112.3 | 147.4 | 5 | 01121 | 11854 / 3488 | 8049 14192 17346 28433 8589 |
+      | n4 | 553 | 95.4 | 144.4 | 5 | 01121 | 11867 / 2995 | 6949 12729 17375 28555 8596 |
+      | o5 | v1.0b5 | 109.8 | 130.0 | 4 | 0112 | 13081 / 3339 | 7877 12754 18430 26542 |
+      | n5 | 553 | 116.2 | 143.6 | 5 | 01121 | 11746 / 3019 | 6590 12915 17072 28568 8584 |
+      | o6 | v1.0b5 | 96.4 | 142.9 | 5 | 01121 | 10366 / 3397 | 6240 11653 16462 25766 8596 |
+      | n6 | 553 | 95.9 | 143.9 | 5 | 01121 | 11689 / 3129 | 7083 12781 16888 28649 8594 |
+      | o7 | v1.0b5 | 110.1 | 149.7 | 5 | 01121 | 11200 / 3612 | 7858 12533 18414 26552 8604 |
+      | n7 | 553 | 95.6 | 144.3 | 5 | 01121 | 11844 / 3038 | 7048 12730 17368 28565 8601 |
+      | o8 | v1.0b5 | 109.8 | 149.9 | 5 | 01121 | 11215 / 3636 | 7858 12764 18414 26497 8624 |
+      | n8 | 553 | 95.7 | 144.2 | 5 | 01121 | 11815 / 3066 | 7041 12581 17403 28698 8586 |
+
+      Entrance: v1.0b5 130.0-201.1 ms (median 148.6), 553 143.6-147.0 ms
+      (median 144.4). First paint: v1.0b5 96.4-112.3 (median 109.8), 553
+      92.8-95.9 except n5 116.2. New prefetch in every run: stacks=3
+      pending=0 reads=86 cache=86/512 evicted=0. In n1-n3 also Games (first
+      paint 93.0 / 92.9 / 102.9, entrance 142.2 / 142.2 / 136.7) and Prefs
+      (72.9 / 72.9 / 85.3, entrance 130.9 / 146.9 / 134.7).
+- [x] The entrance finding (a few ms slower than v1.0b5 on Coffin, 3.9,
+      3.1.4.1): NOISE, not a difference between the builds. Numbers:
+      - The entrance length is set by two things both builds share: whether
+        the box needs 4 or 5 motion frames (130 ms against 143-150 ms; both
+        builds do both) and how long the frame at scale ~235 with a 3/4 fade
+        takes (it mixes the box with the backdrop twice). Frames 1-3 are the
+        same in both builds.
+      - n1-n3 (the session's first new runs) had that frame at 43.1-46.8 ms
+        (Downloads and Games, identical to 0.2 ms) against 25.8-28.7 ms in
+        every other run of either build. The same 553 binary was at 19.7 ms
+        (entrance 139.1) with a 32 KB block allocated before the start
+        (tool Hold), and at 28.6 ms in n4-n8 later in the session with no
+        shift: the slow frame follows where memory lands, not the code.
+      - The entrance code (advance_folder_motion, compose_folder_scale) is
+        byte-identical in v1.0b5 and 553 (diff of both functions). What
+        changed around it (prefetch, 512-entry cache with an FNV-1a key,
+        per-slot prefetch, stack morphs) runs before the motion clock starts
+        or not at all during it (prefetch waits while a box is open).
+      - Diagnostic builds (scratch worktree, not committed) logged per frame
+        the elapsed time, scale, fade quarter, compose time and task
+        dispatches: 553 diag 25.3-27.5 ms, v1.0b5 diag 26.2 ms for that
+        frame (compose 21-23.5 ms, 2-6 dispatches, idle 0). A sweep of the
+        output buffer's address (16 openings, offset 0-30 KB) gave 25.2-28.3
+        ms with no slow case, so it is not aliasing of that buffer. Why the
+        frame took 43 ms in that memory state was not found.
+      - First paint: the "capture" stage (screen backdrop read) is bimodal in
+        both builds (v1.0b5 10.2 or 23.9-24.1 ms; 553 10.2 ms, once 30.7 ms
+        in n5), which explains n5's 116.2 ms; the other 553 runs are 13-17
+        ms faster than v1.0b5's slow-capture runs.
+      No code change.
+- [x] §4.5 hover, agent sweep (relative moves to x 350, 500, 650, 800, 950
+      at y 692, then off, one per message, after 45 s idle), the same 15-pin
+      row for both builds (pl: the user's paths + Archives:Games, AOS32:Prefs,
+      Personal:Downloads, no "folder"; canvas 896), ChangeTaskPri -30:
+      v1.0b5 / 553 / v1.0b5 render_us_avg 13374 / 10378 / 13868, max 37253 /
+      18847 / 127367, stalled 9 / 4 / 8 (553 retire_waits=0
+      retire_defers=5). Pass (the pacing cascade shows in v1.0b5 only).
+- [x] §4.5 --bench-sweep 8 (pl, ChangeTaskPri -30), 165 redraws each:
+
+      | build | render_us_avg | compose us | stalled |
+      | --- | --- | --- | --- |
+      | v1.0b5 | 7035 / 6495 / 6481 | 4753 / 4766 / 4746 | 42 / 41 / 41 |
+      | 553 | 8018 / 7998 / 7432 | 6251 / 5683 / 5664 | 41 / 40 / 41 |
+
+      Stalled equal; render_us_avg NOT within the old spread: compose is
+      ~0.9 ms (about 20%) higher in 553. Same damage (kpx) and zoom levels
+      frame for frame; 553 composes each frame 0.06-2.8 ms slower. The rest
+      frames are pixel-identical (--pip-dump). Not memory placement: with
+      Hold 32 KB / 300000 B, 553 7469 / 7478 (compose 5684 / 5710), v1.0b5
+      6526 / 6612 (4784 / 4791). Code placement: the compose code is
+      unchanged since v1.0b5 except the deleted divider, yet unrelated
+      edits move it: v1.0b5 + a 30-line diagnostic in amiga_ui.c 5154 us;
+      553 + diagnostic 6597; 553 + diagnostic + buffer pad 5104; 553 built
+      with -falign-functions=32 -falign-loops=32 -falign-jumps=16 4943 /
+      4947, but the padded variant with the same flags 5854 / 5868. So the
+      same compose code costs 4.75-6.6 ms depending on the binary's layout,
+      and alignment flags do not pin it. On 3.1.4.1 the same 553 binary was
+      faster than v1.0b5 (6440 against 6753 / 6736). Not fixed (no code
+      cause found); open for the owner: find the layout-sensitive part, for
+      example with the 68080's data-cache hit/miss counters (DCH/DCM, movec
+      $80E/$80F) around the compose.
+- [x] End state: 553 in SYS:WBStartup/DockAwesome (Version 0.553; 542 was
+      not locked and is deleted, copied as .new and renamed), started with
+      WBRun, FindTask finds it, Status lists no CLI dock, one
+      "DockAwesome.PiP2" lease (its own); its Downloads stack opened and
+      closed with the user's ENVARC config. ENVARC:DockAwesome.json not
+      written (10:45:25). SYS:WBStartup/Disabled holds only WBDock. RAM:
+      clean (Clipboards, ENV, empty T), ENV:dpid deleted; Hold, diagnostic
+      and aligned builds deleted; the three scratch worktrees removed on the
+      Mac. AmigaAMP, started once by a missed click on the Music pin, was
+      closed.
+- [ ] NOT RUN on 3.2.3: Open Folder as a DOpus lister (Workbench is the
+      desktop, --caps dopus no); the box order after Date Modified (PiP
+      only); Sort by Kind and Name removing "sorts" on this boot (run with
+      541).
