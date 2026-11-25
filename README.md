@@ -36,7 +36,7 @@ double-click `DockAwesome`. If you use WBDock, move it to
 | Drag a pin out to **Remove** | Remove it |
 | Right-click the dock | **Settings**, **About** or **Quit** |
 | Right-click a running program | **Quit**, **Close** or **Keep in Dock** |
-| Right-click a Folder Stack | **Sort by** Name, Date Modified or Kind; **Show Contents** or **Open in Workbench** |
+| Right-click a Folder Stack | **Sort by** Name, Date Modified or Kind; **Click to** **Show Stack** or **Open Folder** |
 
 **Settings** sets the icon size, the zoom and the screen edge. Pins and
 settings are saved in `ENVARC:DockAwesome.json`.

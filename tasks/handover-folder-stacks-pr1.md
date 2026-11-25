@@ -302,3 +302,39 @@ One push of folder-stacks; PR opened as a draft and left a draft with a
   scratch worktree removed. C:ApolloExplorerSrv runs until reboot.
 - Not run on ApolloOS this time: drops, reorder/drag-out, Settings,
   --bench-sweep (unchanged paths; run with 533/538).
+
+## Follow-up: "Click to" Show Stack / Open Folder per stack (2026-11-25)
+
+- Owner request: the stack menu's action rows Show Contents / Open in
+  Workbench become options under a muted "Click to" heading (after the
+  Sort by group and the hairline): Show Stack (default, the box) or Open
+  Folder (a left click opens the drawer as a Workbench window, a DOpus
+  lister when DOpus is the desktop), as macOS "Display as Stack / Folder".
+  The box's Open in Workbench tile stays; no Close row is added back.
+- Code: `DockClick` and `"clicks": {path: "folder"}` in dock_prefs (the
+  same path-map reader/writer now serves "sorts" and "clicks"; nothing
+  written for Show Stack; old files read as Show Stack), `Item.click`,
+  `stack_box()`, `click_menu_item` (save at once, revert on a failed save,
+  re-arm the read-ahead on Show Stack), `DOCK_UI_CLICK_STACK/_FOLDER`
+  replace `DOCK_UI_SHOW_CONTENTS/_OPEN_DRAWER`, popup check marks as a row
+  mask.
+- Open Folder click path: `launch_pin(path,1)` + `status_changed`, the
+  launch code of 1.0 beta 5 drawer pins and of the old menu row (through
+  `launch_object` and the unquoted DOpus `lister new` from 4ed4e32 when
+  Workbench is not the desktop). No `record_launch`: a stack has no
+  running state, so no app may claim it.
+- Plan decision 3 stands: an Open Folder stack has no running dot and no
+  Close row; it still goes to the status worker as kind 0 like every stack.
+- Open Folder stacks are not read ahead (prefetch and `stacks=` in the
+  profile count only Show Stack stacks); Show Stack first opens unchanged.
+- Verification: tasks/todo.md, "Folder Stack "Click to"": host tests
+  (test_clicks), v1.0b5 and build 550 read a file with "clicks", ApolloOS
+  menu / window / box / persistence / restart / reorder / drag-out /
+  migration, first open and hover.
+- Opus review: no P0/P1/P2.
+- Installed: build 551 in ApolloOS SYS:WBStartup/DockAwesome, running
+  (WBRun, the user's ENVARC config, not written by the tests). Delete
+  SYS:WBStartup/Disabled/DockAwesome-locked-delete (538) and -2 (550)
+  after the next ApolloOS boot. RAM: clean.
+- Not run: the other boots; Open Folder as a DOpus lister on AmiKit (same
+  launch_pin path the old menu row used there); the no-dot look (PiP).

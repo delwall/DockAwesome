@@ -2395,3 +2395,109 @@ Downloads last) kept its date (18:06:15 on the Amiga clock) throughout.
       use) after the next ApolloOS boot.
 - [ ] NOT RUN on ApolloOS this time: drawer/volume drops (pins came from
       the config), reorder and drag-out, Settings, --bench-sweep.
+
+### Folder Stack "Click to": Show Stack / Open Folder per stack (2026-11-25, owner request)
+Scope: the stack menu's action rows Show Contents / Open in Workbench become
+options under a muted "Click to" heading: Show Stack (default, the box) or
+Open Folder (a left click opens the drawer as a Workbench window, a DOpus
+lister when DOpus is the desktop, through launch_pin as the old menu row
+and the 1.0b5 drawer pins). Saved per stack as "clicks": {path: "folder"}
+like "sorts". Open Folder stacks are not read ahead, have no running dot
+(plan decision 3 / D9: stacks go to the status worker as kind 0) and no
+Close row. The box's Open in Workbench tile stays.
+- [x] dock_prefs: DockClick; "sorts" and "clicks" share one path-map
+      reader (read_map + parse callback) and writer (write_map); "clicks"
+      lists only "folder" stacks, after "sorts"; unknown values, other
+      shapes, paths for no pin read as Show Stack; migration appends Show
+      Stack.
+- [x] amiga_main: Item.click (loaded with the path, saved by save_config,
+      moved by dock_reorder, gone with remove_pin); stack_box(); a left
+      click on an Open Folder stack closes an open box and calls
+      launch_pin(path,1) + status_changed, no record_launch (no app may
+      claim it); stack_next_pin and the read-ahead only for Show Stack
+      stacks (`stacks=` in the profile counts those); click_menu_item saves
+      at once, reverts on a failed save, re-arms the read-ahead on Show
+      Stack.
+- [x] amiga_ui: drawer_items = Sort by group, separator, "Click to" heading,
+      Show Stack, Open Folder; popup_checked is a row mask; the
+      DOCK_UI_SHOW_CONTENTS / DOCK_UI_OPEN_DRAWER actions are gone
+      (DOCK_UI_CLICK_STACK / _FOLDER).
+- [x] Tests: test_prefs test_clicks (no key when all Show Stack, exact
+      format alone and after "sorts", round trip, before "paths", case,
+      unknown/odd values, duplicate keys, empty and array shapes, reorder,
+      removal, hand-edited order, migration, out-of-range not written) and
+      three bad files.
+- [x] 1.0 beta 5 compatibility: v1.0b5's dock_prefs.c (git archive, host)
+      read a file written by this build with "sorts" and "clicks" (paths
+      intact); build 550's reader too.
+- [x] make host-test, make host-sanitize green; make amiga no warnings
+      (build 551).
+- [x] impeccable polish (in-thread; the detector is web-only): the menu on
+      ApolloOS shows Sort by / Name / Date Modified / Kind, the hairline,
+      Click to / Show Stack / Open Folder; headings muted, checks in one
+      column, labels aligned past it, 115x146 px. No change needed: the
+      group order matches the macOS Dock (Sort by, then Display as) and the
+      heading reads as a sentence with each option.
+- [x] ApolloOS R9.5, build 551 from RAM:, --config RAM:t1.json (the user's
+      14 pins + Archives:Games + ApolloOS:Prefs, Downloads last; four
+      stacks: Audio, Games, Prefs, Downloads):
+
+      | check | result |
+      | --- | --- |
+      | menu | Sort by group, separator, Click to, check on Show Stack |
+      | Downloads -> Open Folder | file gains "clicks": {"Personal:Downloads": "folder"}; menu check on Open Folder |
+      | left click, Open Folder | Workbench window "Downloads", no box window |
+      | Show Stack again | "clicks" removed; left click opens the box (356x368) |
+      | Games, Audio -> Open Folder | both in "clicks" |
+      | restart | Games menu checked Open Folder; left click opens window "Games" |
+      | box open + quick click on Audio | box closed, window "Audio" opened |
+      | reorder Games to slot 0 | paths start with Archives:Games, "clicks" kept for Games and Audio; click at slot 0 opens window "Games"; Prefs (Show Stack) still opens its box |
+      | drag Audio out | Audio gone from paths and "clicks"; Games kept |
+      | migration (RAM:t3.json: "clicks" and "sorts" before "paths", "folder" Downloads) | Downloads appended, no "folder", Games "date" and "folder" kept, Downloads not in "clicks" |
+
+      Profile after the first session: stacks=2 (Prefs, Downloads; Audio and
+      Games were Open Folder at exit).
+- [x] First open after 45 s idle, pointer off the dock, fresh dock per run,
+      config o.json (the build-550 runs' config: user's 11 pins of then +
+      Games + Prefs + "folder" Downloads); of.json = the same with Games as
+      Open Folder:
+
+      | run | config | first paint ms | entrance ms | frames | prefetch |
+      | --- | --- | --- | --- | --- | --- |
+      | n1 551 | o.json | 107.8 | 142.0 | 5 | stacks=3 reads=81 |
+      | n2 551 | of.json | 114.7 | 150.3 | 4 | stacks=2 reads=48 |
+      | n3 551 | o.json | 107.7 | 138.4 | 5 | stacks=3 reads=81 |
+      | n4 551 | of.json | 107.4 | 137.6 | 4 | stacks=2 reads=48 |
+      | n5 551 | of.json | 107.2 | 138.2 | 5 | stacks=2 reads=48 |
+
+      Build 550 (same config): 104.6 / 105.1 ms, 133.9 / 141.2 ms; v1.0b5
+      max 108.1 / 149.8. Pending=0 evicted=0 in every run. n2 is one run
+      above the old maximum: one prepare stage took 15.7 ms (7.4-7.7 in the
+      other runs); n4/n5 with the same config are at 107 ms, so it reads as
+      run noise. The Open Folder stack is skipped by the read-ahead (reads
+      48 instead of 81).
+- [x] Hover agent sweep (t.json, 15 pins, canvas 896, ChangeTaskPri -30,
+      x 350/500/650/800/950 at y 688, relative, one per message):
+      551 render_us_avg 9733 / 9677, stalled 2 / 0; 550 (installed
+      binary, same run) 9492, stalled 1. Old spread from the 550 runs
+      9077-10211. The two 551 stalls are the first two frames after idle.
+      No hover code changed.
+- [x] Opus review (fresh, diff only): no P0/P1/P2. Its note: switching a
+      stack to Open Folder leaves its read-ahead page in memory until the
+      slot is reused (no behaviour change).
+- [x] Build 551 installed in place: copied to SYS:WBStartup/DockAwesome.new;
+      the 550 file was "in use" (WBRun), so it is now
+      SYS:WBStartup/Disabled/DockAwesome-locked-delete2; .new renamed into
+      place, Version 0.551; started with WBRun, FindTask finds it, the
+      only dock (Status lists no CLI dock); with the user's ENVARC config
+      (14 pins) the Downloads menu shows Name and Show Stack checked.
+      ENVARC:DockAwesome.json kept its date (17:40:52 on the Amiga clock):
+      not written by the tests. RAM: clean (tools, configs, profiles,
+      ENV:dpid deleted); scratch files removed on the Mac.
+- [ ] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete (538) and
+      -locked-delete2 (550) after the next ApolloOS boot (both in use).
+- [ ] NOT RUN: Coffin, AmigaOS 3.2.3, 3.9, 3.1.4.1, AmiKit XE (Open Folder
+      as a DOpus lister is untested end to end on AmiKit; the launch path
+      is the one 4ed4e32 verified there for the old menu row), no-dot
+      check of an Open Folder stack (PiP only, ask the user), the box's
+      Open in Workbench tile (unchanged).

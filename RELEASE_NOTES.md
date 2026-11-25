@@ -10,7 +10,10 @@ Coffin, AmigaOS 3.2.3 and AmiKit XE only.
   the dock. Disks stay ordinary pins that open a window.
 - Stacks move and are removed like any other pin. A click on another stack
   closes the open one and opens the one you clicked.
-- Right-click a stack for **Show Contents** or **Open in Workbench**.
+- Right-click a stack to choose what a click on it does: **Show Stack**
+  (its contents above the dock, the default) or **Open Folder** (its
+  drawer as a window, as a pinned drawer did in 1.0 beta 5). The choice is
+  saved per stack and kept when the stack is moved (checked on ApolloOS).
 - Each stack can be sorted by **Name**, **Date Modified** (newest first) or
   **Kind** (drawers first, then by file type) from its right-click menu;
   the choice is saved per stack.
@@ -30,8 +33,8 @@ Coffin, AmigaOS 3.2.3 and AmiKit XE only.
   waited up to 30 ms for the display, and the zoom stuttered until the row
   came to rest (also in 1.0 beta 5). The dock now draws such a frame at the
   next field and keeps pace (checked on AmigaOS 3.2.3).
-- AmiKit (Directory Opus 5 as the desktop): **Open in Workbench** and disk
-  pins open a Directory Opus lister again. Before, Directory Opus showed an
+- AmiKit (Directory Opus 5 as the desktop): disk pins open a Directory
+  Opus lister again. Before, Directory Opus showed an
   empty lister titled "DOS error: device (or volume) is not mounted" (also
   in 1.0 beta 5; checked on AmiKit XE).
 

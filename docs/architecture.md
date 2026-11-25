@@ -229,7 +229,11 @@ edge defaults to bottom. A `"folder"` key from 1.0 beta 5 and older is read,
 moved to the end of `"paths"` (`dock_prefs_migrate`) and never written again.
 `"sorts"` maps a stack's path to its order (`"date"` or `"kind"`); stacks
 sorted by name are not listed, and a key or path this build does not know
-reads as name. Older builds skip the key.
+reads as name. `"clicks"` maps a stack's path to `"folder"` the same way
+(the same reader and writer for both maps): stacks that show their box are
+not listed, and anything else reads as Show Stack. Older builds skip both
+keys. Both follow the pin's `Item` through reorder, removal and
+`save_config`, and are matched by path, not by position.
 
 Every pinned drawer that is a directory and not a volume root is a Folder
 Stack: a click opens its box, and the pin moves and is removed like any
@@ -244,6 +248,16 @@ drawer as before, sorts it by name to pair icons with their entries, then
 in the stack's order; the box, the drawers opened inside it and the
 read-ahead all use that order, so the page read ahead is the page shown.
 A new choice is saved at once and reads that stack's first page again.
+
+Each stack also chooses what a left click does ("Click to" in its menu):
+Show Stack opens the box; Open Folder opens the drawer through
+`launch_pin`, as a drawer pin did in 1.0 beta 5 (a Workbench window, a
+Directory Opus lister when Directory Opus is the desktop). An Open Folder
+stack keeps the stack menu, has no running dot and no Close row (it goes to
+the status worker as kind 0 like every stack), records no launch for an app
+to claim, and is not read ahead (`stack_box`); the profile's `stacks=`
+counts only Show Stack stacks. Choosing Show Stack again reads its first
+page ahead. The box's own Open in Workbench tile is unchanged.
 
 ## References
 

@@ -25,8 +25,9 @@ Keep the original Workbench artwork, aspect ratio, and alpha.
 - Use a compact dark context menu. Match the dock's glass and thin rim.
 - A Folder Stack's menu follows the macOS Dock's: a muted **Sort by**
   heading, **Name**, **Date Modified** and **Kind** with a check mark on the
-  active one, a hairline separator, then **Show Contents** and **Open in
-  Workbench**. All its labels start past the check column.
+  active one, a hairline separator, then a muted **Click to** heading,
+  **Show Stack** and **Open Folder** with a check mark on what a left click
+  does. All its labels start past the check column.
 - Keep **Size**, **Scale** and position in a compact native
   window. **Save** applies the draft. **Cancel** discards it.
 - Keep side icons upright. Use the same zoom and input rules on all edges.
