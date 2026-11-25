@@ -2706,3 +2706,78 @@ menus are real windows, so screenshots show them).
       started it by hand); not investigated (not a dock matter).
 - [ ] NOT RUN on 3.9: --bench-sweep; Open Folder as a DOpus lister
       (Workbench is the desktop here).
+
+### AmigaOS 3.1.4.1 with build 551/553 (2026-11-25)
+AmigaOS 3.1.4.1 on the Vampire (Kickstart 46.143, exec 46.45, Workbench
+45.194, graphics 45.27, intuition 40.87, layers 45.30, icon 51.4,
+workbench 45.194, cybergraphics 41.4, input.device 45.2: the dock's
+V39/V44 requirements hold, so it does not refuse), core 12856, 24-bit
+1280x720. Installed before: release 1.0 beta 4 ("DockAwesome 1.0",
+21-Nov), running from WBStartup. amiagent was up at boot;
+ApolloExplorerSrv was not (started with Run >NIL: C:ApolloExplorerSrv).
+Build 551 = HEAD 9bc7080 (not stale); baseline tag v1.0b5 built in a
+scratch worktree outside the repo, no warnings.
+- [x] Old leftover SYS:WBStartup/Disabled/DockAwesome-locked-delete
+      (21-Nov) was not locked and is deleted.
+- [x] --caps: 551, v1.0b5 and the installed 1.0 beta 4 identical (diff on
+      the Mac): shaped_windows no, pip yes, pixels ammx, ui_glass yes,
+      aa_text no, error none.
+- [x] DEFECT (also in v1.0b5): a Break during startup killed the dock
+      without cleanup and froze Intuition input. Migration test: the
+      installed dock stopped (BreakTask), 551 started on a copy of the
+      user's file (--config RAM:mig.json --profile), stop.s sent Break
+      within about a second. Its output file held only "***Break";
+      RAM:mig.json.new (582 bytes, migrated) was left and mig.json not
+      renamed, so it died inside save_config, after install_input. A
+      second start showed "PiP2 is already in use." and the agent's
+      pointer moves and clicks no longer moved the pointer. A window
+      walk (tool Wins) found a leaked 1x1 dock receiver window whose
+      owner task was gone; the "DockAwesome.PiP2" lease semaphore was
+      still listed with no process; an input.device spy saw only its own
+      two handlers in the chain and no events.
+      Cause: libnix's read() and write() call __chkabort, which raises
+      SIGINT when Ctrl-C is pending: it prints "***Break" and exits
+      without main's cleanup (input handler, PiP lease, windows,
+      AppWindow). The event loop clears Ctrl-C in its
+      Wait, so only a Break that lands before the loop (startup) or
+      while a file or stdout write runs hits it; --bench-sweep polls
+      Ctrl-C without clearing it, so a Break there also aborted at the
+      profile report.
+      Reproduced on v1.0b5 and 551 without a leak that matters: a tool
+      (CtrlCRun) runs the dock in its own process with Ctrl-C pending;
+      `--caps` printed only "***Break", rc 20, on both.
+      Fix: `void __chkabort(void) {}` in amiga_main.c, so libnix never
+      aborts and Ctrl-C is the event loop's alone (nm: the binary's
+      ___chkabort is an rts, _raise is no longer linked). Same CtrlCRun
+      test with 552: the full --caps output, rc 0.
+      Opus review of the delta: no blocking finding. Its non-blocking
+      point is done in build 553: the stock __chkabort also cleared
+      Ctrl-C, so --bench-sweep now reads and clears it
+      (SetSignal(0,SIGBREAKF_CTRL_C)) and main clears a Break the loop
+      never took before it returns, so it cannot stop the next command
+      of a script. CtrlCRun with 553: full --caps output, rc 0,
+      Ctrl-C not left pending. make host-test, make host-sanitize green;
+      make amiga (552 and 553) without warnings.
+- [x] Installed: 552 copied to SYS:WBStartup/DockAwesome.new; the 1.0
+      beta 4 file was "in use", so it is now
+      SYS:WBStartup/Disabled/DockAwesome-locked-delete; .new renamed
+      into place; then 553 replaced 552 the same way (552 was never
+      started, so it was deleted), Version 0.553. Not started: the leaked PiP2 lease and
+      the frozen input need a reboot first. ENVARC:DockAwesome.json
+      (1.0b5 format, "folder": "Personal:Downloads", 12 paths) kept its
+      date (Saturday 00:40:38); 553 migrates it on its first start.
+      RAM: clean except RAM:m1.txt, held open by the second test dock
+      that waits on its "PiP2 is already in use" requester (gone at
+      reboot); ENV:dpid deleted; scratch worktree removed on the Mac.
+- [ ] Reboot 3.1.4.1 (the user; a software reboot needs their consent).
+      Then: delete SYS:WBStartup/Disabled/DockAwesome-locked-delete
+      (1.0 beta 4), check that 553 started from WBStartup (FindTask) and
+      migrated the user's file, and run on 553 a Break during startup
+      (stop.s at once) and a Break during --bench-sweep: both must leave
+      no "DockAwesome.PiP2" semaphore (tool Sems) and working input.
+- [ ] NOT RUN on 3.1.4.1 (blocked by the frozen input until reboot): the
+      whole §4.4 matrix after --caps (migration end to end, A5, no
+      divider, stack switch, program pin, volume pin, Sort by, Click to,
+      box tile, reorder/drag-out, Settings) and all of §4.5 (first open,
+      hover, --bench-sweep 8). Unknown whether agent input reaches the
+      dock on this boot: the first agent click came after the freeze.

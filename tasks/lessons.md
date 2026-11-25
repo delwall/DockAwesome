@@ -632,3 +632,16 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
   run was clean; the cause is not proven. Time first-open clicks alone
   (the next agent call seconds later) and repeat a run before calling it
   a regression.
+
+## libnix aborts on a pending Ctrl-C inside any write (3.1.4.1, 2026-11-25)
+- A test dock got its Break within a second of starting. libnix's write()
+  called __chkabort, which printed "***Break" and exited past main's
+  cleanup: the input handler, the PiP lease and the receiver window
+  stayed behind and Intuition took no more input. The output file held
+  only "***Break"; that line is the tell.
+- Rule: an Amiga program that owns system resources defines an empty
+  `__chkabort` and handles Ctrl-C itself. Test "Break at startup" by
+  running the program in-process with Ctrl-C already pending (RunCommand
+  after SetSignal), not by racing a Break against the start.
+- Give a just-started test dock a few seconds before stop.s, and after an
+  odd stop check the PiP lease (FindSemaphore) before the next start.

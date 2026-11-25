@@ -3,7 +3,8 @@
 ## 1.0 beta 6
 
 Draft, not released. Changes since 1.0 beta 5, so far run on ApolloOS,
-Coffin, AmigaOS 3.2.3, AmigaOS 3.9 and AmiKit XE only.
+Coffin, AmigaOS 3.2.3, AmigaOS 3.9 and AmiKit XE (on AmigaOS 3.1.4.1 only
+--caps and the Ctrl-C fix below).
 
 **Folder Stacks**
 - Every drawer you pin is a Folder Stack: a click opens its contents above
@@ -38,6 +39,12 @@ Coffin, AmigaOS 3.2.3, AmigaOS 3.9 and AmiKit XE only.
   Opus lister again. Before, Directory Opus showed an
   empty lister titled "DOS error: device (or volume) is not mounted" (also
   in 1.0 beta 5; checked on AmiKit XE).
+- A Ctrl-C (Break) that reaches the dock while it starts no longer makes
+  it quit half closed. Before, it could quit without removing its input
+  hook and display overlay: the mouse stopped moving and the next start
+  said "PiP2 is already in use" until a reboot (seen on AmigaOS 3.1.4.1;
+  1.0 beta 5 quits the same way). Checked on AmigaOS 3.1.4.1 with Ctrl-C
+  already pending at start.
 
 ## 1.0 beta 5
 

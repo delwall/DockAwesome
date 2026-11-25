@@ -408,4 +408,21 @@ One push of folder-stacks; PR opened as a draft and left a draft with a
   4, in use) after the next 3.9 boot; the older one (509) is deleted. RAM:
   clean; scratch worktree removed. C:ApolloExplorerSrv runs until reboot.
 - Not run on 3.9: --bench-sweep; DOpus lister (Workbench is the desktop).
-- Still not booted with this PR: AmigaOS 3.1.4.1.
+- 3.1.4.1 (2026-11-25): booted; Kickstart 46.143, Workbench 45.194,
+  graphics 45.27, intuition 40.87, icon 51.4, workbench 45.194 (the dock's
+  requirements hold), core 12856, 24-bit 1280x720. --caps of 551, v1.0b5
+  and the installed 1.0 beta 4 identical. Then a defect, also in v1.0b5: a
+  Break within a second of a test dock's start hit libnix's __chkabort in
+  a write (save_config's migration save), which exits past main's cleanup;
+  the input handler, the PiP2 lease and the receiver window leaked and
+  Intuition took no more input. Fixed by an empty `__chkabort` in
+  amiga_main.c (552); after the Opus review (no blocking finding) 553 also
+  clears a Break that --bench-sweep or an early exit never took. Proven by
+  running the dock in-process with Ctrl-C pending (CtrlCRun): v1.0b5 and
+  551 print only "***Break" (rc 20) for --caps, 552 and 553 the full
+  output (rc 0; 553 leaves no Ctrl-C pending). 553 is installed in place in
+  SYS:WBStartup (1.0 beta 4 in Disabled/DockAwesome-locked-delete, in
+  use) but not started: the machine needs a reboot (the user). The user's
+  ENVARC file is untouched. Not run on 3.1.4.1: the rest of §4.4 and all
+  of §4.5; details in tasks/todo.md, "AmigaOS 3.1.4.1 with build
+  551/553".
