@@ -3243,3 +3243,66 @@ Folder", the muted heading colour. The action is unchanged.
       of the ring, which no booted system uses; a paged box (no drawer here
       has more than one page at 36 px). docs/images/folder-stack.png still
       shows the old tile (and the old divider).
+
+### Open Folder tile on AmigaOS 3.2.3 with build 556 (2026-11-25)
+AmigaOS 3.2.3 on the Vampire (Workbench desktop), agent input (warps 1:1).
+Build 556 = HEAD 3ea4b09, not stale (`make amiga`: nothing to rebuild; no
+warnings). Installed before: 553 from WBStartup, stopped with BreakTask
+(FindTask and the PiP2 lease gone after 5 s). Test docks from RAM: with
+`--config RAM:` copies (pl = the user's 12 pins + Archives:Games +
+AOS32:Prefs + Personal:Downloads, three stacks); exactly one dock at a time.
+- [x] `--pip-dump` of the Downloads box (356x359, 30 entries, size 36): the
+      tile shows the smaller muted ring and "Open Folder" on one line, like
+      AmiKit. Images: scratchpad `design/323-556-downloads.png` (and -2x,
+      `323-556-cell-4x.png`).
+- [x] Tile click: Workbench window "Downloads" opened, box closed.
+- [x] Quick switch Games -> Downloads and Downloads -> Games (quick clicks,
+      a move to the pin first); with the Games box open a quick click on
+      TextEdit started TextEdit and closed the box.
+- [x] First open after 45 s idle, pointer off the dock, fresh dock per run,
+      ChangeTaskPri -30, pl copies, Downloads opened and closed:
+
+      | run | first paint ms | entrance ms | frames | note |
+      | --- | --- | --- | --- | --- |
+      | 1 | 90.2 | 149.6 | 5 | |
+      | 2 | 103.5 | 136.0 | 5 | capture stage 23.4 ms (bimodal, known) |
+      | 3 | 90.1 | 145.0 | 5 | |
+      | 4 | 181.9 | 138.2 | 5 | backdrop-copy stage 94.5 ms (3.0 elsewhere) |
+      | 5 | 103.6 | 136.2 | 5 | capture stage 23.6 ms |
+
+      553 (same boot, earlier): first paint 92.8-95.9 (once 116.2), entrance
+      143.6-147.0. Entrance within the spread; the fast-capture first paints
+      (90.1/90.2) are under 553's. Run 4 is a single-stage spike in a stage
+      the tile change does not touch (the text stage is 6.0-6.4 ms in every
+      run); judged noise. Prefetch pending=0 reads=86 every run.
+- [x] Hover sweep (relative moves to x 350, 500, 650, 800, 950 at y 692,
+      one per call, 45 s idle, pl, -30): render_us_avg 9626, max 18342,
+      stalled 2 (553: 10378 / 18847 / 4). Pass.
+- [x] Owner's report: the Downloads window (1034,599 169x96) opened "behind
+      the dock". Findings:
+
+      | question | answer |
+      | --- | --- |
+      | where the position comes from | the drawer icon's snapshot: Personal:Downloads.info is a PNG icon; its icOn chunk holds drawer x 1034, y 599, w 169, h 96 (file dated 18-May-26). The dock calls `OpenWorkbenchObjectA(path,NULL)` and sets no position |
+      | v1.0b5 | same call; its plain drawer pin for Personal:Downloads opened the window at 1034,599 169x96 |
+      | dock pixels over the window? | `--pip-dump` (composed vs source), 15 pins: at rest x 327-952, y 665-716; zoomed on Downloads x 270-965, y 610-716 (with the label). Window x 1034-1202: 0 covered pixels, 69 px clear. The user's 13-pin row ends further left |
+      | what can cover it | the open Downloads box (746-1101 x 279-637 with 15 pins, 706-1061 with 13) covers the window's top-left corner while the box is open or closing (popover over everything, by design) |
+
+      Not a regression and no overlap with the row measured; no code change.
+      Options for the owner if wanted: none for the row; for the box, open
+      the window only after the dismissal motion ends (it already closes
+      first). Moving a window away from its snapshot would override the
+      user's own placement, so not proposed.
+- [x] Seen once: with the 556 test dock running, a click on the window's
+      close gadget right after it opened did nothing; repeated 3 times
+      later (twice with the installed 556 right after the tile click, once
+      with no dock) it closed every time. Not reproduced.
+- [x] End state: 556 in SYS:WBStartup/DockAwesome (copied as .new, 553
+      deleted (not locked), renamed; Version 0.556), started with WBRun;
+      FindTask finds it, one DockAwesome.PiP2 lease, no CLI dock in Status;
+      its Downloads box opened and closed, its tile opened the window.
+      ENVARC:DockAwesome.json untouched (568 bytes, 17:36:48). Disabled
+      holds only WBDock. RAM: holds only Clipboards, ENV, T (empty); ENV:dpid
+      deleted. Scratch upload/download folders removed on the Mac.
+- [ ] NOT RUN on 3.2.3: DOpus lister (Workbench is the desktop); the tile on
+      a paged box.

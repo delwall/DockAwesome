@@ -545,3 +545,22 @@ One push of folder-stacks; PR opened as a draft and left a draft with a
   and 72, the tile opens a DOpus lister, first open and hover within the
   553 spread (tasks/todo.md, "Open Folder tile in the Folder Stack box").
 - Installed: 556 on AmiKit XE; the other boots still run 553.
+
+## Follow-up: Open Folder tile on AmigaOS 3.2.3 (2026-11-25)
+
+- Build 556 (HEAD 3ea4b09, not stale, no warnings) installed in place on
+  3.2.3 (553 deleted, not locked), started with WBRun, the only dock.
+- Box dump (Downloads, size 36): smaller muted ring, one-line "Open
+  Folder". The tile opens a Workbench window; quick stack switch and a
+  program pin with a box open still work.
+- First open (5 runs): first paint 90.1-103.6 ms and once 181.9 (one
+  backdrop-copy stage at 94.5 ms), entrance 136.0-149.6 ms; 553 had
+  92.8-95.9 / 143.6-147.0. Hover sweep 9626 us, stalled 2 (553 10378, 4).
+- Owner's "window behind the dock": the position is the drawer icon's own
+  snapshot (1034,599 169x96 in Personal:Downloads.info); v1.0b5 opens it at
+  the same place; --pip-dump shows the row ends at x 965 even zoomed, so
+  only the open Downloads box overlaps the window's corner. No code change;
+  decision left to the owner. Details: tasks/todo.md, "Open Folder tile on
+  AmigaOS 3.2.3 with build 556".
+- Installed now: 556 on AmigaOS 3.2.3 and AmiKit XE; 553 on 3.1.4.1; 551
+  on ApolloOS, Coffin, 3.9.
