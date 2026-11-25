@@ -453,6 +453,107 @@ static void test_outside_shown(void)
     }
 }
 
+/* The box's parent drawer and page buttons. The ink (the chevron's points
+   grown by its half width) is centred on the disc exactly for every
+   direction and size; the rasterised pixel bounding box agrees with the
+   disc's along the pointing direction (across it the mirror and transpose
+   checks already force it); left and right mirror each other sample for
+   sample, up is left transposed and symmetric itself; from a 15 px control
+   on, the disc is 5/6 of the control (below, a 12 px floor). */
+static void button_bounds(int x, int size, int direction, int box[8])
+{
+    DockButtonGlyph g, left;
+    int px, py;
+    dock_button_glyph(x,x,size,size,direction,&g);
+    dock_button_glyph(x,x,size,size,DOCK_BUTTON_LEFT,&left);
+    box[0] = box[1] = box[4] = box[5] = INT_MAX;
+    box[2] = box[3] = box[6] = box[7] = INT_MIN;
+    for (py = x; py < x+size; ++py) for (px = x; px < x+size; ++px) {
+        int disc, stroke = dock_button_coverage(&g,px,py,&disc), mirror_disc, other_disc;
+        int mirror = dock_button_coverage(&g,2*x+size-1-px,py,&mirror_disc);
+        if (direction == DOCK_BUTTON_UP) {
+            assert(mirror == stroke && mirror_disc == disc);
+            assert(dock_button_coverage(&left,py,px,&other_disc) == stroke && other_disc == disc);
+        } else {
+            DockButtonGlyph m;
+            dock_button_glyph(x,x,size,size,-direction,&m);
+            assert(dock_button_coverage(&m,2*x+size-1-px,py,&other_disc) == stroke && other_disc == disc);
+        }
+        if (stroke) {
+            if (px < box[0]) box[0] = px;
+            if (py < box[1]) box[1] = py;
+            if (px > box[2]) box[2] = px;
+            if (py > box[3]) box[3] = py;
+        }
+        if (disc) {
+            if (px < box[4]) box[4] = px;
+            if (py < box[5]) box[5] = py;
+            if (px > box[6]) box[6] = px;
+            if (py > box[7]) box[7] = py;
+        }
+    }
+}
+
+static void test_button_glyph(void)
+{
+    static const int directions[3] = {DOCK_BUTTON_LEFT, DOCK_BUTTON_RIGHT, DOCK_BUTTON_UP};
+    int size, x, d;
+    for (size = 8; size <= 40; ++size) for (x = 0; x < 3; ++x) for (d = 0; d < 3; ++d) {
+        int direction = directions[d], o = 5+x, box[8], k, i;
+        int lo[2] = {INT_MAX, INT_MAX}, hi[2] = {INT_MIN, INT_MIN};
+        DockButtonGlyph g;
+        DockButtonPixels n;
+        button_bounds(o,size,direction,box);
+        assert(box[0] <= box[2] && box[4] <= box[6]);
+        /* Centres in half pixels: stroke and disc agree exactly up to a
+           24 px control (the box's fonts give 18 or 19); above, a cap's
+           faint edge sample can add half a pixel. */
+        for (k = 0; k < 2; ++k) {
+            int offset = box[k]+box[k+2]-box[k+4]-box[k+6];
+            if (size <= 24) assert(offset == 0);
+            else assert(abs(offset) <= 1);
+        }
+        dock_button_glyph(o,o,size,size,direction,&g);
+        assert(g.radius >= (size*8 < 96 ? size*8 : 96) && g.radius <= size*8);
+        if (size >= 15) assert(g.radius*6 >= size*40-6 && g.radius*6 <= size*40+6);
+        /* The ink (points grown by half) is centred on the disc exactly. */
+        for (k = 0; k < 2; ++k) {
+            int low = g.tip[k], high = g.tip[k];
+            for (i = 0; i < 2; ++i) {
+                if (g.end[i][k] < low) low = g.end[i][k];
+                if (g.end[i][k] > high) high = g.end[i][k];
+            }
+            assert(low+high == 2*(k ? g.cy : g.cx));
+        }
+        if (direction == DOCK_BUTTON_UP) assert(g.tip[1] < g.cy && g.tip[0] == g.cx);
+        else assert(direction*(g.tip[0]-g.cx) > 0 && g.tip[1] == g.cy);
+        /* Native: a centred disc inside the control; the 45 degree lines'
+           pixels span their end points: centred exactly along the
+           direction, to half a pixel across it. */
+        dock_button_pixels(o,o,size,size,direction,&n);
+        assert(2*(n.left-o)+n.size == size && 2*(n.top-o)+n.size == size);
+        for (i = 0; i < 2; ++i) for (k = 0; k < 3; ++k) {
+            int c;
+            if (k) {
+                assert(abs(n.stroke[i][k][0]-n.stroke[i][k-1][0]) ==
+                    abs(n.stroke[i][k][1]-n.stroke[i][k-1][1]));
+            }
+            for (c = 0; c < 2; ++c) {
+                if (n.stroke[i][k][c] < lo[c]) lo[c] = n.stroke[i][k][c];
+                if (n.stroke[i][k][c] > hi[c]) hi[c] = n.stroke[i][k][c];
+            }
+        }
+        for (k = 0; k < 2; ++k) {
+            int along = direction == DOCK_BUTTON_UP ? k == 1 : k == 0;
+            int offset = lo[k]+hi[k]-(2*(k ? n.top : n.left)+n.size-1);
+            assert(lo[k] > (k ? n.top : n.left) && hi[k] < (k ? n.top : n.left)+n.size-1);
+            if (along) assert(offset == 0);
+            else assert(offset == (size+1)%2);
+        }
+        if (direction == DOCK_BUTTON_UP) assert(n.stroke[1][1][1] == lo[1] && n.stroke[1][1][0] == n.stroke[1][0][0]+(n.stroke[1][2][0]-n.stroke[1][0][0])/2);
+    }
+}
+
 int main(void)
 {
     test_layout_and_baseline();
@@ -465,6 +566,7 @@ int main(void)
     test_zoom_room_after_insertion();
     test_gap_motion();
     test_outside_shown();
-    puts("geometry: bottom/left/right layout, upright hit/slot/outside, half-open panel bounds and animation equivalence PASS");
+    test_button_glyph();
+    puts("geometry: bottom/left/right layout, upright hit/slot/outside, half-open panel bounds, animation equivalence and centred box buttons (left, right, up) PASS");
     return 0;
 }

@@ -1281,63 +1281,45 @@ static void folder_glyph(DockUI *ui, struct RastPort *rp, int x, int y, int draw
 
 enum { FOLDER_PAINT_LABELS = 1, FOLDER_PAINT_GLYPHS = 2 };
 
-/* The back and page buttons: a round face with a chevron pointing left
-   (direction -1) or right (1). Natively a disc and a two-pixel chevron. */
+/* The parent drawer and page buttons: a round face with a chevron
+   pointing up (DOCK_BUTTON_UP), left or right, 5/6 of the control and
+   centred in it (dock_button_pixels). Natively a disc and a two-pixel
+   chevron. */
 static void folder_button(DockUI *ui, struct RastPort *rp, int direction,
     int x, int y, int width, int height)
 {
-    int size = width < height ? width : height, arm = size/5, i;
-    x += (width-size)/2; y += (height-size)/2;
+    DockButtonPixels b;
+    int i;
+    if (width < 6 || height < 6) return;
+    dock_button_pixels(x,y,width,height,direction,&b);
     popup_color(ui,rp,MENU_HOVER);
-    fill_rounded(rp,x,y,size,size,size/2);
+    fill_rounded(rp,b.left,b.top,b.size,b.size,b.size/2);
     popup_color(ui,rp,MENU_TEXT);
-    x += size/2-direction*arm/2; y += size/2;
     for (i = 0; i < 2; ++i) {
-        Move(rp,x-direction*(arm-i),y-arm);
-        Draw(rp,x+direction*i,y);
-        Draw(rp,x-direction*(arm-i),y+arm);
+        Move(rp,b.stroke[i][0][0],b.stroke[i][0][1]);
+        Draw(rp,b.stroke[i][1][0],b.stroke[i][1][1]);
+        Draw(rp,b.stroke[i][2][0],b.stroke[i][2][1]);
     }
 }
 
-/* Squared distance from (px,py) to the segment (x0,y0)-(x1,y1), all in
-   1/16 px. */
-static int segment_distance2(int px, int py, int x0, int y0, int x1, int y1)
-{
-    int dx = x1-x0, dy = y1-y0, ex = px-x0, ey = py-y0;
-    int length = dx*dx+dy*dy, along = ex*dx+ey*dy;
-    if (along > 0 && length > 0) {
-        if (along >= length) { ex = px-x1; ey = py-y1; }
-        else { ex -= dx*along/length; ey -= dy*along/length; }
-    }
-    return ex*ex+ey*ey;
-}
-
-/* folder_button antialiased into an RGBA target, 4x4 samples per pixel:
-   a faint disc of the text colour over the glass and a round-capped
-   chevron stroke, the weight of the Open Folder ring. */
+/* folder_button antialiased into an RGBA target, 4x4 samples per pixel
+   (dock_button_coverage): a faint disc of the text colour over the glass
+   and a round-capped chevron stroke. */
 static void folder_button_aa(DockImage *target, int direction, int x, int y, int width, int height)
 {
     ULONG color = menu_colors[MENU_TEXT];
     unsigned int red = (color>>16)&255, green = (color>>8)&255, blue = color&255;
-    int size = width < height ? width : height;
-    int radius = size*8, cx = x*16+width*8, cy = y*16+height*8;
-    int arm = radius*3/8, reach = radius*3/16, half = 13;
-    int tip = cx+direction*(reach-radius/16), back = cx-direction*(reach+radius/16);
+    DockButtonGlyph glyph;
     int px, py;
-    if (!target || !target->pixels || size < 6) return;
+    if (!target || !target->pixels || width < 6 || height < 6) return;
+    dock_button_glyph(x,y,width,height,direction,&glyph);
     for (py = y; py < y+height; ++py) {
         if (py < 0 || py >= target->height) continue;
         for (px = x; px < x+width; ++px) {
-            int disc = 0, stroke = 0, sx, sy;
+            int disc, stroke;
             unsigned char *pixel;
             if (px < 0 || px >= target->width) continue;
-            for (sy = 0; sy < 4; ++sy) for (sx = 0; sx < 4; ++sx) {
-                int qx = px*16+2+4*sx, qy = py*16+2+4*sy;
-                int dx = qx-cx, dy = qy-cy;
-                if (dx*dx+dy*dy <= radius*radius) ++disc;
-                if (segment_distance2(qx,qy,back,cy-arm,tip,cy) <= half*half ||
-                    segment_distance2(qx,qy,back,cy+arm,tip,cy) <= half*half) ++stroke;
-            }
+            stroke = dock_button_coverage(&glyph,px,py,&disc);
             pixel = target->pixels+((size_t)py*target->width+px)*4;
             if (disc) amiga_blend_coverage(pixel,red,green,blue,(unsigned int)disc*3);
             if (stroke) amiga_blend_coverage(pixel,red,green,blue,((unsigned int)stroke*255+8)/16);
@@ -1371,7 +1353,7 @@ static void paint_folder_content(DockUI *ui, struct RastPort *rp, int parts, Doc
     if (labels)
         centered_folder_text(ui,rp,target,title,offset+width/2,(f->header-font_height)/2,width-4*control,MENU_TEXT);
     if (folder_nested(f))
-        folder_control(ui,rp,target,parts,-1,offset+f->pad,(f->header-control)/2,control,control);
+        folder_control(ui,rp,target,parts,DOCK_BUTTON_UP,offset+f->pad,(f->header-control)/2,control,control);
     if (labels && !f->count) {
         centered_folder_text(ui,rp,target,f->read_ok ? "Empty drawer" : "Cannot read drawer",
             offset+width/2,f->header,width-2*f->pad,MENU_TEXT);
@@ -1401,9 +1383,9 @@ static void paint_folder_content(DockUI *ui, struct RastPort *rp, int parts, Doc
                 (unsigned long)folder_last_page(f)+1);
             centered_folder_text(ui,rp,target,page,offset+width/2,y+(control-font_height)/2,width,MENU_TEXT);
         }
-        if (f->page) folder_control(ui,rp,target,parts,-1,offset+f->pad,y,control,control);
+        if (f->page) folder_control(ui,rp,target,parts,DOCK_BUTTON_LEFT,offset+f->pad,y,control,control);
         if (f->page < folder_last_page(f))
-            folder_control(ui,rp,target,parts,1,offset+width-f->pad-control,y,control,control);
+            folder_control(ui,rp,target,parts,DOCK_BUTTON_RIGHT,offset+width-f->pad-control,y,control,control);
     }
 }
 

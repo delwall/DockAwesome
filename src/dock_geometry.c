@@ -313,3 +313,89 @@ DockRect dock_gap_rect(const DockGap *g)
         r = (DockRect){g->shown.x, g->shown.y, g->shown.x+g->shown.size, g->shown.y+g->shown.size};
     return r;
 }
+
+void dock_button_glyph(int x, int y, int width, int height, int direction, DockButtonGlyph *out)
+{
+    int size = width < height ? width : height;
+    /* 5/6 of the control, but a 12 px disc where the control has room. */
+    int radius = (size*40+3)/6, least = size*8 < 96 ? size*8 : 96;
+    int reach, arm;
+    if (radius < least) radius = least;
+    reach = radius*3/16;
+    arm = radius*3/8;
+    out->cx = x*16+width*8;
+    out->cy = y*16+height*8;
+    out->radius = radius;
+    /* The stroke shrinks with the glyph: 5/6 of its old 13. */
+    out->half = 11;
+    if (direction == DOCK_BUTTON_UP) {
+        out->tip[0] = out->cx; out->tip[1] = out->cy-reach;
+        out->end[0][0] = out->cx-arm; out->end[1][0] = out->cx+arm;
+        out->end[0][1] = out->end[1][1] = out->cy+reach;
+    } else {
+        int sign = direction < 0 ? -1 : 1;
+        out->tip[0] = out->cx+sign*reach; out->tip[1] = out->cy;
+        out->end[0][0] = out->end[1][0] = out->cx-sign*reach;
+        out->end[0][1] = out->cy-arm; out->end[1][1] = out->cy+arm;
+    }
+}
+
+/* Squared distance from (px,py) to the segment (x0,y0)-(x1,y1). */
+static int segment_distance2(int px, int py, int x0, int y0, int x1, int y1)
+{
+    int dx = x1-x0, dy = y1-y0, ex = px-x0, ey = py-y0;
+    int length = dx*dx+dy*dy, along = ex*dx+ey*dy;
+    if (along > 0 && length > 0) {
+        if (along >= length) { ex = px-x1; ey = py-y1; }
+        else { ex -= dx*along/length; ey -= dy*along/length; }
+    }
+    return ex*ex+ey*ey;
+}
+
+int dock_button_coverage(const DockButtonGlyph *g, int px, int py, int *disc)
+{
+    int stroke = 0, inside = 0, sx, sy, half2 = g->half*g->half, radius2 = g->radius*g->radius;
+    for (sy = 0; sy < 4; ++sy) for (sx = 0; sx < 4; ++sx) {
+        int qx = px*16+2+4*sx, qy = py*16+2+4*sy, dx = qx-g->cx, dy = qy-g->cy;
+        if (dx*dx+dy*dy <= radius2) ++inside;
+        if (segment_distance2(qx,qy,g->end[0][0],g->end[0][1],g->tip[0],g->tip[1]) <= half2 ||
+            segment_distance2(qx,qy,g->end[1][0],g->end[1][1],g->tip[0],g->tip[1]) <= half2) ++stroke;
+    }
+    if (disc) *disc = inside;
+    return stroke;
+}
+
+void dock_button_pixels(int x, int y, int width, int height, int direction, DockButtonPixels *out)
+{
+    int size = width < height ? width : height;
+    int inset = size >= 12 ? (size+6)/12 : 0, drawn = size-2*inset, arm = drawn/5;
+    int left = x+(width-size)/2, top = y+(height-size)/2, i;
+    /* Along its direction the chevron spans arm+2 pixels: the same parity
+       as the disc's centres it exactly. Positions as if it pointed right
+       or down from (0,0) = the control's corner: tip at lead, across at
+       middle. */
+    int lead, middle = size/2;
+    if (arm < 1) arm = 1;
+    if ((drawn+arm)&1) ++arm;
+    lead = (size+arm-2)/2;
+    out->left = left+inset;
+    out->top = top+inset;
+    out->size = drawn;
+    for (i = 0; i < 2; ++i) {
+        /* Pointing right: (lead-(arm-i), middle-arm) -> (lead+i, middle)
+           -> (lead-(arm-i), middle+arm); left and up mirror and turn it. */
+        int along[3] = {lead-(arm-i), lead+i, lead-(arm-i)};
+        int across[3] = {middle-arm, middle, middle+arm};
+        int k;
+        for (k = 0; k < 3; ++k) {
+            int a = direction == DOCK_BUTTON_UP || direction < 0 ? size-1-along[k] : along[k];
+            if (direction == DOCK_BUTTON_UP) {
+                out->stroke[i][k][0] = left+across[k];
+                out->stroke[i][k][1] = top+a;
+            } else {
+                out->stroke[i][k][0] = left+a;
+                out->stroke[i][k][1] = top+across[k];
+            }
+        }
+    }
+}
