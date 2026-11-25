@@ -197,6 +197,15 @@ static int dump_ppm(const char *prefix, const char *suffix, const DockImage *ima
     return !failed;
 }
 
+/* --pip-dump: the Folder Stack box once each opening has settled with
+   its icons, as prefix-folder.ppm (the latest opening wins). */
+static void dump_folder_box(App *app)
+{
+    const DockImage *box = dock_ui_folder_artwork(app->ui);
+    if (!box) app->folder_dumped = 0;
+    else if (!app->folder_dumped) app->folder_dumped = dump_ppm(app->pip_dump,"folder",box) ? 1 : -1;
+}
+
 int canonical_path(const char *path, char *absolute)
 {
     BPTR lock = Lock((STRPTR)path,ACCESS_READ);
@@ -940,6 +949,7 @@ static int animation_step(App *app)
     app->field_pass = 1;
     held = dock_ui_holds_dock(app->ui);
     closed = dock_ui_folder_step(app->ui);
+    if (app->pip_dump[0]) dump_folder_box(app);
     /* The entrance ended: presses on the dock count again. */
     if (closed || held != dock_ui_holds_dock(app->ui)) {
         sync_input_ui(app);
@@ -2912,7 +2922,8 @@ static void usage(void)
          "11900 or newer and a 16-, 24- or 32-bit Workbench screen.\n"
          "--ammx and --pip are accepted for compatibility: both are always on.\n"
          "--pip-x-offset and --pip-y-offset set alignment from -128 to 128.\n"
-         "--pip-dump writes prefix-source.ppm and prefix-composed.ppm on exit.\n"
+         "--pip-dump writes prefix-source.ppm and prefix-composed.ppm on exit,\n"
+         "and prefix-folder.ppm when a Folder Stack box has opened.\n"
          "--bench-sweep 1..64 sweeps a synthetic pointer at that many pixels per\n"
          "frame, prints the profile and exits. --damage-check compares every\n"
          "frame with a full composition and PiP conversion and reports mismatches.\n"

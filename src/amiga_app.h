@@ -401,6 +401,7 @@ typedef struct App {
     char config[CONFIG_CAP], shell_launcher_path[PATH_CAP];
     DockPrefs prefs;
     char pip_dump[CONFIG_CAP];
+    int folder_dumped;                 /* --pip-dump: this opening's box is written */
     struct Screen *screen;
     struct Window *window;
     struct MsgPort *drop_port, *input_port;

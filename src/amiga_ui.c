@@ -1994,6 +1994,13 @@ int dock_ui_folder_open(const DockUI *ui)
     return ui && ui->popup && ui->folder.path[0] && ui->folder.motion != FOLDER_CLOSING;
 }
 
+const DockImage *dock_ui_folder_artwork(const DockUI *ui)
+{
+    if (!dock_ui_folder_open(ui) || ui->folder.motion || dock_ui_folder_pending(ui) ||
+        !ui->folder.artwork_ready) return NULL;
+    return &ui->folder.artwork;
+}
+
 int dock_ui_folder_progress(const DockUI *ui)
 {
     const FolderView *f;
