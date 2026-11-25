@@ -20,6 +20,7 @@ Pointer -> layout -> renderer -> frame -> native window or PiP2
 | `dock_interaction.c` | Button pairs, drag state, and pin actions |
 | `dock_renderer.c` | Pixel backend selection, damage tracking, and damaged PiP conversion |
 | `dock_prefs.c` | JSON preferences |
+| `dock_sort.c` | Folder Stack orders: name, date modified, kind |
 | `dock_text.c` | Text rules without OS calls: window titles that name a document, Shell quoting, text detection |
 | `dock_profile.c` | Feature choice from probed capabilities, and why PiP cannot run |
 | `amiga_caps.c` | CPU, chipset and OS capability probes, `--caps` |
@@ -226,6 +227,9 @@ disables its controls meanwhile. Restore the previous settings and caches if
 saving or opening the surface fails. The JSON file stores the edge. A missing
 edge defaults to bottom. A `"folder"` key from 1.0 beta 5 and older is read,
 moved to the end of `"paths"` (`dock_prefs_migrate`) and never written again.
+`"sorts"` maps a stack's path to its order (`"date"` or `"kind"`); stacks
+sorted by name are not listed, and a key or path this build does not know
+reads as name. Older builds skip the key.
 
 Every pinned drawer that is a directory and not a volume root is a Folder
 Stack: a click opens its box, and the pin moves and is removed like any
@@ -233,6 +237,13 @@ other, without a running dot. While the dock idles with the pointer off it,
 the event loop reads one more icon of a stack's first page per live tick,
 round robin over the stacks from the one nearest the pointer, into a
 512-entry icon cache that this read-ahead never evicts from.
+
+Each stack has its own order, chosen in its menu: Name, Date Modified or
+Kind (`dock_sort.c`, host-tested). `amiga_folder_read` reads the whole
+drawer as before, sorts it by name to pair icons with their entries, then
+in the stack's order; the box, the drawers opened inside it and the
+read-ahead all use that order, so the page read ahead is the page shown.
+A new choice is saved at once and reads that stack's first page again.
 
 ## References
 

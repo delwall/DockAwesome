@@ -1738,3 +1738,73 @@ Plan: tasks/plan-folder-stacks.md (D1-D17). Branch folder-stacks, one PR.
 - [x] ApolloOS, --config RAM:ta.json with "folder": "RAM:DoesNotExist": no message, dock runs, file after start has paths ["Personal:Downloads"] and no "folder".
 - [x] Control, "folder": "SYS:Prefs" not in paths: appended last as ApolloOS:Prefs, no "folder" key.
 - [ ] Not run: the other boots, a host test for the missing-drawer case (the skip lives in amiga_main.c).
+
+### Folder Stack Sort by per stack (2026-11-25, owner request)
+Scope: the stack's right-click menu gets Sort by Name / Date Modified /
+Kind (check mark on the active one) above Show Contents and Open in
+Workbench, saved per stack; the read-ahead uses the stack's order.
+Out of scope: Date Added/Created (not in AmigaDOS), Display as, View
+content as, Options.
+- [x] dock_sort.c/h (host): Stricmp-style fold (ASCII + Latin-1 to
+      capitals, so "_tmp" stays after "zebra" as before), newest first by
+      the entry's own DateStamp (not its .info), drawers then extension
+      (none first) then name; ties end in byte order (total order).
+- [x] amiga_folder_read(path, sort, ...): reads the whole drawer as before,
+      sorts by name to pair .info files, then in the stack's order. No
+      extra directory reads.
+- [x] Prefs: "sorts": {path: key}, only non-name stacks written; read by
+      path (case-insensitive), before or after "paths"; unknown keys,
+      non-string values, other shapes read as name. Item.sort follows the
+      Item through reorder/removal; save_config writes it; migration
+      appends the old Folder Stack as name.
+- [x] UI: drawer_items with a muted heading, three sort rows, a 7 px
+      separator row; variable row tops (popup_top), check column,
+      heading/separator inert (a click keeps the menu). Other menus keep
+      their geometry (top 3+i*row, width label+24).
+- [x] Prefetch: slot keyed by sort too; a new choice saves at once (reverts
+      if the save fails) and re-arms that stack.
+- [x] Tests: tests/test_sort.c (fold, date, kind, permutation stability,
+      keys); test_prefs test_sorts (write format, round trip, order of
+      keys, case, unknown/odd values, duplicate keys, reorder, removal,
+      hand-edited order, migration) and bad files.
+- [x] 1.0 beta 5 compatibility: v1.0b5's dock_prefs.c (git archive) built
+      on the host read a file written by this build with "sorts" (paths
+      intact).
+- [x] make host-test, make host-sanitize green; make amiga clean rebuild,
+      no warnings (build 537).
+- [x] impeccable polish (in-thread; detector is web-only): separator inset
+      10 px both sides like the labels; checked on ApolloOS screenshots.
+- [x] ApolloOS R9.5, build 537 from RAM:, --config RAM:t1.json (copy of the
+      user's file, Downloads stack, 35 entries on one page):
+      Name order as before; menu showed the check on Name; Date Modified
+      saved "sorts": {"Personal:Downloads": "date"} and the box showed
+      newest first (SAGADriver.readme/.lha first: their DateStamp is day
+      46751 = 2106, List shows "01-Jan-06"); Kind saved "kind": drawers,
+      files without extension, .adf, .jic, .key, .lha, .readme, .zip.
+      A click on the heading kept the menu. After a restart the box kept
+      Kind and the menu showed the check on Kind; Date the same.
+- [x] ApolloOS, RAM:t2.json (CLI, Games date, Downloads kind, Prefs):
+      Downloads dragged to slot 0 -> file order Downloads, CLI, Games,
+      Prefs with Downloads kind / Games date; Games dragged out -> gone
+      with its sort, Downloads kind kept; menus: Downloads Kind, Prefs Name;
+      Show Contents still opens the box.
+- [x] ApolloOS, RAM:t3.json with "folder": "Archives:Games" and "sorts"
+      before "paths": after start Games last, "folder" gone, Downloads
+      "date" kept.
+- [x] First open after 45 s idle, fresh dock per run, Downloads (Input
+      downs/ups matched, prefetch pending=0 evicted=0 each run):
+
+      | sort | first paint ms | entrance ms |
+      | --- | --- | --- |
+      | Name | 106.9 | 132.6 |
+      | Name | 107.7 | 132.8 |
+      | Date Modified | 107.7 | 137.6 |
+      | Date Modified | 108.1 | 131.6 |
+      | Kind | 117.2 | 144.2 |
+      | Kind | 109.1 | 132.8 |
+
+      Reference build 533 Name 106.3 / 132.2; 1.0 beta 5 max 110.5 / 174.7.
+      One Kind run (117.2) is above that maximum; the repeat was 109.1, so
+      it reads as run noise (one run is noise, lessons). Every other run is
+      under 110.5.
+- [ ] NOT RUN: Coffin, AmigaOS 3.2.3, 3.9, 3.1.4.1, AmiKit XE (not booted).

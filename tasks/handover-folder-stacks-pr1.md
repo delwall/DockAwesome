@@ -100,6 +100,29 @@ pin the migration appended is treated so (App.migrated_pin).
   stays until reboot. RAM: is clean.
 - Other boots still run their earlier builds.
 
+## Follow-up in the same PR: per-stack Sort by (2026-11-25)
+
+- Scope: the stack menu gains a muted "Sort by" heading, Name / Date
+  Modified / Kind with a check mark, a separator, then Show Contents /
+  Open in Workbench (macOS Dock stack menu; no Date Added/Created, no
+  Display as / View content as / Options).
+- Code: `dock_sort.c/h` (host-tested ordering), `amiga_folder_read(path,
+  sort,...)`, `DockPrefs.sorts` + `"sorts": {path: key}` (only non-name
+  stacks written), `Item.sort`, `sort_menu_item` (save at once, revert on a
+  failed save, re-arm that stack's read-ahead), prefetch slot keyed by
+  sort, `FolderAnchor.sort` (drawers opened inside the box keep it),
+  variable-height popup rows (`popup_top`, inert heading and separator).
+- Decision: keyed by path, not by index, so a hand-edited or reordered
+  `"paths"` cannot move a sort to another stack; 1.0 beta 5 skips the key
+  (its own `dock_prefs.c` read a file written by this build on the host).
+- The menu and the box share one window, so the box is always closed
+  while the menu is up: a new sort shows at the next opening (no open box
+  to refresh).
+- Verification: tasks/todo.md, section "Folder Stack Sort by per
+  stack": host tests, ApolloOS menu/order/persistence/reorder/removal/
+  migration, first-open table per sort.
+- Not run: the other boots (as above).
+
 ## Delivery
 
 One push of folder-stacks; PR opened as a draft and left a draft with a

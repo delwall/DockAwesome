@@ -10,6 +10,9 @@ Draft, not released. Changes since 1.0 beta 5, so far run on ApolloOS only.
 - Stacks move and are removed like any other pin. A click on another stack
   closes the open one and opens the one you clicked.
 - Right-click a stack for **Show Contents** or **Open in Workbench**.
+- Each stack can be sorted by **Name**, **Date Modified** (newest first) or
+  **Kind** (drawers first, then by file type) from its right-click menu;
+  the choice is saved per stack.
 - Stacks show no running dot.
 - The Folder Stack setting is gone from **Settings**. A Folder Stack set in
   1.0 beta 5 becomes the last pin on the first start.
