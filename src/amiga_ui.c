@@ -1281,10 +1281,10 @@ static void folder_glyph(DockUI *ui, struct RastPort *rp, int x, int y, int draw
 
 enum { FOLDER_PAINT_LABELS = 1, FOLDER_PAINT_GLYPHS = 2 };
 
-/* The parent drawer and page buttons: a round face with a stemmed up
-   arrow (DOCK_BUTTON_PARENT) or a chevron pointing left or right, 5/6 of
-   the control and centred in it (dock_button_pixels). Natively a disc and
-   lines two pixels wide (the arrow's stem one). */
+/* The parent drawer and page buttons: a round face with a return arrow
+   (DOCK_BUTTON_PARENT) or a chevron pointing left or right, 5/6 of the
+   control and centred in it (dock_button_pixels). Natively a disc, the
+   chevrons two pixels wide and the arrow one. */
 static void folder_button(DockUI *ui, struct RastPort *rp, int direction,
     int x, int y, int width, int height)
 {
@@ -1304,7 +1304,7 @@ static void folder_button(DockUI *ui, struct RastPort *rp, int direction,
 
 /* folder_button antialiased into an RGBA target, 4x4 samples per pixel
    (dock_button_coverage): a faint disc of the text colour over the glass
-   and a round-capped chevron stroke. */
+   and a round-capped chevron or return arrow stroke. */
 static void folder_button_aa(DockImage *target, int direction, int x, int y, int width, int height)
 {
     ULONG color = menu_colors[MENU_TEXT];

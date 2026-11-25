@@ -335,16 +335,39 @@ void dock_button_glyph(int x, int y, int width, int height, int direction, DockB
     out->half = 11;
     out->count = 0;
     if (direction == DOCK_BUTTON_PARENT) {
-        /* A stem as tall as the chevron, each side of the head a third
-           of it. */
-        int reach = radius*3/8, head = radius/4;
-        button_segment(out,0,-reach,0,reach);
-        button_segment(out,-head,head-reach,0,-reach);
-        button_segment(out,head,head-reach,0,-reach);
+        /* On a grid of u (one pixel at the box's 19 px control): stem at
+           x 3 from y 5 up to 1, a quarter turn of radius 2 about (1, 1)
+           into the bar at y -1, the bar to x -3, the head's arms from
+           (-1, -3) and (-1, 1). Its box spans y -3..5: one u below the
+           centre, which puts its ink (the bar and head weigh more than the
+           stem) 0.15 px below the centre (0.29 px right) and keeps the
+           lines on whole
+           pixels; centred by the box it read high. Thinner than the
+           chevrons, so its one pixel lines stay crisp at the real size. */
+        static const int turn[5][2] = {{1000,0}, {924,383}, {707,707}, {383,924}, {0,1000}};
+        int u = (radius*16+63)/127, i;
+        out->half = 9;
+        button_segment(out,3*u,5*u,3*u,u);
+        for (i = 0; i < 4; ++i)
+            button_segment(out,u+2*u*turn[i][0]/1000,u-2*u*turn[i][1]/1000,
+                u+2*u*turn[i+1][0]/1000,u-2*u*turn[i+1][1]/1000);
+        button_segment(out,u,-u,-3*u,-u);
+        button_segment(out,-u,-3*u,-3*u,-u);
+        button_segment(out,-u,u,-3*u,-u);
     } else {
         int sign = direction < 0 ? -1 : 1, reach = radius*3/16, arm = radius*3/8;
         button_segment(out,-sign*reach,-arm,sign*reach,0);
         button_segment(out,-sign*reach,arm,sign*reach,0);
+    }
+    {
+        int i, k;
+        out->ink[0] = out->ink[1] = 0x7fffffff;
+        out->ink[2] = out->ink[3] = -0x7fffffff;
+        for (i = 0; i < out->count; ++i) for (k = 0; k < 4; ++k) {
+            int c = k&1, v = out->segment[i][k];
+            if (v-out->half < out->ink[c]) out->ink[c] = v-out->half;
+            if (v+out->half > out->ink[c+2]) out->ink[c+2] = v+out->half;
+        }
     }
 }
 
@@ -363,10 +386,12 @@ static int segment_distance2(int px, int py, int x0, int y0, int x1, int y1)
 int dock_button_coverage(const DockButtonGlyph *g, int px, int py, int *disc)
 {
     int stroke = 0, inside = 0, sx, sy, i, half2 = g->half*g->half, radius2 = g->radius*g->radius;
+    /* Only a pixel that reaches the ink's box tests the segments. */
+    int near = px*16+16 > g->ink[0] && px*16 <= g->ink[2] && py*16+16 > g->ink[1] && py*16 <= g->ink[3];
     for (sy = 0; sy < 4; ++sy) for (sx = 0; sx < 4; ++sx) {
         int qx = px*16+2+4*sx, qy = py*16+2+4*sy, dx = qx-g->cx, dy = qy-g->cy;
         if (dx*dx+dy*dy <= radius2) ++inside;
-        for (i = 0; i < g->count; ++i) {
+        if (near) for (i = 0; i < g->count; ++i) {
             const int *s = g->segment[i];
             if (segment_distance2(qx,qy,s[0],s[1],s[2],s[3]) <= half2) { ++stroke; break; }
         }
@@ -385,23 +410,19 @@ void dock_button_pixels(int x, int y, int width, int height, int direction, Dock
     out->size = drawn;
     if (arm < 1) arm = 1;
     if (direction == DOCK_BUTTON_PARENT) {
-        /* Rows tip .. tip+length-1 with length of the disc's parity, so the
-           arrow is centred down exactly; the head is the up chevron. */
-        int length = drawn/2, tip;
-        if ((length+size)&1) ++length;
-        if (length < arm+2) length = arm+2+((arm+size)&1);
-        tip = (size-length)/2;
+        /* The return arrow on a grid of n pixels about the middle pixel,
+           one n low as in dock_button_glyph: stem up from (3, 5) to (3, 1),
+           a 45 degree turn into the bar at y -1, the bar to the tip at
+           x -3, the head's arms from (-1, -3) and (-1, 1). From 15 to 18 px
+           the stem's foot touches the disc's edge, below 15 px it leaves
+           the disc. */
+        static const int lines[3][3][2] = {
+            {{3,5}, {3,1}, {1,-1}}, {{1,-1}, {-3,-1}, {-3,-1}}, {{-1,-3}, {-3,-1}, {-1,1}}};
+        int n = drawn/15 > 1 ? drawn/15 : 1;
         out->count = 3;
-        for (i = 0; i < 2; ++i) {
-            int along[3] = {tip+arm+i, tip+i, tip+arm+i}, across[3] = {middle-arm, middle, middle+arm};
-            for (k = 0; k < 3; ++k) {
-                out->stroke[i][k][0] = left+across[k];
-                out->stroke[i][k][1] = top+along[k];
-            }
-        }
-        for (k = 0; k < 3; ++k) {
-            out->stroke[2][k][0] = left+middle;
-            out->stroke[2][k][1] = top+(k ? tip+length-1 : tip);
+        for (i = 0; i < 3; ++i) for (k = 0; k < 3; ++k) {
+            out->stroke[i][k][0] = left+middle+n*lines[i][k][0];
+            out->stroke[i][k][1] = top+middle+n*lines[i][k][1];
         }
         return;
     }

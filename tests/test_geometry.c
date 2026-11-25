@@ -454,22 +454,22 @@ static void test_outside_shown(void)
 }
 
 /* The box's parent drawer and page buttons. The ink (the segments' end
-   points grown by the half width) is centred on the disc exactly for every
-   glyph and size; the rasterised pixel bounding box agrees with the
-   disc's; left and right mirror each other sample for sample and the
-   parent arrow is symmetric itself; from a 15 px control on, the disc is
-   5/6 of the control (below, a 12 px floor). */
+   points grown by the half width) is centred on the disc exactly for the
+   chevrons and one grid step low for the return arrow, at every size; the rasterised pixel bounding box agrees with the
+   disc's; left and right mirror each other sample for sample; from a 15 px
+   control on, the disc is 5/6 of the control (below, a 12 px floor). */
 static void button_bounds(int x, int size, int direction, int box[8])
 {
     DockButtonGlyph g, m;
     int px, py;
     dock_button_glyph(x,x,size,size,direction,&g);
-    dock_button_glyph(x,x,size,size,direction == DOCK_BUTTON_PARENT ? direction : -direction,&m);
+    if (direction != DOCK_BUTTON_PARENT) dock_button_glyph(x,x,size,size,-direction,&m);
     box[0] = box[1] = box[4] = box[5] = INT_MAX;
     box[2] = box[3] = box[6] = box[7] = INT_MIN;
     for (py = x; py < x+size; ++py) for (px = x; px < x+size; ++px) {
         int disc, stroke = dock_button_coverage(&g,px,py,&disc), mirror_disc;
-        assert(dock_button_coverage(&m,2*x+size-1-px,py,&mirror_disc) == stroke && mirror_disc == disc);
+        if (direction != DOCK_BUTTON_PARENT)
+            assert(dock_button_coverage(&m,2*x+size-1-px,py,&mirror_disc) == stroke && mirror_disc == disc);
         if (stroke) {
             if (px < box[0]) box[0] = px;
             if (py < box[1]) box[1] = py;
@@ -499,15 +499,23 @@ static void test_button_glyph(void)
         /* Centres in half pixels: stroke and disc agree exactly up to a
            24 px control (the box's fonts give 18 or 19); above, a cap's
            faint edge sample can add half a pixel. */
+        dock_button_glyph(o,o,size,size,direction,&g);
         for (k = 0; k < 2; ++k) {
             int offset = box[k]+box[k+2]-box[k+4]-box[k+6];
-            if (size <= 24) assert(offset == 0);
+            /* The return arrow sits one grid step u low (2 half pixels at
+               the 19 px control): to the nearest half pixel. */
+            if (direction == DOCK_BUTTON_PARENT) {
+                /* Its grid scales with the disc, so off the 19 px control
+                   its pixel box can differ by half a pixel; at 19 exact. */
+                int u = (g.radius*16+63)/127, shift = k ? 2*u : 0;
+                assert(abs(16*offset-shift) <= 16);
+                if (u == 16) assert(offset == shift/16);
+            } else if (size <= 24) assert(offset == 0);
             else assert(abs(offset) <= 1);
         }
-        dock_button_glyph(o,o,size,size,direction,&g);
         assert(g.radius >= (size*8 < 96 ? size*8 : 96) && g.radius <= size*8);
         if (size >= 15) assert(g.radius*6 >= size*40-6 && g.radius*6 <= size*40+6);
-        assert(g.count == (direction == DOCK_BUTTON_PARENT ? 3 : 2));
+        assert(g.count == (direction == DOCK_BUTTON_PARENT ? 8 : 2));
         for (k = 0; k < 2; ++k) {
             int low = INT_MAX, high = INT_MIN;
             for (i = 0; i < g.count; ++i) {
@@ -517,9 +525,14 @@ static void test_button_glyph(void)
                 if (a > high) high = a;
                 if (b > high) high = b;
             }
-            assert(low+high == 2*(k ? g.cy : g.cx));
-            /* The parent arrow's head is its top, on the centre line. */
-            if (direction == DOCK_BUTTON_PARENT && k) assert(g.segment[1][3] == low && g.segment[1][2] == g.cx);
+            assert(g.ink[k] == low-g.half && g.ink[k+2] == high+g.half);
+            assert(low+high == 2*(k ? g.cy : g.cx)+
+                (direction == DOCK_BUTTON_PARENT && k ? 2*((g.radius*16+63)/127) : 0));
+            /* The return arrow: its tip is the leftmost point, its stem
+               the rightmost and lowest. */
+            if (direction == DOCK_BUTTON_PARENT)
+                assert(g.segment[6][k+2] == (k ? (g.segment[6][1]+g.segment[7][1])/2 : low) &&
+                    g.segment[0][k] == high);
         }
         if (direction != DOCK_BUTTON_PARENT)
             assert(direction*(g.segment[0][2]-g.cx) > 0 && g.segment[0][3] == g.cy);
@@ -542,14 +555,16 @@ static void test_button_glyph(void)
                 if (n.stroke[i][k][c] > hi[c]) hi[c] = n.stroke[i][k][c];
             }
         }
-        /* The native arrow points up, its stem from the apex down. */
+        /* The native return arrow: the stem's foot is the right bottom
+           corner, the head's tip the leftmost point. */
         if (direction == DOCK_BUTTON_PARENT)
-            assert(n.stroke[0][1][1] == lo[1] && n.stroke[2][0][0] == n.stroke[0][1][0] &&
-                n.stroke[2][1][1] == hi[1]);
+            assert(n.stroke[0][0][0] == hi[0] && n.stroke[0][0][1] == hi[1] && n.stroke[2][1][0] == lo[0]);
         for (k = 0; k < 2; ++k) {
             int edge = k ? n.top : n.left, along = direction == DOCK_BUTTON_PARENT ? k == 1 : k == 0;
-            assert(lo[k] > edge && hi[k] < edge+n.size-1);
-            assert(lo[k]+hi[k]-(2*edge+n.size-1) == (along ? 0 : (size+1)%2));
+            if (direction != DOCK_BUTTON_PARENT || size >= 15) assert(lo[k] > edge && hi[k] < edge+n.size-1);
+            assert(lo[k]+hi[k]-(2*edge+n.size-1) ==
+                (along && direction != DOCK_BUTTON_PARENT ? 0 : (size+1)%2)+
+                (direction == DOCK_BUTTON_PARENT && k ? 2*(n.size/15 > 1 ? n.size/15 : 1) : 0));
         }
     }
 }
@@ -567,6 +582,6 @@ int main(void)
     test_gap_motion();
     test_outside_shown();
     test_button_glyph();
-    puts("geometry: bottom/left/right layout, upright hit/slot/outside, half-open panel bounds, animation equivalence and centred box buttons (page chevrons, parent arrow) PASS");
+    puts("geometry: bottom/left/right layout, upright hit/slot/outside, half-open panel bounds, animation equivalence and centred box buttons (page chevrons, return arrow) PASS");
     return 0;
 }
