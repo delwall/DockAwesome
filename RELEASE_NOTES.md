@@ -2,8 +2,8 @@
 
 ## 1.0 beta 6
 
-Draft, not released. Changes since 1.0 beta 5, so far run on ApolloOS,
-Coffin, AmigaOS 3.2.3, AmigaOS 3.9, AmigaOS 3.1.4.1 and AmiKit XE.
+Changes since 1.0 beta 5. Checked on ApolloOS, Coffin, AmigaOS 3.2.3,
+AmigaOS 3.9, AmigaOS 3.1.4.1 and AmiKit XE.
 
 **Folder Stacks**
 - Every drawer you pin is a Folder Stack: a click opens its contents above
