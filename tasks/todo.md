@@ -3524,3 +3524,121 @@ or more before each stop).
       `design/3141-569-*.png`, also in ~/Downloads/DockAwesome-design/.
 - [ ] NOT RUN on 3.1.4.1: the native (no AA) path (not used here); DOpus
       lister (Workbench is the desktop).
+
+### AmiKit XE with build 569 (2026-11-26)
+AmiKit XE 11.5 (KS 47.96, Directory Opus 5 desktop), 24-bit 1280x720,
+agent input at ((X+4)/2, (Y+4)/2). Build 569 = 08de37b (HEAD 5fead28; the
+commits since touched only docs; `make amiga`: nothing to rebuild, no
+warnings; the binary is byte-identical to the 3.1.4.1 upload). Installed
+before: 556 from WBStartup (FindTask found it, one PiP2 lease), stopped
+with BreakTask. ApolloExplorerSrv started with Run. Test docks from RAM:
+with `--config RAM:` copies, exactly one dock at a time (Status, FindTask
+and Sems before each start).
+- [x] Installed 569 in place: copied as DockAwesome.new, 556 deleted (not
+      locked), renamed; Version 0.569 build 569. Disabled holds no
+      DockAwesome.
+- [x] Box dumps (`--pip-dump`, RAM:BtnTest = Sub (360 files) + t10-t15;
+      pins Shell, RAM:BtnTest, MultiView), nested Sub page 2 (2/4, 2/5,
+      2/8), sizes 36/48/72: 698x598, 836x541, 1252x465 as on 3.2.3. A CON
+      window with no text (`Run >NIL: Wait 1500 >CON:0/23/1280/640/Plain`)
+      lay behind the box so the glass was even: on the bare desktop the BOOT
+      icon lay under the 36 px parent arrow and read +1.65 px.
+
+      | control | AmiKit bbox offset (x / y), 36 / 48 / 72 | 3.2.3 (569) |
+      | --- | --- | --- |
+      | parent arrow | 0.00 / -0.05, 0.00 / 0.00, 0.00 / 0.00 | 0.00 / 0.00 each |
+      | page back "<" | 0.00 / 0.00 each | 0.00 / +0.06, 0.00 / +0.02, 0.00 / 0.00 |
+      | page forward ">" | 0.00 / 0.00 each | 0.00 / +0.03, -0.01 / +0.08, - (backdrop logo) |
+      | Open Folder ring (full-tone box, 36) | 649..675 x 509..535, centre 662.00 / 522.00 = icon box centre | the same |
+
+      The -0.05 is the CON window's title bar under the glass (gradient
+      noise, as the +-0.08 on 3.2.3). Ink centroids equal 3.2.3's (arrow
+      0.24 right / 0.63-0.71 up; chevrons 0.13 toward the open side). Every
+      full-tone #dee2e9 pixel (buttons, ring, arrow, label, title, page
+      count) lies at exactly the 3.2.3 positions: 274 / 431 / 845 pixels at
+      36 / 48 / 72, 0 differ. Tone (36, brightest pixel per element): title,
+      parent arrow, "<", ">", page count, ring and label #dee2e9; file names
+      #f2f4f8.
+- [x] Images: scratchpad `design/ak-569-btn-compare-{36,48,72}.png` (10x,
+      3.2.3 above AmiKit, cross-hair on the control centre),
+      `design/ak-569-nested-p2-36-2x.png`, `-48.png`, `-72.png`,
+      `design/ak-569-open-folder-36-6x.png`; also in
+      ~/Downloads/DockAwesome-design/.
+- [x] Behaviour (569 test docks, agent clicks):
+
+      | check | result |
+      | --- | --- |
+      | Open Folder cell, BtnTest box | DOpus lister "Ram Disk:BtnTest" (Sub, t10-t15), no DOS error, box closed |
+      | Open Folder cell, Personal:Audio box (185x147) | DOpus lister "Personal:Audio" (MOD, MP3, Streams, Apollo.mp3), no DOS error |
+      | parent arrow in Sub (page 1) | back to the BtnTest box (185x200) |
+      | page buttons | ">" to 2/4 (36), 2/5 (48), 2/8 (72); "<" back to 1/4 (dump) |
+      | quick switch | Downloads (356x359) -> Demos (185x200) -> Downloads |
+      | program pin with a box open | Downloads box open, pointer moved to Clock, click: Clock started, box closed |
+      | Click to | Open Folder saved "clicks" {Downloads: folder}; left click opened a DOpus lister "Personal:Downloads", no box; Show Stack removed "clicks"; left click opened the box |
+
+      The three test listers and Clock were closed again.
+- [x] First open after 45 s idle, pointer off the dock (parked at 640,300
+      on the DOpus desktop), fresh dock per run, ChangeTaskPri -30, a copy
+      of the user's ENVARC file per run; Pictures opened and closed, then
+      Downloads after another 45 s; 556 control runs alternated (first
+      paint / entrance ms):
+
+      | run | Pictures | Downloads |
+      | --- | --- | --- |
+      | 569 f1 | 284.5 / 214.4 (fields 0118) | 128.2 / 130.9 |
+      | 556 g1 | 283.7 / 134.6 | 121.4 / 137.8 |
+      | 569 f2 | 271.9 / 165.6 | 123.8 / 153.8 |
+      | 556 g2 | 284.6 / 174.4 | 121.3 / 137.6 |
+      | 569 f3 | 287.7 / 170.8 | 124.8 / 154.0 |
+      | 569 f4 | 284.3 / 135.1 | 129.5 / 188.2 (fields 0113) |
+
+      Medians 569: Pictures 284.4 / 168.2, Downloads 126.5 / 153.9. Earlier
+      AmiKit figures: 556 Pictures 273.0-306.0 / 132.9-165.7 (medians 284.4
+      / 134.5); 553 Downloads 121.5-134.3 / 137.4-246.5 (medians 132.1 /
+      146.7). Pictures first paint equal; Downloads first paint inside 553's
+      range, 4-8 ms over the two 556 runs. Entrances: same frame counts;
+      the spread is in the fields a present waits (f1 one 8-field wait,
+      f2/f3 Downloads 01213 against 556's 01122), the pattern of the known
+      single-run outliers (553 246.5, v1.0b5 174.3). Per stage the 569
+      "layer" step (finish_folder_layer) took 47.8-48.7 ms (Pictures) and
+      30.7-31.3 ms (Downloads) against 556's 40.5 and 21.5, and the "read
+      back" step was shorter; finish_folder_layer and its callees are
+      unchanged since 556, so that shift follows the binary's layout or
+      memory, not code (3.2.3 lesson). Not shown to be a regression; no
+      rebuild with an unrelated change was run. Prefetch pending=0
+      reads=153 in every run.
+- [x] FINDING, pre-existing (544 finding; also 556 here): the first agent
+      click after idle was lost in 5 of 8 first opens with 569 (Pictures 4
+      of 4, Downloads 1 of 4) and 3 of 4 with 556 (Pictures 2 of 2,
+      Downloads 1 of 2); a second click opened the box each time and the
+      figures above are from that click. Profile: `PiP receiver: arms=1
+      disarms=0 presses_armed=1..2`: with the pointer parked on the DOpus
+      desktop the receiver rests on the plate (dopus_desktop, by design for
+      DOpus drops), and the warp press lands on it before any hover. The
+      553 session opened 24 of 24 at the first click; why is not known (its
+      parking spot was not recorded). Same in both builds, so not a 569
+      defect; physical-mouse effect not measured; left open for the owner
+      as before.
+- [x] Hover sweep (relative moves to x 350, 500, 650, 800, 950 at y 690,
+      one per message, 45 s idle, user's file copy, -30): render_us_avg
+      6957, max 14374, stalled 2 (556: 7283 / 14535 / 2; 553: 7359 / 14546
+      / 0). Pass. A first sweep sent the five moves in one message and was
+      discarded.
+- [x] Seen: the Amiga clock jumped from 15:47 to 17:29 mid-session
+      (AmiKit's time sync); the measuring CON window's `Wait 1200` ended at
+      that moment and the open box closed with it. The box then reopened
+      normally.
+- [x] End state: 569 in SYS:WBStartup/DockAwesome, started from a script
+      `Run >NIL: Stack 400000 +` / `SYS:WBStartup/DockAwesome` (the script
+      ends at once and was deleted; a script that runs the dock itself
+      stays "in use"); Status shows it once with stk 400000, one
+      DockAwesome.PiP2 lease, no test dock; its Downloads box opened
+      (356x359) and closed with the user's config. ENVARC:DockAwesome.json
+      untouched (424 bytes, 17:49:26, as since the 553 session). RAM: holds
+      only Clipboards, ENV, Logs and T (amiagent's files); ENV:dpid
+      deleted; DL: assign removed. No DOpus listers were open at the start
+      (the machine had been rebooted; `lister list` empty, desktop
+      screenshot), so none were left open. ApolloExplorerSrv runs until
+      reboot.
+- [ ] NOT RUN on AmiKit: a rebuild with an unrelated change to settle the
+      layer-stage shift; the native (no AA) path (not used here).

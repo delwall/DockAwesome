@@ -735,3 +735,15 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
   that drawer comes down; `host:RAM:` also tried to read a file the test
   dock still had open and hung until the watchdog. Copy a box dump only
   about 2 s after a page click: it is written once the page has settled.
+
+## Start a dock from a script that ends (AmiKit, 2026-11-26)
+- A script `Stack 400000` + `SYS:WBStartup/DockAwesome` run with
+  `Run >NIL: Execute` stays "in use" while the dock runs, so it cannot be
+  deleted; `Stack 400000` + `Run >NIL: <dock>` gave the dock only 131072.
+- Rule: put `Run >NIL: Stack 400000 +` and the dock on the next line in
+  the script and Execute it: the new CLI gets the stack (Status FULL: stk
+  400000) and the script ends at once and can be deleted.
+- Measure box glyphs over an even background: a CON window with no text
+  (`Run >NIL: Wait 1500 >CON:...`) behind the box; desktop icons under
+  the glass moved a reading by 1.65 px. The Amiga clock can jump (time
+  sync) and end such a Wait early.

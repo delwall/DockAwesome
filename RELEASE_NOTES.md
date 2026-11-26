@@ -33,8 +33,8 @@ Coffin, AmigaOS 3.2.3, AmigaOS 3.9, AmigaOS 3.1.4.1 and AmiKit XE.
   button; the box's **Open Folder** tile sits exactly on its icon cell
   (before, half a pixel off). All of the box's controls (buttons, tile,
   title, page count) now share one slightly softer tone; file names keep
-  theirs. The click areas are unchanged (checked on AmigaOS 3.2.3 and
-  AmigaOS 3.1.4.1 at icon sizes 36, 48 and 72).
+  theirs. The click areas are unchanged (checked on AmigaOS 3.2.3,
+  AmigaOS 3.1.4.1 and AmiKit XE at icon sizes 36, 48 and 72).
 - The Folder Stack setting is gone from **Settings**. A Folder Stack set in
   1.0 beta 5 becomes the last pin on the first start.
 - The divider before the last icon is gone: all icons are evenly spaced.

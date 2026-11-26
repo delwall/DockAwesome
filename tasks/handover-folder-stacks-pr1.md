@@ -619,3 +619,33 @@ One push of folder-stacks; PR opened as a draft and left a draft with a
   "AmigaOS 3.1.4.1 with build 569".
 - Installed now: 569 on AmigaOS 3.2.3 and 3.1.4.1; 556 on AmiKit XE; 551
   on ApolloOS, Coffin, 3.9.
+
+## Follow-up: AmiKit XE with build 569 (2026-11-26)
+
+- Build 569 (08de37b; HEAD 5fead28 changed only docs; not stale, no
+  warnings) installed in place of 556 on AmiKit XE, started from a
+  `Run >NIL: Stack 400000 +` script (WBRun does not work under DOpus),
+  the only dock, stack 400000, one PiP2 lease.
+- Box dumps at 36/48/72 (nested drawer, page 2, over an even CON window so
+  the desktop icons do not show through the glass): parent arrow and page
+  buttons 0.00 px by their box (one -0.05 reading = glass gradient), the
+  Open Folder ring centred on its icon box (662.00, 522.00 at 36); every
+  #dee2e9 pixel at exactly the 3.2.3 positions (0 differ at all three
+  sizes); file names #f2f4f8.
+- Open Folder cell opens a DOpus lister with no DOS error (RAM:BtnTest,
+  Personal:Audio); parent arrow, page buttons, quick switch, a program pin
+  with a box open and Click to work.
+- First open (4 runs, 556 controls alternated): Pictures 284.4 / 168.2 ms
+  medians (556 283.7-284.6 / 134.6-174.4), Downloads 126.5 / 153.9 (556
+  121.3-121.4 / 137.6-137.8; 553 121.5-134.3 / 137.4-246.5). One 569
+  Pictures entrance waited 8 fields (214.4). The layer step is 7-9 ms
+  slower in code unchanged since 556 (placement, not code; not settled by
+  a rebuild). Hover sweep 6957 us, stalled 2 (556 7283 / 2). No regression
+  shown; no code change.
+- Pre-existing finding seen again (also 556): the first agent click after
+  idle is often lost when the pointer was parked on the DOpus desktop (the
+  receiver rests on the plate there). Open for the owner as before.
+- ENVARC:DockAwesome.json untouched (424 bytes, 17:49:26). RAM: clean. No
+  DOpus listers were open at the start (rebooted machine), none left open.
+- Installed now: 569 on AmigaOS 3.2.3, 3.1.4.1 and AmiKit XE; 551 on
+  ApolloOS, Coffin, 3.9.
