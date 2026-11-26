@@ -591,3 +591,9 @@ One push of folder-stacks; PR opened as a draft and left a draft with a
   control, placed one pixel below the disc centre so it reads centred (box
   +1.00 px, ink centroid 0.15 px down / 0.29 px right). Installed: 567 on
   AmigaOS 3.2.3 (WBRun, the only dock).
+- Owner's correction (2026-11-26): every control glyph centred exactly by
+  its box (the arrow is no longer one pixel low; the Open Folder ring sat
+  half a pixel off its icon cell and is now exact) and one shared control
+  tone FOLDER_GLYPH #dee2e9 (15% less contrast than the old #f2f4f8; the
+  tile was #aeb8c7). File names keep #f2f4f8. Installed: 569 on AmigaOS
+  3.2.3 (WBRun, the only dock).

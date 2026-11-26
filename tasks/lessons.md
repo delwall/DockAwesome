@@ -708,3 +708,17 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
 - Rule: generate test files with a straight-line script written on the
   Mac (one Echo per file), never an AmigaDOS counting loop; bound every
   listing of a test drawer with a narrow PAT and NOHEAD.
+
+## Centre by the bounding box, never by an optical offset (2026-11-26)
+- I set the parent-drawer return arrow one pixel below its disc's centre
+  because, box-centred, its ink looked high. The owner: "Alltid exakt!"
+  Every control glyph is centred exactly by its bounding box.
+- The Open Folder ring had sat half a pixel off its icon cell since it was
+  added (its centre was a pixel centre, the icon box's an edge for even
+  sizes); a host test on the rasterised box would have caught it.
+- Rule: centre glyphs by their box and assert it on the rasterised pixels
+  in a host test for every size; also check the reference box (cell or
+  control) is the one the user sees, not a pixel coordinate near it.
+- Rule: before changing a colour for a group of controls, measure every
+  element's colour in a dump: the box mixed #f2f4f8 and #aeb8c7 for
+  controls without anyone deciding it.

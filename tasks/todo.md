@@ -3393,3 +3393,37 @@ rejected; the owner now chooses from candidates A-E, the build carries A).
 - [ ] NOT RUN: the native (no AA) path on hardware (no booted system uses
       it; host-tested only); an 18 px control (topaz 8 fallback; host
       only); other OSes.
+- [x] Owner's correction 2026-11-26: "Alltid exakt!" and one shared,
+      slightly more faded tone for the controls. Build 569:
+      - Return arrow centred by its box again (0.00 / 0.00 in the dumps at
+        36/48/72; ink centroid 0.24 px right, 0.71 px up, not compensated).
+      - Open Folder ring: was centred on a pixel centre, half a pixel right
+        and down of an even icon's box (ring box centre 662.50, 522.50 for
+        the icon box 662, 522 at size 36); now 662.00, 522.00. Coverage in
+        `dock_open_glyph`/`dock_open_glyph_row` (host-tested); the arrow
+        outlines are centred on the ring by their box (tables shifted
+        (-1, +3)/64) and their vertices lie on multiples of 4/16 px so no
+        sample falls on one; ring and arrow alone are pixel-exact for every
+        icon size 16-192 (host test). Native ring still half a pixel off
+        for even icons (DrawEllipse; documented).
+      - Tones measured in the 556/566 dumps: page/parent strokes, title and
+        page count #f2f4f8; Open Folder ring and label #aeb8c7; file names
+        #f2f4f8. Now all controls #dee2e9 (`FOLDER_GLYPH`, the menu text
+        30% toward the muted tone); file names #f2f4f8; disc tint
+        unchanged. WCAG contrast of #dee2e9: 13.26 on the darkest glass
+        (black backdrop, #181b22), 8.76 on the lightest (white backdrop,
+        #373a41, measured over a Workbench window), 7.52 / 5.08 on the disc
+        over those; #f2f4f8 had 15.65 / 10.34 / 8.87 / 6.00 (-15%), #aeb8c7
+        8.60 / 5.68 / 4.87 / 3.30.
+      - Review (Opus, fresh): no P0/P1; four P2 fixed (arrow-only pixel
+        test and the vertex rule, a pen-collision guard for FOLDER_GLYPH,
+        the native ring comment, a stale test comment).
+      - Installed 569 in place (WBRun), the only dock; the installed file
+        run from the CLI gave a dump byte-identical to the test run.
+        ENVARC:DockAwesome.json was changed by the owner at 01:03 (added
+        Personal:Audio, 590 bytes), not by the tests (they use RAM:
+        copies). A Workbench window "Personal" was open during the runs
+        (not opened by the tests' clicks as far as seen; left open).
+      - Images: scratchpad `design/btn-compare-{36,48,72}.png`,
+        `design/tone-compare-36.png`, `design/btn-{before,after}-36-nested-p2-2x.png`,
+        also in ~/Downloads/DockAwesome-design/.

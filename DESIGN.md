@@ -32,11 +32,18 @@ Keep the original Workbench artwork, aspect ratio, and alpha.
   the real icons: a ring about 72% of the icon size at the icon's centre,
   ring and one-line label in the muted heading tone.
 - A box's page buttons show **<** and **>** in a faint disc 5/6 of the
-  button (its click area stays the full button), each exactly in the
-  middle of its disc; inside a drawer, the header's button to the parent
-  drawer shows a return arrow in the same disc (a stem up from the bottom
-  right turning left into an arrowhead, one-pixel lines), set a pixel
-  below the middle so that it reads centred.
+  button (its click area stays the full button); inside a drawer, the
+  header's button to the parent drawer shows a return arrow in the same
+  disc (a stem up from the bottom right turning left into an arrowhead,
+  one-pixel lines).
+- Centre every control glyph exactly by its bounding box: the chevrons and
+  the return arrow on their disc, the Open Folder ring and arrow on the
+  tile's icon box. Never shift a glyph for optical balance.
+- One tone for every control in a box (FOLDER_GLYPH #dee2e9, the menu
+  text a little faded): the buttons' glyphs, the Open Folder ring, arrow
+  and label, the title, the page count and the empty/error notice. File
+  names under the icons keep the menu text colour; the buttons' disc keeps
+  its faint tint of the menu text.
 - Keep **Size**, **Scale** and position in a compact native
   window. **Save** applies the draft. **Cancel** discards it.
 - Keep side icons upright. Use the same zoom and input rules on all edges.
