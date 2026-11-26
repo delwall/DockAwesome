@@ -23,6 +23,8 @@ Keep the original Workbench artwork, aspect ratio, and alpha.
 - Show **Remove** beyond the drag boundary. Dropping there removes only the pin.
 - Put the hover label on the desktop side of the icon.
 - Use a compact dark context menu. Match the dock's glass and thin rim.
+  Its glass shows whatever lies behind it, the dock's own icons, running dots
+  and plate included.
 - A Folder Stack's menu follows the macOS Dock's: a muted **Sort by**
   heading, **Name**, **Date Modified** and **Kind** with a check mark on the
   active one, a hairline separator, then a muted **Click to** heading,

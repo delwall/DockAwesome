@@ -157,6 +157,32 @@ void dock_blend_masked(DockImage *dst, const DockImage *src, int x, int y, unsig
     blend_mask(dst, src, x, y, coverage, 0, &full);
 }
 
+unsigned long dock_overlay_onto_capture(DockImage *capture, int capture_left, int capture_top,
+    const DockImage *canvas, const unsigned char *coverage, int visible,
+    int canvas_left, int canvas_top)
+{
+    unsigned long replaced = 0;
+    int x0, y0, x1, y1, y;
+    if (!capture || !capture->pixels || !canvas || !canvas->pixels) return 0;
+    if (visible > canvas->width) visible = canvas->width;
+    /* The overlap in screen coordinates. */
+    x0 = capture_left > canvas_left ? capture_left : canvas_left;
+    y0 = capture_top > canvas_top ? capture_top : canvas_top;
+    x1 = capture_left+capture->width < canvas_left+visible ? capture_left+capture->width : canvas_left+visible;
+    y1 = capture_top+capture->height < canvas_top+canvas->height ? capture_top+capture->height :
+        canvas_top+canvas->height;
+    if (x1 <= x0 || y1 <= y0) return 0;
+    for (y = y0; y < y1; ++y) {
+        uint32_t *out = (uint32_t *)capture->pixels+(size_t)(y-capture_top)*capture->width+(x0-capture_left);
+        size_t at = (size_t)(y-canvas_top)*canvas->width+(x0-canvas_left);
+        const uint32_t *in = (const uint32_t *)canvas->pixels+at;
+        const unsigned char *covered = coverage ? coverage+at : NULL;
+        int x;
+        for (x = 0; x < x1-x0; ++x) if (!covered || covered[x]) { out[x] = in[x]; ++replaced; }
+    }
+    return replaced;
+}
+
 /* Area coverage of a circular corner cell. Supersampling is confined to the
    boundary and cached by DockRenderer. All coordinates use integer sixteenths. */
 static unsigned char corner_coverage(int x, int y, int radius, int inset)

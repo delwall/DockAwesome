@@ -3741,8 +3741,8 @@ stop).
       `design/ao-569-btn-compare-{36,48,72}.png` (10x, 3.2.3 above
       ApolloOS), `design/ao-569-nested-p2-36-2x.png`, `-48.png`, `-72.png`;
       also in ~/Downloads/DockAwesome-design/.
-- [ ] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete (551) after
-      the next ApolloOS boot.
+- [x] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete (551) after
+      the next ApolloOS boot (done in the menu glass session).
 - [ ] NOT RUN on ApolloOS: the native (no AA) path (not used here); Sort
       by on this build (unchanged since 551, run there).
 
@@ -3998,3 +3998,135 @@ FindTask and Sems before each start, 5 s or more before each stop).
       start amiagent and ApolloExplorerSrv there.
 - [ ] NOT RUN on 3.9: the native (no AA) path (not used here); a DOpus
       lister for Open Folder (Workbench is the desktop).
+
+### Menu glass over the dock's icons (ApolloOS, 2026-11-26)
+User report (photo, build 569 / 1.0 beta 6): a stack's right-click menu is
+glass against the desktop but covers the dock's zoomed icons as if opaque.
+The brief said AmigaOS 3.9 was booted; the machine was ApolloOS R9.5
+(Kickstart 51.3, volumes ApolloOS/Personal/Archives, no AOS39), 16-bit
+1280x720, so everything below ran on ApolloOS. Installed before: 569 from
+SYS:WBStartup (one task, one PiP2 semaphore). ApolloExplorerSrv was not
+running; started with Run >NIL: C:ApolloExplorerSrv.
+- [x] Root cause (code + dump): the menu's glass is `capture_glass` of the
+      screen bitmap, tinted (`tint_popup_glass`, shift 2: a quarter of the
+      backdrop); the dock is in PiP, never in the screen bitmap, and
+      `pip_mask` cuts the menu's span out of PiP. So over the row the glass
+      held only the desktop. 1.0 beta 5 has the same capture and mask
+      (`git show v1.0b5`): same defect by code, not run. The Folder Stack
+      box ends 3 px above the row's full zoom height (FOLDER_GAP 10 -
+      FOLDER_TIP 7 above `hover_label_anchor`), so it was not affected.
+      Settings/About are opaque GadTools windows (PiP is keyed out there):
+      no glass, not affected.
+- [x] Dump first (commit b7d94dc, build 571 = the "before" binary):
+      `--pip-dump` writes each menu's window read back from the screen
+      (`-popup.ppm`), its tinted glass (`-popupglass`), the capture
+      (`-popupdesk`) and the canvas keyed magenta where PiP shows the
+      screen (`-popupdock`), and prints both positions.
+- [x] Fix (build 572): `dock_overlay_onto_capture` (dock_compose.c, pure)
+      copies the canvas's covered pixels in its visible columns into the
+      capture before the tint, through a DockUI hook (`menu_under`) set
+      on every DockUI (start and Workbench reopen), menus only. The
+      canvas is opaque and already blended over the backdrop, so the copy
+      is "dock over desktop". `open_menu` draws once before opening when
+      the hover label or a press must go: in 571's dump the canvas at
+      opening still held the "Audio" label, which the next frame removed.
+      Without RGB glass (no `popup_rgb`) `capture_glass` returns nothing
+      and the pens are unchanged.
+- [x] Row under an open menu: `update_target` returns while the UI holds
+      the dock and `open_menu` copies placement to target, so the row
+      does not ease back. Measured (canvas at opening vs at exit with the
+      menu still open, 4-5 s later): only 986-1099 pixels changed, all
+      inside the menu's rectangle (the plate re-mixing the menu window
+      from the live capture, hidden by PiP's cut-out). Decision: snapshot
+      at opening, no refresh (a dot that changes under an open menu shows
+      the old dot until it closes); no repaint, no flicker.
+- [x] Host: `test_overlay_onto_capture` (4000 random sizes/offsets incl.
+      negative, visible < width, NULL coverage, against a per-pixel
+      reference, plus the screen case); `make host-test`, `make
+      host-sanitize` pass; `make amiga` no warnings.
+- [x] Agent right-click on the Audio stack (zoomed, label shown), user's
+      config copy (14 pins, size 36), `--pip-dump`; measured inner glass
+      pixels covered by the dock (rim and corners excluded; tint
+      [20,23,29] fitted on the desktop-only pixels, 100% share):
+
+      | edge | build | menu / dock | dock px in capture | glass vs tint(desktop+dock) | glass vs tint(desktop) |
+      | --- | --- | --- | --- | --- | --- |
+      | bottom | 571 | 520,540 115x146 / 208,612 864x108 | - | max 54, 1.5% within 1 | max 0 |
+      | bottom | 572 | same | 3682 | max 0, 100% within 1 (2894 px) | max 54 |
+      | left | 572 | 30,286 / 3,13 192x707 (visible 184) | 5104 | max 0 (4214 px) | max 61 |
+      | right | 572 | 1135,286 / 1093,13 192x707 (visible 187) | 5182 | max 0 (4288 px) | max 55 |
+
+      The window read back from the screen equals the glass at RGB565
+      on 89-97% of those pixels; the rest are the rows' text and checks.
+      Hover on a row over the icons repainted the band with the icons
+      around it (screenshot). There is no top edge (DockEdge: bottom,
+      left, right).
+- [x] Images (4x): scratchpad `design/menu-glass-bottom-before-after-4x.png`,
+      `-bottom-before-4x`, `-bottom-after-4x`, `-left-after-4x`,
+      `-right-after-4x`, `-dock-at-open-before-4x` (label still in the
+      canvas) and `-dock-at-open-after-4x`; also in
+      ~/Downloads/DockAwesome-design/.
+- [x] First open of Downloads after 55 s idle, pointer off the dock, fresh
+      dock per run, ChangeTaskPri -30, o.json (migrated each run), 569
+      (the installed binary) alternated:
+
+      | run | build | first paint ms | entrance ms | fields |
+      | --- | --- | --- | --- | --- |
+      | n1 | 572 | 100.4 | 137.9 | 01112 |
+      | o1 | 569 | 101.0 | 137.6 | 01112 |
+      | n2 | 572 | 100.4 | 138.0 | 01112 |
+      | o2 | 569 | 100.7 | 138.0 | 01112 |
+      | n3 | 572 | 100.8 | 137.7 | 01112 |
+      | n4 | 572 | 107.8 | 130.6 (4 frames) | 0112 |
+      | o3 | 569 | 101.7 | 137.8 | 01112 |
+      | n5 | 572 | 100.2 | 137.8 | 01112 |
+
+      569 earlier on ApolloOS: 100.2-100.9 / 137.7-139.5. n4's first paint
+      had one prepare stage at 29.3 ms (21.3-22.2 in every other run);
+      that path does not run the changed code (menus only) and n5
+      repeated normally. Prefetch stacks=3 pending=0 reads=81 every run.
+      Pass.
+- [x] Hover sweep (t.json, relative moves to x 350, 500, 650, 800, 950 at
+      y 688, one per call, 50 s idle, -30):
+
+      | run | build | render_us_avg | max us | stalled | redraws |
+      | --- | --- | --- | --- | --- | --- |
+      | hn1 | 572 | 9529 | 17539 | 0 | 93 |
+      | ho1 | 569 | 9614 | 17709 | 0 | 93 |
+      | hn2 | 572 | 9605 | 18217 | 1 | 93 |
+      | ho2 | 569 | 9614 | 17690 | 0 | 94 |
+      | hn3 | 572 | 9651 | 18214 | 0 | 92 |
+      | hn4 | 572 | 9524 | 17633 | 0 | 93 |
+
+      569 earlier 9516 / stalled 0. Pass (the hover path is unchanged).
+- [x] Old SYS:WBStartup/Disabled/DockAwesome-locked-delete (551) was no
+      longer locked after the reboot and is deleted.
+- [x] Independent review (Opus) of the diff: no P0/P1; four P2 fixed in
+      build 573: `open_menu` also draws a frame the loop pass already
+      had pending (`redraw`, `redraw_due`: a new running dot or a
+      field-deferred zoom step would otherwise miss the glass); the
+      random host test filled every pixel with 0 (cast before shift),
+      so it now checks real pixel content; an early return when nothing
+      overlaps (no out-of-range pointer arithmetic); a comment that the
+      one extra draw is unpaced and may wait up to a field.
+- [x] Build 573 rerun: bottom dump identical to 572 (3682 dock pixels,
+      glass vs tint(desktop+dock) max 0 over 2894 px); first open 100.5 /
+      137.8 ms, 01112; hover sweep 10102 (95 redraws) / 9419 / 9605,
+      stalled 0, against 569 ho3 9640 in the same session (569 runs
+      9614 / 9614 / 9640).
+- [x] End state: 573 in SYS:WBStartup/DockAwesome (Version 0.573), started
+      with WBRun; the task list shows one DockAwesome and its status
+      task, one DockAwesome.PiP2 semaphore, Status lists no CLI dock;
+      its Audio menu opened over the zoomed row and closed (Esc). The 569
+      file was "in use" (WBStartup), so it is now
+      SYS:WBStartup/Disabled/DockAwesome-locked-delete. ENVARC:DockAwesome.json
+      untouched (588 bytes, 18:10:59 as at the start). RAM: holds only
+      Clipboards, ENV, T; DL: assign removed, ENV:dpid deleted.
+      amiagent and C:ApolloExplorerSrv (started this session) keep running.
+- [ ] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete (569) after
+      the next ApolloOS boot.
+- [ ] NOT RUN: AmigaOS 3.9, Coffin, AmigaOS 3.2.3, AmigaOS 3.1.4.1, AmiKit
+      XE (same renderer, menu code and PiP cut-out; 24-bit screens there);
+      1.0 beta 5 on hardware (same code, by reading); a right-click on the
+      plate while the row is still easing (the review's case, covered by
+      the pending-frame draw, not reproduced).

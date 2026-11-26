@@ -215,6 +215,27 @@ outside the artwork and plate use SAGA's source key. The native display code
 locks the source bitmap for each read. Equal source bytes skip decoding and
 drawing. Poll at 100 ms when idle and ask for 10 ms during motion (about 17 ms between polls). See [PiP](pip-backend.md).
 
+A menu is a real window whose glass is a capture of the screen bitmap at
+its rectangle, tinted (a quarter of the backdrop through the surface
+colour). The screen bitmap never holds the PiP overlay, and PiP cuts the
+menu's shape out of the dock, so where a menu lies over the row the
+capture alone showed only the desktop (1.0 beta 6 and older). Before the
+tint, the UI's under hook (`menu_under`) copies the dock's covered canvas
+pixels into the capture with `dock_overlay_onto_capture` (host-tested):
+what PiP shows there, the dock already blended over the desktop. It runs
+once per opening, never per dock frame; `open_menu` first draws the frame
+that stays under the menu (without the hover label). The row holds still
+while a menu is open (`update_target` returns while the UI holds the
+dock), so the glass is a snapshot: a running dot that changes under an
+open menu, or the plate mixing in the menu window from the live capture,
+stays hidden by PiP's cut-out until the menu closes. The Folder Stack box
+ends 3 px above the row's full zoom height and does not call the hook.
+Without RGB glass (screens of 8 bits or fewer) menus keep their opaque
+pens. `--pip-dump` writes each menu as `prefix-popup.ppm` (its window read
+back from the screen), `-popupglass.ppm`, `-popupdesk.ppm` (the capture
+before the dock's pixels) and `-popupdock.ppm` (the canvas, magenta where
+PiP shows the screen), and prints both positions.
+
 Workbench drops use a temporary receiver. Capture a clean backdrop before
 Workbench locks the layers. Reuse it until the drop or release is complete.
 Window regions must outlive their windows. See [Hardware](hardware.md) for

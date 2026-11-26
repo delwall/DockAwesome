@@ -1,5 +1,15 @@
 # Release notes
 
+## 1.0 beta 7
+
+Draft, not released.
+
+**Fixes**
+- A right-click menu that lies over the dock's icons now shows them, and
+  the plate, through its glass; before, the glass there showed only the
+  desktop, as if the dock were not behind it (checked on ApolloOS with
+  the dock at the bottom, left and right).
+
 ## 1.0 beta 6
 
 Changes since 1.0 beta 5. Checked on ApolloOS, Coffin, AmigaOS 3.2.3,
