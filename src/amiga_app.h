@@ -693,6 +693,7 @@ static inline void end_gap(App *app)
 void stack_button_build(App *app);
 void ui_blocking(void *context, int blocking);
 int ui_fit(void *context, const DockUIPrefs *draft);
+void menu_under(void *context, DockImage *capture, int left, int top);
 DockUIPrefs current_ui_prefs(const App *app);
 int apply_preferences(App *app, const DockUIPrefs *prefs);
 

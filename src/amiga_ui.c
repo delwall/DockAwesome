@@ -263,6 +263,8 @@ struct DockUI {
     int carry_left, carry_top;
     DockUIFit fit;
     const volatile ULONG *fields; /* --profile: the display's field count */
+    DockUIUnder under;            /* the dock's pixels into a menu's capture */
+    void *under_context;
     void *fit_context;
     char dialog_title[64], busy_title[96];
     struct Gadget *gadgets;
@@ -919,6 +921,9 @@ static void capture_popup_glass(DockUI *ui, int left, int top, int width, int he
     if (!ui->popup_display) return;
     folder_stamp(profile,0);
     apply_backdrop_carry(ui,glass,left,top);
+    /* A menu can lie over the dock's row. A Folder Stack box ends 3 px
+       above the row's full zoom height (FOLDER_GAP less FOLDER_TIP). */
+    if (!folder && ui->under) ui->under(ui->under_context,glass,left,top);
     if (folder) {
         size_t bytes = (size_t)width*height*4;
         DockImage *under = &ui->folder.motion_backdrop;
@@ -2246,6 +2251,33 @@ void dock_ui_set_busy(DockUI *ui, const char *status)
 void dock_ui_set_field_counter(DockUI *ui, const volatile ULONG *fields)
 {
     if (ui) ui->fields = fields;
+}
+
+void dock_ui_set_under_hook(DockUI *ui, DockUIUnder hook, void *context)
+{
+    if (!ui) return;
+    ui->under = hook;
+    ui->under_context = context;
+}
+
+const DockImage *dock_ui_menu_glass(const DockUI *ui)
+{
+    if (!ui || !ui->popup || ui->folder.path[0] || ui->glass_tint_shift || !ui->popup_glass.pixels)
+        return NULL;
+    return &ui->popup_glass;
+}
+
+int dock_ui_menu_pixels(DockUI *ui, DockImage *out)
+{
+    const DockImage *glass = dock_ui_menu_glass(ui);
+    *out = (DockImage){0};
+    if (!glass || !ui->popup_display) return 0;
+    *out = (DockImage){glass->width,glass->height,malloc((size_t)glass->width*glass->height*4)};
+    if (out->pixels && amiga_display_capture(ui->popup_display,out,ui->popup->LeftEdge,ui->popup->TopEdge))
+        return 1;
+    free(out->pixels);
+    *out = (DockImage){0};
+    return 0;
 }
 
 void dock_ui_set_fit_hook(DockUI *ui, DockUIFit hook, void *context)
