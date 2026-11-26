@@ -4345,3 +4345,14 @@ docks used RAM:da.json / RAM:dl.json copies; ENVARC untouched.
       with a qualifier-correct right-click); ApolloOS pop-up menus
       (ICF_POPUPMENUS); the monitor itself (PiP is not in screenshots: the
       dock's register writes were observed, not the picture).
+- [x] End state: 579 in SYS:WBStartup/DockAwesome (Version 0.579), started
+      with WBRun; one PiP2 lease, Status lists no CLI dock; re-measured
+      after install: right-clicks at 400,500 / 300,650 / 400,200 keep PiP2
+      ON. 577 was "in use", so it is SYS:WBStartup/Disabled/
+      DockAwesome-locked-delete-577 (573's locked copy is still there
+      too). ENVARC:DockAwesome.json untouched (588 bytes, 17:16:08). RAM:
+      holds only Clipboards, ENV, T (amiagent files); the probe tools,
+      configs, logs and test builds are deleted; the 1.0 beta 5 scratch
+      worktree is removed.
+- [ ] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete and
+      DockAwesome-locked-delete-577 after the next ApolloOS boot.
