@@ -4123,10 +4123,119 @@ running; started with Run >NIL: C:ApolloExplorerSrv.
       untouched (588 bytes, 18:10:59 as at the start). RAM: holds only
       Clipboards, ENV, T; DL: assign removed, ENV:dpid deleted.
       amiagent and C:ApolloExplorerSrv (started this session) keep running.
-- [ ] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete (569) after
-      the next ApolloOS boot.
+- [x] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete (569) after
+      the next ApolloOS boot (done in the disk stack session).
 - [ ] NOT RUN: AmigaOS 3.9, Coffin, AmigaOS 3.2.3, AmigaOS 3.1.4.1, AmiKit
       XE (same renderer, menu code and PiP cut-out; 24-bit screens there);
       1.0 beta 5 on hardware (same code, by reading); a right-click on the
       plate while the row is still easing (the review's case, covered by
       the pending-frame draw, not reproduced).
+
+### Disks as Folder Stacks, opt-in per pin (ApolloOS, 2026-11-26, owner decision)
+Scope: a disk pin (a drawer pin whose path ends in ':') gets the stack menu
+(Sort by, Click to). Default Open Folder = 1.0 beta 6's disk pin (window,
+running dot, Close while open, no read-ahead); Show Stack makes it a stack
+(box, no dot, no Close, read ahead). Close stays offered while the window
+is open, last, after a second hairline. Persisted in "clicks" by path, only
+non-default values ("stack" for a disk, "folder" for a drawer).
+- [x] dock_prefs: `dock_click_default(path)`; the reader gives each path its
+      own default, the writer omits it; "stack" and "folder" accepted for
+      any path; unknown values read as the path's default. Migration keeps
+      the 1.0 beta 5 Folder Stack showing its box (a disk there: "stack").
+- [x] amiga_main: `disk_pin` (derived from kind + path), `stack_menu`,
+      `set_click` (sets `Item.stack` for disks, clears running/owner/lister
+      when the flag changes, arms the read-ahead for a box); `pin_path`
+      and startup go through it; `click_menu_item` builds the close button
+      and calls `status_changed` on a flag change; `read_folder_icon` runs
+      without requesters; icon reload keeps the disk loader for disks.
+- [x] amiga_status: a reply for a pin that is a stack now is ignored (a
+      poll in flight when a disk became a stack).
+- [x] amiga_ui: `drawer_items` + separator + Close (`DRAWER_ROWS` without
+      them, all rows with `DOCK_UI_CLOSE_ITEM`); a root's box title drops
+      the colon ("Personal", as the hover label).
+- [x] Host: `test_disk_clicks` (defaults per path, exact "clicks" format
+      with "stack"/"folder", round trip, explicit defaults not written
+      back, unknown/odd values, key for no pin, reorder, removal, hand
+      edit, migration of a disk Folder Stack); `make host-test`, `make
+      host-sanitize` pass; `make amiga` no warnings (build 576).
+- [x] Compatibility (host, `git archive` of each tag's dock_prefs.c, a file
+      with "Personal:": "stack", "Personal:Downloads": "folder" and sorts):
+      v1.0b5 reads all 5 paths, ignores "sorts" and "clicks" and writes
+      neither; v1.0b6 reads all 5 paths, Personal: as Show Stack (its disks
+      are never stacks: a window opens), keeps "folder" and the sorts and
+      drops "stack" at its next save (the disk reads as Open Folder again
+      in this build). No path lost.
+- [x] impeccable polish (in-thread): group order Sort by, Click to as for
+      drawers; Close is an action, not an option, so it goes last below
+      its own hairline (the Mac puts Quit last), label in the same column;
+      wording kept ("Open Folder" as the box tile). Box title without the
+      colon. No other change.
+- [x] ApolloOS R9.5, test docks from RAM: (`--config RAM:d1.json`: the
+      user's 14 pins + Archives:), one dock at a time (FindTask, Sems,
+      Status before each start; 5 s+ before each stop):
+
+      | check | result |
+      | --- | --- |
+      | right-click Archives: (no window) | Sort by (Name checked), hairline, Click to, Open Folder checked; no Close (115x146) |
+      | right-click Personal: (window open) | the same + hairline + Close (115x172) |
+      | Archives: -> Show Stack | file gains "clicks": {"Archives:": "stack"}; click opens the box "Archives" (185x200, 8 entries + Open Folder) |
+      | Date Modified | "sorts": {"Archives:": "date"}; box order Games, Prefs, C, Demos, iGame.guide, S, Devs, ABDisk (List SORT=DATE agrees) |
+      | drawer inside, parent arrow | Archives:Games (356x359, parent arrow) and back to the root box |
+      | Personal: (open) -> Show Stack | menu without Close; canvas dump: dot under Personal gone; click opens its box (299x253, 16 entries) |
+      | Personal: -> Open Folder | "Personal:" leaves "clicks"; Close back after the status poll; Close closed the window; click opened it again |
+      | reorder Archives: to slot 0 | first in "paths", "sorts"/"clicks" kept; slot 0 click opens its box |
+      | restart | Archives: menu: Date Modified + Show Stack checked; click opens the box |
+      | drag Archives: out | gone from "paths", no "sorts"/"clicks" left |
+
+      These ran on build 575; build 576 (the flag derived from the path,
+      see Performance) repeated: idle Archives: menu (Open Folder checked,
+      no Close), Show Stack saved as "stack" and the click opened its box
+      (185x200), Personal: (window open) menu 115x172 with Close.
+
+- [x] Many entries: BOOT: (about 180 root entries) as Show Stack: box
+      698x598, page 1/2; first open after the read-ahead: first paint
+      332 ms, entrance 140 ms, 3 frames (the largest box; the read-ahead
+      read 149 icons, pending=0).
+- [x] Absent volume: an ADF made on the Mac (FFS, "DockGone", 3 entries)
+      in IDF0: with MountDiskImage; pins CLI, DockGone: (stack), BOOT:,
+      Editor. Box 185x147 while inserted; after EJECT (Info: no volume
+      DockGone) a click shows the box with "Cannot read drawer" (185x109),
+      no requester, first paint 22 ms; Kind chosen for it re-armed its
+      read-ahead, which read once and finished (reads 123 = 3 + 119 + 1,
+      pending=0), no requester, no stall. Control: `Dir DockGone:` from the
+      Shell opened "Please insert volume "DockGone" in any drive" (cancelled).
+      A pin on an empty drive (DF0:, ICD0:) cannot load at startup, as in
+      1.0 beta 6 ("Cannot read this icon"), so it never becomes a pin.
+- [x] Dumps (`--pip-dump`, pins CLI, Personal: (window open), Archives:
+      (stack), Editor; sizes 36/48/72): menu 115x172 at every size; boxes
+      185x200, 224x246, 334x342. Images (4x menus, 3x/2x boxes):
+      scratchpad `design/disk-stack-menu-{36,48,72}-4x.png`,
+      `-menu-idle-36-4x.png`, `-box-36-3x.png`, `-box-48-3x.png`,
+      `-box-72-2x.png`, `-absent-36-4x.png`, `-boot-p1-36-2x.png`,
+      `-dot-folder-vs-stack-4x.png`; also in ~/Downloads/DockAwesome-design/.
+- [x] Performance (ChangeTaskPri -30, fresh dock per run, 573 = the
+      installed binary from RAM:). First open of Downloads after 50 s idle,
+      o.json:
+
+      | run | build | first paint ms | entrance ms | fields |
+      | --- | --- | --- | --- | --- |
+      | n1-n4 | 575 | 102.1 / 103.5 / 103.7 / 103.0 | 137.5 / 148.7 / 136.0 / 145.7 | 0122 / 01121 / 01112 / 01121 |
+      | o1-o4 | 573 | 102.8 / 103.4 / 103.0 / 104.4 | 136.9 / 131.3 / 145.1 / 135.7 | 01112 / 0112 / 01121 / 0112 |
+      | n5-n8 | 576 | 110.2 / 111.9 / 104.7 / 104.3 | 132.5 / 136.1 / 147.3 / 147.8 | 0112 / 01112 / 01121 / 01121 |
+
+      n5/n6: one prepare stage each at 29.4 / 34.0 ms (21-26 in every
+      other run; the box's painting, not changed code), as 572's n4. The
+      01121 pattern (one field late, ~146 ms) shows on 573 too. Prefetch
+      stacks=3 pending=0 reads=81 every run. Pass.
+      Hover sweep (t.json, 15 pins, relative moves x 350..950 at y 688,
+      one per call, 45 s idle, then off the dock):
+
+      | run | build | render_us_avg | compose_us_avg | stalled | redraws |
+      | --- | --- | --- | --- | --- | --- |
+      | hn1, hn2 | 575 | 11338 / 11327 | 8755 / 8769 | 5 / 4 | 111 / 96 |
+      | ho1, ho2 | 573 | 10065 / 10182 | 7343 / 7501 | 0 / 2 | 97 / 93 |
+      | hn3, hn4 | 576 | 10212 / 10227 | 7648 / 7637 | 0 / 1 | 95 / 94 |
+
+      575 had `int volume` in `Item` (App grew 128 bytes): compose 1.4 ms
+      slower with unchanged compose code (lessons.md). 576 derives it from
+      the path: within 0.5% of 573. Pass.

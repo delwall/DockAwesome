@@ -308,6 +308,110 @@ static void test_clicks(void)
     assert(fclose(file) == 0);
 }
 
+/* A disk (a path ending in ':') opens as a folder until its menu chose
+   Show Stack: "clicks" lists it only as "stack", a drawer only as
+   "folder"; each path reads its own default, and a key never moves to
+   another pin. */
+static void test_disk_clicks(void)
+{
+    DockPrefs before, after;
+    char json[4096];
+    FILE *file;
+    int i;
+    assert(dock_click_default("Personal:") == DOCK_CLICK_FOLDER);
+    assert(dock_click_default("DF0:") == DOCK_CLICK_FOLDER);
+    assert(dock_click_default("Personal:Downloads") == DOCK_CLICK_STACK);
+    assert(dock_click_default("Personal:Downloads/") == DOCK_CLICK_STACK);
+    assert(dock_click_default("C:Dir") == DOCK_CLICK_STACK);
+    assert(dock_click_default("") == DOCK_CLICK_STACK);
+    dock_prefs_defaults(&before);
+    before.count = 4;
+    strcpy(before.paths[0],"Personal:");
+    strcpy(before.paths[1],"Personal:Downloads");
+    strcpy(before.paths[2],"Archives:");
+    strcpy(before.paths[3],"SYS:Utilities/Clock");
+    for (i = 0; i < before.count; ++i) before.clicks[i] = dock_click_default(before.paths[i]);
+    /* Every pin at its default: no "clicks", as from 1.0 beta 6. */
+    written_json(&before,json,sizeof(json));
+    assert(!strstr(json,"clicks"));
+    /* A file without "clicks": disks open as folders, drawers as stacks. */
+    assert(read_text(json,&after));
+    assert(!memcmp(&before,&after,sizeof(before)));
+    assert(after.clicks[0] == DOCK_CLICK_FOLDER && after.clicks[1] == DOCK_CLICK_STACK);
+    assert(after.clicks[2] == DOCK_CLICK_FOLDER && after.clicks[3] == DOCK_CLICK_STACK);
+    /* Personal: shows its box, Downloads opens as a folder. */
+    before.clicks[0] = DOCK_CLICK_STACK;
+    before.clicks[1] = DOCK_CLICK_FOLDER;
+    before.sorts[0] = DOCK_SORT_DATE;
+    written_json(&before,json,sizeof(json));
+    assert(strstr(json,"\n  ],\n  \"sorts\": {\n    \"Personal:\": \"date\"\n  },\n"
+        "  \"clicks\": {\n    \"Personal:\": \"stack\",\n    \"Personal:Downloads\": \"folder\"\n  }\n}\n"));
+    assert(!strstr(json,"\"Archives:\": "));
+    file = tmpfile();
+    assert(file && dock_prefs_write(file,&before));
+    rewind(file);
+    assert(dock_prefs_read(file,&after));
+    assert(fclose(file) == 0);
+    assert(!memcmp(&before,&after,sizeof(before)));
+    /* Back to the defaults: nothing written again. */
+    before.clicks[0] = DOCK_CLICK_FOLDER;
+    before.clicks[1] = DOCK_CLICK_STACK;
+    written_json(&before,json,sizeof(json));
+    assert(!strstr(json,"clicks"));
+    /* Both values for any path, by hand: an explicit default reads the
+       same and is not written back; unknown values, other shapes and a
+       key for no pin read as each path's default. */
+    assert(read_text("{\"version\":1,\"clicks\":{\"personal:\":\"stack\",\"Archives:\":\"folder\","
+        "\"Work:\":\"list\",\"Programs:\":{\"as\":\"stack\"},\"DF0:\":1,\"Gone:\":\"stack\","
+        "\"Work:A\":\"stack\"},"
+        "\"paths\":[\"Personal:\",\"Archives:\",\"Work:\",\"Programs:\",\"DF0:\",\"Work:A\"]}",&after));
+    assert(after.count == 6);
+    assert(after.clicks[0] == DOCK_CLICK_STACK && after.clicks[1] == DOCK_CLICK_FOLDER);
+    assert(after.clicks[2] == DOCK_CLICK_FOLDER && after.clicks[3] == DOCK_CLICK_FOLDER);
+    assert(after.clicks[4] == DOCK_CLICK_FOLDER && after.clicks[5] == DOCK_CLICK_STACK);
+    written_json(&after,json,sizeof(json));
+    assert(strstr(json,"\"clicks\": {\n    \"Personal:\": \"stack\"\n  }\n}\n"));
+    /* A reorder (save_config's order) and a removal: each disk keeps its
+       own click and sort, none moves to the pin that takes its slot. */
+    dock_prefs_defaults(&before);
+    before.count = 3;
+    strcpy(before.paths[0],"Archives:");
+    strcpy(before.paths[1],"Personal:");
+    strcpy(before.paths[2],"Personal:Audio");
+    before.clicks[0] = DOCK_CLICK_FOLDER;
+    before.clicks[1] = DOCK_CLICK_STACK;
+    before.clicks[2] = DOCK_CLICK_STACK;
+    before.sorts[1] = DOCK_SORT_KIND;
+    written_json(&before,json,sizeof(json));
+    assert(read_text(json,&after));
+    assert(!strcmp(after.paths[1],"Personal:") && after.clicks[1] == DOCK_CLICK_STACK &&
+        after.sorts[1] == DOCK_SORT_KIND);
+    assert(!strcmp(after.paths[0],"Archives:") && after.clicks[0] == DOCK_CLICK_FOLDER &&
+        after.sorts[0] == DOCK_SORT_NAME);
+    before.count = 2;
+    strcpy(before.paths[0],"Archives:");
+    strcpy(before.paths[1],"Personal:Audio");
+    before.clicks[1] = DOCK_CLICK_STACK;
+    before.sorts[1] = DOCK_SORT_NAME;
+    written_json(&before,json,sizeof(json));
+    assert(!strstr(json,"clicks") && !strstr(json,"sorts") && read_text(json,&after));
+    assert(after.clicks[0] == DOCK_CLICK_FOLDER && after.clicks[1] == DOCK_CLICK_STACK);
+    /* An edit by hand that reorders "paths" alone. */
+    assert(read_text("{\"version\":1,\"paths\":[\"Personal:Audio\",\"Personal:\"],"
+        "\"clicks\":{\"Personal:\":\"stack\"}}",&after));
+    assert(after.clicks[0] == DOCK_CLICK_STACK && after.clicks[1] == DOCK_CLICK_STACK);
+    assert(read_text("{\"version\":1,\"paths\":[\"Personal:Audio\",\"Personal:\"]}",&after));
+    assert(after.clicks[0] == DOCK_CLICK_STACK && after.clicks[1] == DOCK_CLICK_FOLDER);
+    /* 1.0 beta 5's Folder Stack on a disk was a stack there: it stays
+       one, written as "stack"; a disk pin beside it keeps its default. */
+    assert(read_text("{\"version\":1,\"folder\":\"Work:\",\"paths\":[\"Archives:\"]}",&after));
+    assert(dock_prefs_migrate(&after) == 1);
+    assert(after.count == 2 && !strcmp(after.paths[1],"Work:"));
+    assert(after.clicks[0] == DOCK_CLICK_FOLDER && after.clicks[1] == DOCK_CLICK_STACK);
+    written_json(&after,json,sizeof(json));
+    assert(strstr(json,"\"clicks\": {\n    \"Work:\": \"stack\"\n  }\n}\n"));
+}
+
 static void test_bad_file(void)
 {
     static const char *const bad[] = {
@@ -416,6 +520,7 @@ int main(void)
     test_folder_migration();
     test_sorts();
     test_clicks();
+    test_disk_clicks();
     puts("JSON preferences: ordered paths, escapes, bounds, unknown keys and transactional read PASS");
     return 0;
 }

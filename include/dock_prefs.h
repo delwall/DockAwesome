@@ -9,8 +9,13 @@
 
 /* What a left click on a Folder Stack does, chosen per stack in its menu
    ("Click to"): show its box, or open its drawer as a window. Show Stack
-   is the default. */
+   is the default for a drawer, Open Folder for a disk (a volume root, a
+   path ending in ':'), which shows its box only when chosen. */
 typedef enum { DOCK_CLICK_STACK, DOCK_CLICK_FOLDER, DOCK_CLICK_COUNT } DockClick;
+
+/* The click a pin has until one is chosen: Open Folder for a path ending
+   in ':', else Show Stack. */
+DockClick dock_click_default(const char *path);
 
 typedef struct {
     int size, zoom, levels;
@@ -28,7 +33,9 @@ typedef struct {
        or one this build does not know, reads as name. */
     DockSort sorts[DOCK_MAX_ITEMS];
     /* Each pin's left click, kept like sorts: "clicks" maps a path to
-       "folder" and lists only stacks that open as a folder. */
+       "stack" or "folder" and lists only pins whose click is not their
+       default (dock_click_default); a value this build does not know
+       reads as that default. */
     DockClick clicks[DOCK_MAX_ITEMS];
 } DockPrefs;
 
@@ -36,11 +43,12 @@ void dock_prefs_defaults(DockPrefs *prefs);
 /* Read a version-1 JSON object. A failed read leaves prefs unchanged. */
 int dock_prefs_read(FILE *file, DockPrefs *prefs);
 /* Write a complete JSON object, without "folder", with "sorts" only when
-   a pin is not sorted by name and "clicks" only when a pin opens as a
-   folder. The caller handles flushing and replacement. */
+   a pin is not sorted by name and "clicks" only when a pin's click is not
+   its default. The caller handles flushing and replacement. */
 int dock_prefs_write(FILE *file, const DockPrefs *prefs);
 /* 1.0 beta 5 and older kept one Folder Stack apart from the pins: make it
-   the last pin unless it is one already. 1 when prefs changed. */
+   the last pin, showing its box (also a disk, which was a stack there),
+   unless it is one already. 1 when prefs changed. */
 int dock_prefs_migrate(DockPrefs *prefs);
 
 #endif

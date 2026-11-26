@@ -4,6 +4,19 @@
 
 Draft, not released.
 
+**Folder Stacks**
+- A pinned disk can now be a Folder Stack too. Right-click it: the menu
+  has **Sort by** and **Click to** like a stack's, with **Open Folder**
+  (a window, as before) checked; choose **Show Stack** and a click on the
+  disk opens its contents above the dock. The choice and the sort are
+  saved per disk and kept when it is moved. A disk left at **Open Folder**
+  works as before (running dot, **Close** while its window is open, now
+  below the menu's groups) and is never read while the dock idles. A disk
+  that is taken out shows "Cannot read drawer" in its box, without an
+  "insert volume" requester (checked on ApolloOS; not yet on the other
+  systems). Before, a right-click on a disk without an open window did
+  nothing.
+
 **Fixes**
 - A right-click menu that lies over the dock's icons now shows them, and
   the plate, through its glass; before, the glass there showed only the

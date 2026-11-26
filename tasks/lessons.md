@@ -769,3 +769,15 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
 - Rule: before calling a held drawer a dock leak, open and close it as a
   Workbench window by ARexx and try Delete again; only a lock that
   survives that is worth a bisect.
+
+## A field added to a struct inside App moved hover by 12% (ApolloOS, 2026-11-26)
+- Build 575 added `int volume` to `Item` (32 of them inside `App`): the
+  hover sweep composed 8.76 ms a frame against 7.34 ms for 573 in the
+  same session (render 11.3 / 10.1 ms, stalls 5 / 0), with the same
+  damage and no change to the compose code. Deriving the flag from the
+  path instead (build 576, `Item` and `App` back to 573's size) gave
+  10.2 ms against 10.1-10.2 ms.
+- Rule: keep `Item` and `App` sizes unchanged unless a field is needed;
+  derive cheap facts (a path ending in ':') instead. After any change to
+  their layout, run the matched hover sweep against the installed build
+  before judging the feature.

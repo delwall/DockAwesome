@@ -3,6 +3,7 @@
    status, Workbench client and the surface backends are separate modules
    (amiga_app.h). */
 #include "amiga_app.h"
+#include "amiga_folder.h"
 
 #ifndef ICONCTRLA_GetARGBImageData1
 /* AROS icon.library extension absent from the classic NDK. */
@@ -338,10 +339,15 @@ __attribute__((noinline)) int load_icon_mode(const App *app, const char *path, D
 }
 
 /* An entry's own icon, else the one Workbench shows for it: the default
-   icon for its type (DefIcons: ENV:Sys/def_lha, def_drawer, ...). */
+   icon for its type (DefIcons: ENV:Sys/def_lha, def_drawer, ...). Without
+   DOS requesters, as the box's drawer read: a disk taken out after the
+   read fails quietly. */
 static int read_folder_icon(const void *context, const char *path, DockImage *icon)
 {
-    return load_icon_mode(context,path,icon,NULL,0);
+    void *requesters = amiga_requesters_off();
+    int ok = load_icon_mode(context,path,icon,NULL,0);
+    amiga_requesters_restore(requesters);
+    return ok;
 }
 
 static int load_stack_icon(const App *app, const char *path, DockImage *icon)
@@ -350,7 +356,8 @@ static int load_stack_icon(const App *app, const char *path, DockImage *icon)
 }
 
 /* A pinned drawer opens as a Folder Stack: a directory (not a link to
-   one, as read_folder lists it) that is not a volume root. */
+   one, as read_folder lists it) that is not a volume root. A disk (a
+   volume root) is one only when its menu chose Show Stack (set_click). */
 static int drawer_is_stack(const char *path)
 {
     size_t n = strlen(path);
@@ -373,6 +380,45 @@ static int drawer_is_stack(const char *path)
 static int stack_box(const Item *item)
 {
     return item->stack && item->click == DOCK_CLICK_STACK;
+}
+
+/* A disk: a drawer pin on a volume root. It is a stack only while its
+   click is Show Stack (set_click), else a drawer pin with a running dot.
+   Derived from the path, so Item (and App after it) keeps its size. */
+static int disk_pin(const Item *item)
+{
+    size_t n = strlen(item->path);
+    return item->kind == PIN_DRAWER && n && item->path[n-1] == ':';
+}
+
+/* A pin with the stack menu (Sort by, Click to): every stack, and a disk
+   that opens as a window. */
+static int stack_menu(const Item *item)
+{
+    return item->stack || disk_pin(item);
+}
+
+/* A pin's left click. A disk turns into a stack with Show Stack and back
+   into a drawer pin with Open Folder: the running state it had belongs to
+   the other kind (a stack has none; the status worker finds a disk's
+   window again). A box it shows is read ahead. 1 when the stack flag
+   changed. */
+static int set_click(App *app, Item *item, DockClick click)
+{
+    int was_stack = item->stack;
+    item->click = click;
+    if (disk_pin(item)) item->stack = click == DOCK_CLICK_STACK;
+    if (item->stack != was_stack) {
+        item->running = 0;
+        item->owner = NULL;
+        item->lister = 0;
+    }
+    if (stack_box(item)) {
+        item->prefetch = 1;
+        item->prefetch_turns = 0;
+        app->prefetch_pending = 1;
+    }
+    return item->stack != was_stack;
 }
 
 /* A deferred report waits until the caller has replied to its Workbench
@@ -420,11 +466,8 @@ static int pin_path(App *app, const char *path, int defer)
     }
     free(source.pixels);
     item = append_item(app,clean,kind,&cache);
-    if (stack) {
-        item->stack = 1;
-        item->prefetch = 1; item->prefetch_turns = 0;
-        app->prefetch_pending = 1;
-    }
+    item->stack = stack;
+    set_click(app,item,dock_click_default(clean));
     return (int)(item-app->items)+1;
 }
 
@@ -2412,7 +2455,7 @@ static void open_menu(App *app, int x, int y, uint32_t pin_id, int pending)
         const Item *item;
         if (index < 0) return;
         item = &app->items[index];
-        stack = item->stack;
+        stack = stack_menu(item);
         sort = item->sort;
         click = item->click;
         /* Only an app with a program file can become a pin. */
@@ -2483,7 +2526,7 @@ static void sort_menu_item(App *app, DockSort sort)
     int index = pin_index(app,app->menu_pin_id);
     Item *item;
     DockSort previous;
-    if (index < 0 || !app->items[index].stack || app->items[index].sort == sort) return;
+    if (index < 0 || !stack_menu(&app->items[index]) || app->items[index].sort == sort) return;
     item = &app->items[index];
     previous = item->sort;
     item->sort = sort;
@@ -2493,23 +2536,25 @@ static void sort_menu_item(App *app, DockSort sort)
     app->prefetch_pending = 1;
 }
 
-/* The menu's "Click to" choice for its stack, saved at once (reverted if
-   the save fails). Show Stack reads its first page ahead again; Open
-   Folder needs no read-ahead. */
+/* The menu's "Click to" choice for its stack or disk, saved at once
+   (reverted if the save fails). Show Stack reads its first page ahead
+   again; Open Folder needs no read-ahead. The menu shares the box's
+   window, so no box is open. A disk that became a stack needs the close
+   button and loses its dot; one that became a drawer pin again shows its
+   window's dot after the next status poll. */
 static void click_menu_item(App *app, DockClick click)
 {
     int index = pin_index(app,app->menu_pin_id);
     Item *item;
     DockClick previous;
-    if (index < 0 || !app->items[index].stack || app->items[index].click == click) return;
+    if (index < 0 || !stack_menu(&app->items[index]) || app->items[index].click == click) return;
     item = &app->items[index];
     previous = item->click;
     item->click = click;
     if (!item->temporary && !save_config(app)) { item->click = previous; return; }
-    if (click == DOCK_CLICK_STACK) {
-        item->prefetch = 1;
-        item->prefetch_turns = 0;
-        app->prefetch_pending = 1;
+    if (set_click(app,item,click)) {
+        if (item->stack) stack_button_build(app);
+        status_changed(app);
     }
 }
 
@@ -2571,7 +2616,8 @@ int apply_preferences(App *app, const DockUIPrefs *prefs)
             /* Rebuilding takes seconds at large sizes: show progress. */
             snprintf(status,sizeof(status),"Resizing icons %d/%d...",i+1,app->count);
             dock_ui_set_busy(app->ui,status);
-            ok = (app->items[i].stack ? load_stack_icon(app,app->items[i].path,&image) :
+            ok = (app->items[i].stack && !disk_pin(&app->items[i]) ?
+                load_stack_icon(app,app->items[i].path,&image) :
                 load_icon(app,app->items[i].path,&image,NULL)) && dock_cache_build(&swap[i],&image,&next);
             free(image.pixels);
             if (!ok) {
@@ -3168,7 +3214,7 @@ int main(int argc, char **argv)
         if (!loaded) app->incomplete_pins = 1;
         else {
             app->items[loaded-1].sort = app->prefs.sorts[i];
-            app->items[loaded-1].click = app->prefs.clicks[i];
+            set_click(app,&app->items[loaded-1],app->prefs.clicks[i]);
         }
     }
     initial_count = app->count;

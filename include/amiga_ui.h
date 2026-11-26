@@ -62,7 +62,8 @@ int dock_ui_menu_pixels(DockUI *ui, DockImage *out);
 void dock_ui_destroy(DockUI *ui);
 ULONG dock_ui_signal_mask(const DockUI *ui);
 /* drawer: a Folder Stack's menu, with sort (a DockSort) and click (a
-   DockClick) checked. */
+   DockClick) checked, and a Close row when item_action is
+   DOCK_UI_CLOSE_ITEM (a disk whose window is open). */
 int dock_ui_open_popup(DockUI *ui, DockEdge edge, int anchor_x, int anchor_y,
     const struct Window *native_dock,
     int item_action, int can_keep, int drawer, int sort, int click);
