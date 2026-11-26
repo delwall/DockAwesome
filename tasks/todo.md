@@ -2701,12 +2701,14 @@ menus are real windows, so screenshots show them).
       RAM: clean (tools, scripts, configs, profiles, dumps, binaries,
       Editor's RAM:T/JanoRecentFiles), ENV:dpid deleted; scratch worktree
       removed on the Mac.
-- [ ] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete (1.0 beta 4,
-      in use) on 3.9 after its next boot.
-- [ ] amiagent does not start at boot on this 3.9 install (the user
-      started it by hand); not investigated (not a dock matter).
-- [ ] NOT RUN on 3.9: --bench-sweep; Open Folder as a DOpus lister
-      (Workbench is the desktop here).
+- [x] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete (1.0 beta 4,
+      in use) on 3.9 after its next boot (done in the 569 session; it was
+      no longer locked).
+- [x] amiagent does not start at boot on this 3.9 install (the user
+      started it by hand). Solved outside the dock by the user's two
+      S:User-Startup lines; seen working at the 569 session's boot.
+- [ ] NOT RUN on 3.9: Open Folder as a DOpus lister (Workbench is the
+      desktop here). --bench-sweep ran in the 569 session.
 
 ### AmigaOS 3.1.4.1 with builds 551 and 553 (2026-11-25)
 AmigaOS 3.1.4.1 on the Vampire (Kickstart 46.143, exec 46.45, Workbench
@@ -3855,4 +3857,144 @@ each stop).
 - [ ] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete (551) after
       the next Coffin boot.
 - [ ] NOT RUN on Coffin: the native (no AA) path (not used here); a DOpus
+      lister for Open Folder (Workbench is the desktop).
+
+### AmigaOS 3.9 with build 569 (2026-11-26)
+Plain AmigaOS 3.9 on the Vampire (the agent reports kickstart 40.10,
+graphics 40; volume AOS39), 24-bit 1280x720, agent input with relative moves. Build
+569 = 08de37b (HEAD 2b57cc9 changed only docs; `make amiga`: nothing to
+rebuild, no warnings; byte-identical to the Coffin upload). Installed
+before: 551, started from SYS:WBStartup at boot. Test docks from RAM:
+with `--config RAM:` copies, exactly one dock at a time (Status COM=,
+FindTask and Sems before each start, 5 s or more before each stop).
+- [x] At this boot amiagent and ApolloExplorerSrv started by themselves
+      from the two lines the user added at the end of AOS39:S/User-Startup
+      (`run > NIL: Personal:Applications/AmiMCP/amiagent TOKEN=amiga` and
+      `run > NIL: Personal:Applications/ApolloExplorer-Amiga/ApolloExplorerSrv`);
+      Status showed both before any command of mine. On the 551 session's
+      boot amiagent had not started. The user added the same lines on
+      3.1.4.1 (as reported to me); 3.1.4.1 has not been booted with them
+      yet, so that is not verified.
+- [x] Installed 569 in place: 551 copied to RAM:DockOld for controls,
+      stopped (BreakTask, gone after 5 s, no PiP2 semaphore); the old
+      Disabled/DockAwesome-locked-delete (1.0 beta 4) was no longer locked
+      and is deleted; 569 copied as DockAwesome.new, the 551 file was "in
+      use" (WBStartup), so it is now
+      SYS:WBStartup/Disabled/DockAwesome-locked-delete (delete after the
+      next 3.9 boot); .new renamed into place, Version 0.569 build 569.
+- [x] Box dumps (`--pip-dump`, RAM:BtnTest = Sub (360 files) + t10-t15;
+      pins Shell, RAM:BtnTest, Editor), nested Sub page 2 (2/4, 2/5,
+      2/8), sizes 36/48/72: 698x598, 836x541, 1252x465 as on 3.2.3. An
+      empty CON window (`Run >NIL: Wait 1800 >CON:0/20/1280/650/Plain`,
+      grey on 3.9) lay behind the box, so the glass was even.
+
+      | control | 3.9 bbox offset (x / y), 36 / 48 / 72 | 3.2.3 (569) |
+      | --- | --- | --- |
+      | parent arrow | 0.00 / 0.00 each | 0.00 / 0.00 each |
+      | page back "<" | 0.00 / 0.00 each | 0.00 / +0.06, 0.00 / +0.02, 0.00 / 0.00 |
+      | page forward ">" | 0.00 / 0.00 each | 0.00 / +0.03, -0.01 / +0.08, - (backdrop logo) |
+      | Open Folder ring (36) | 648..676 x 508..536, centre 662.00 / 522.00 = icon box centre | the same |
+
+      Ink centroids equal 3.2.3's (arrow 0.24 right / 0.69 up; chevrons
+      0.13 toward the open side). Every full-tone #dee2e9 pixel (buttons,
+      ring, arrow, label, title, page count) lies at exactly the 3.2.3
+      positions: 274 / 431 / 845 pixels at 36 / 48 / 72, 0 differ. Tone
+      (36, brightest pixel per element): title, parent arrow, "<", ">",
+      page count, ring and label #dee2e9 (contrast 11.51 on this grey
+      glass, #24272e); file names #f2f4f8 (13.58).
+- [x] Images: scratchpad `design/39-569-btn-compare-{36,48,72}.png` (10x,
+      3.2.3 above 3.9, cross-hair on the control centre),
+      `design/39-569-nested-p2-36-2x.png`, `-48.png`, `-72.png`,
+      `design/39-569-open-folder-36-6x.png`,
+      `design/39-569-btntest-top-36-2x.png`; also in
+      ~/Downloads/DockAwesome-design/.
+- [x] Behaviour (569 test docks, agent clicks):
+
+      | check | result |
+      | --- | --- |
+      | Open Folder cell, BtnTest box (185x200) | Workbench window "BtnTest" opened, box closed |
+      | Open Folder cell, Downloads box (356x359) | Workbench window "Downloads" (1034,599 169x96) opened, box closed |
+      | parent arrow in Sub | back to the BtnTest box (185x200 at 36 from page 1, 224x246 at 48 from page 2) |
+      | page buttons | ">" to 2/4 (36), 2/5 (48), 2/8 (72); "<" back to page 1 (36) |
+      | quick switch (t.json copy, migrated, 16 pins) | Downloads (box x 766) -> Games (645; its own entries) -> Downloads (766) |
+      | program pin with a box open | Downloads box open, pointer moved to Editor, click: Editor started, box closed |
+      | volume pin (Archives:) | Workbench window "Archives" opened |
+      | Sort by | Date Modified saved "sorts": {"Personal:Downloads": "date"}; the check moved in the reopened menu; box newest first (SAGA readme first) |
+      | Click to | Open Folder saved "clicks" {Personal:Downloads: folder}; left click opened Workbench window "Downloads", no box; the menu showed the check on Open Folder; Show Stack removed "clicks"; left click opened the box |
+
+      Profile: Input downs=8 ups=8 right_seen=3; prefetch stacks=3
+      pending=0. The Downloads box is 356x359 (551: 356x368; the one-line
+      tile, as on the other systems).
+- [x] First open of Downloads after 45 s idle, pointer off the dock
+      (640,300), fresh dock per run, ChangeTaskPri -30, o.json (the 551
+      runs' config, migrated each run), 551 controls (the installed binary
+      from RAM:) alternated:
+
+      | run | build | first paint ms | entrance ms | frame ms | fields |
+      | --- | --- | --- | --- | --- | --- |
+      | n1 | 569 | 92.7 | 142.2 | 6.0 11.7 16.0 23.5 9.0 | 01121 |
+      | o1 | 551 | 95.5 | 139.7 | 5.7 11.8 16.3 20.4 9.1 | 01121 |
+      | n2 | 569 | 92.6 | 146.9 | 7.5 12.8 17.1 26.7 8.9 | 01121 |
+      | o2 | 551 | 95.4 | 139.5 | 5.9 11.3 16.5 20.2 9.2 | 01121 |
+      | n3 | 569 | 93.0 | 141.7 | 6.1 11.3 15.8 21.5 9.0 | 01121 |
+      | n4 | 569 | 92.2 | 147.0 | 7.5 13.0 17.5 26.5 8.9 | 01121 |
+
+      551 recorded earlier on 3.9: 97.4-97.8 / 137.2-137.6 (v1.0b5
+      100.6-114.4 / 134.5-145.6). 569 first paint 2.4-3.2 ms under
+      today's 551 runs. Entrance 2.0-7.5 ms over them with the same five
+      frames and field pattern: no extra field. The fourth frame (the one
+      that spans two fields) takes 21.5-26.7 ms in 569 against 20.2-20.4
+      in 551, and n2/n4 are slower in every frame (memory placement, as
+      in the earlier per-binary lesson); the other systems showed the same
+      direction (Coffin +1.2-1.8, ApolloOS +1-3, 3.1.4.1 +3-4). n2 and n4
+      end 1.3-1.4 ms over the old v1.0b5 maximum 145.6. Open for the
+      owner as a cost note, not a defect: nothing is drawn later (same
+      fields). Prefetch stacks=3 pending=0 reads=92 every run.
+- [x] Hover sweep (pl.json copy, 15 pins, relative moves to x 350, 500,
+      650, 800, 950 at y 692, then off, one per call, 45 s idle, -30):
+
+      | run | build | render_us_avg | max us | stalled | redraws |
+      | --- | --- | --- | --- | --- | --- |
+      | hn1 | 569 | 9835 | 18297 | 1 | 98 |
+      | ho1 | 551 | 9950 | 18015 | 2 | 99 |
+
+      551 earlier 9540 / stalled 0, v1.0b5 9460 / 9561. 569 under today's
+      551 control. Pass; retire_waits=0 retire_defers=3.
+- [x] --bench-sweep 8 (pl.json copy, one script, ChangeTaskPri -30,
+      v1.0b5 from tag v1.0b5 built in a scratch worktree outside the repo),
+      165 redraws each:
+
+      | build | render_us_avg | max us | compose us | stalled |
+      | --- | --- | --- | --- | --- |
+      | v1.0b5 | 7169 | 97527 (first frame) | 4796 | 40 |
+      | 569 | 6804 | 11715 | 5020 | 43 |
+      | v1.0b5 | 6622 | 10949 | 4800 | 40 |
+
+      Same damage (compose 24%, conversion 29% of the pixels). Pass:
+      render_us_avg within the old spread; compose 0.22 ms (4.6%) over
+      v1.0b5 (3.2.3 had shown 0.9 ms with 553), stalled 3 more of 165.
+- [x] RAM:BtnTest stayed "in use" after the tests (as on 3.1.4.1,
+      ApolloOS and Coffin; the tests had opened and closed a Workbench
+      window on it). With RexxMast started for it, ARexx `WINDOW
+      "RAM:BtnTest" OPEN` and `CLOSE` released it and it deleted at once;
+      RexxMast stopped again with RXC. Workbench was the holder, as on
+      Coffin. Not a dock defect.
+- [x] No defect found; no change to src/.
+- [x] End state: 569 in SYS:WBStartup/DockAwesome, started with WBRun,
+      FindTask finds it, one DockAwesome.PiP2 semaphore, Status lists no
+      CLI dock; its Downloads box opened (356x359) and closed with the
+      user's config. ENVARC:DockAwesome.json untouched (566 bytes,
+      Yesterday 16:37:26 on the Amiga clock: the migration by the
+      installed 551 in the 551 session; 13 pins, Downloads last). RAM:
+      holds only Clipboards, ENV, T and amiagent's own file; ENV:dpid,
+      Editor's RAM:T/JanoRecentFiles and an Execute temp file deleted; DL:
+      assign removed; the measuring CON window closed (Break). SYS:WBStartup/
+      Disabled holds the user's WBDock and, until reboot (locked by
+      WBStartup), DockAwesome-locked-delete (551). Scratch worktree
+      removed on the Mac. amiagent and ApolloExplorerSrv keep running.
+- [ ] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete (551) after
+      the next 3.9 boot.
+- [ ] Verify at the next 3.1.4.1 boot that the same two User-Startup lines
+      start amiagent and ApolloExplorerSrv there.
+- [ ] NOT RUN on 3.9: the native (no AA) path (not used here); a DOpus
       lister for Open Folder (Workbench is the desktop).

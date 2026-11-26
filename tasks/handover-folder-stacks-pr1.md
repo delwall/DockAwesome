@@ -705,3 +705,38 @@ One push of folder-stacks; PR opened as a draft and left a draft with a
   (751 bytes, 10:03:46 yesterday, as since the 551 session).
 - Installed now: 569 on AmigaOS 3.2.3, 3.1.4.1, AmiKit XE, ApolloOS and
   Coffin; 551 on AmigaOS 3.9.
+
+## Follow-up: AmigaOS 3.9 with build 569 (2026-11-26)
+
+- At this boot amiagent and ApolloExplorerSrv started by themselves from
+  the two lines the user added at the end of AOS39:S/User-Startup (`run >
+  NIL: .../AmiMCP/amiagent TOKEN=amiga`, `run > NIL:
+  .../ApolloExplorerSrv`); at the 551 session's boot amiagent had not
+  started. The same lines on 3.1.4.1 are not yet verified by a boot.
+- Build 569 (08de37b; HEAD 2b57cc9 changed only docs; not stale, no
+  warnings) installed in place (551 was locked by WBStartup and waits in
+  SYS:WBStartup/Disabled/DockAwesome-locked-delete until reboot; the 1.0
+  beta 4 leftover is deleted), started with WBRun, the only dock, owns
+  PiP2.
+- Box dumps at 36/48/72 (nested drawer, page 2, over an empty CON
+  window): parent arrow and both page buttons 0.00 / 0.00 px by their
+  box at every size, the Open Folder ring on its icon box (662.00,
+  522.00 at 36); every #dee2e9 pixel at exactly the 3.2.3 positions (0
+  differ); file names #f2f4f8.
+- Open Folder cell opens a Workbench window (BtnTest, Downloads); parent
+  arrow, page buttons, quick switch, a program pin with a box open, a
+  volume pin, Sort by and Click to work.
+- First open (4 runs, 551 controls alternated): 92.2-93.0 / 141.7-147.0
+  ms (551 today 95.4-95.5 / 139.5-139.7), same five frames and fields
+  (01121). The two-field fourth frame is 1-6 ms heavier in 569; two runs
+  end 1.3-1.4 ms over v1.0b5's old maximum 145.6, with no extra field.
+  Noted for the owner, not a defect. Hover sweep 9835 us, stalled 1 (551
+  today 9950 / 2). --bench-sweep 8 (first time on 3.9): v1.0b5 / 569 /
+  v1.0b5 7169 / 6804 / 6622 us, compose 4796 / 5020 / 4800, stalled 40 /
+  43 / 40 of 165: pass.
+- RAM:BtnTest stayed locked again; ARexx `WINDOW ... OPEN` + `CLOSE`
+  (RexxMast started for it, stopped with RXC) released it: Workbench was
+  the holder. ENVARC:DockAwesome.json untouched (566 bytes, 16:37:26
+  yesterday, the 551 migration). RAM: clean.
+- Installed now: 569 on all six systems (AmigaOS 3.2.3, 3.1.4.1, AmiKit
+  XE, ApolloOS, Coffin and AmigaOS 3.9).
