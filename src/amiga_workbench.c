@@ -69,6 +69,7 @@ static int acquire_workbench(App *app)
     app->ui = create_ui(app);
     if (!app->ui) { UnlockPubScreen(NULL,app->screen); app->screen = NULL; return 0; }
     dock_ui_set_fit_hook(app->ui,ui_fit,app);
+    dock_ui_set_under_hook(app->ui,menu_under,app);
     use_pixel_backend(app);
     /* A screen PiP cannot use: wait for the next Workbench change. */
     if (app->features.error) return 0;

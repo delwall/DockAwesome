@@ -48,6 +48,17 @@ void dock_ui_set_busy(DockUI *ui, const char *status);
 void dock_ui_set_fit_hook(DockUI *ui, DockUIFit hook, void *context);
 /* --profile: the display's field counter, for the Folder Stack's frame log. */
 void dock_ui_set_field_counter(DockUI *ui, const volatile ULONG *fields);
+/* A menu's glass is built from a capture of the screen bitmap at
+   (left,top), which never holds the PiP overlay: the hook puts what the
+   dock shows there into it, once, before the glass is tinted. */
+typedef void (*DockUIUnder)(void *context, DockImage *capture, int left, int top);
+void dock_ui_set_under_hook(DockUI *ui, DockUIUnder hook, void *context);
+/* --pip-dump: the open menu's tinted glass with its rim (before its rows
+   are drawn), or NULL. */
+const DockImage *dock_ui_menu_glass(const DockUI *ui);
+/* --pip-dump: the open menu's window as the screen shows it, read back
+   into out (the caller frees out->pixels); 0 without glass. */
+int dock_ui_menu_pixels(DockUI *ui, DockImage *out);
 void dock_ui_destroy(DockUI *ui);
 ULONG dock_ui_signal_mask(const DockUI *ui);
 /* drawer: a Folder Stack's menu, with sort (a DockSort) and click (a

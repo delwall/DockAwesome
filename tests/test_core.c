@@ -2037,6 +2037,53 @@ static void test_damage_fuzz(void)
         total,full_frames,box_frames,(unsigned long)(damaged*100/pixels_total));
 }
 
+/* A menu's glass starts from a capture of the screen bitmap, which lacks
+   the PiP overlay: the dock's covered pixels go into it, nothing else. */
+static void test_overlay_onto_capture(void)
+{
+    unsigned int seed = 12345;
+    int round;
+    for (round = 0; round < 4000; ++round) {
+        int cw = 1+(int)((seed = seed*1103515245u+12345u)>>16)%40, ch = 1+(int)((seed = seed*1103515245u+12345u)>>16)%40;
+        int kw = 1+(int)((seed = seed*1103515245u+12345u)>>16)%40, kh = 1+(int)((seed = seed*1103515245u+12345u)>>16)%40;
+        int cl = (int)((seed = seed*1103515245u+12345u)>>16)%100-50, ct = (int)((seed = seed*1103515245u+12345u)>>16)%100-50;
+        int kl = (int)((seed = seed*1103515245u+12345u)>>16)%100-50, kt = (int)((seed = seed*1103515245u+12345u)>>16)%100-50;
+        int visible = (int)((seed = seed*1103515245u+12345u)>>16)%(kw+10)-5;
+        int masked = round%5 != 0, x, y;
+        DockImage capture = {cw,ch,malloc((size_t)cw*ch*4)}, canvas = {kw,kh,malloc((size_t)kw*kh*4)};
+        unsigned char *before = malloc((size_t)cw*ch*4), *coverage = malloc((size_t)kw*kh);
+        unsigned long replaced, expected = 0;
+        assert(capture.pixels && canvas.pixels && before && coverage);
+        for (x = 0; x < cw*ch*4; ++x) capture.pixels[x] = (unsigned char)((seed = seed*1103515245u+12345u)>>16);
+        for (x = 0; x < kw*kh*4; ++x) canvas.pixels[x] = (unsigned char)((seed = seed*1103515245u+12345u)>>16);
+        for (x = 0; x < kw*kh; ++x) coverage[x] = ((seed = seed*1103515245u+12345u)>>16)%3 ? 255 : 0;
+        memcpy(before,capture.pixels,(size_t)cw*ch*4);
+        replaced = dock_overlay_onto_capture(&capture,cl,ct,&canvas,masked ? coverage : NULL,visible,kl,kt);
+        for (y = 0; y < ch; ++y) for (x = 0; x < cw; ++x) {
+            int u = cl+x-kl, v = ct+y-kt;
+            int shown = u >= 0 && u < kw && u < visible && v >= 0 && v < kh &&
+                (!masked || coverage[(size_t)v*kw+u]);
+            const unsigned char *want = shown ? canvas.pixels+((size_t)v*kw+u)*4 : before+((size_t)y*cw+x)*4;
+            assert(!memcmp(capture.pixels+((size_t)y*cw+x)*4,want,4));
+            expected += shown;
+        }
+        assert(replaced == expected);
+        free(capture.pixels); free(canvas.pixels); free(before); free(coverage);
+    }
+    {
+        /* The case on the screen: a 6x4 menu over the top-left of a 8x3
+           dock row; the menu's rows above the row keep the desktop. */
+        unsigned char cap[6*4*4], dock[8*3*4], cov[8*3];
+        DockImage capture = {6,4,cap}, canvas = {8,3,dock};
+        memset(cap,10,sizeof(cap)); memset(dock,200,sizeof(dock)); memset(cov,255,sizeof(cov));
+        cov[0] = 0; /* the plate's clear corner */
+        assert(dock_overlay_onto_capture(&capture,100,698,&canvas,cov,8,101,700) == 2*5-1);
+        assert(cap[(2*6+1)*4] == 10 && cap[(2*6+2)*4] == 200 && cap[(3*6+5)*4] == 200);
+        assert(cap[(1*6+3)*4] == 10 && cap[(2*6+0)*4] == 10);
+        assert(dock_overlay_onto_capture(NULL,0,0,&canvas,cov,8,0,0) == 0);
+    }
+}
+
 int main(void)
 {
     DockSettings defaults = dock_settings_default();
@@ -2045,7 +2092,7 @@ int main(void)
     test_faint_shadows(); test_scaled_shadows(); test_resampling(); test_enclosed_glass_and_centering(); test_animation_stays_inside(); test_zoom_end_keeps_pace(); test_icon_build(); test_scaled_fill(); test_icon_runs();
     test_decode_rgb24(); test_items_fit();
     test_animation_and_pointer_anchor(); test_reference_timing_and_panel(); test_rounded_panel();
-    test_convert(); test_native565(); test_key565(); test_overlay_coverage();
+    test_convert(); test_native565(); test_key565(); test_overlay_coverage(); test_overlay_onto_capture();
     test_render_goldens(0); test_render_goldens(1); test_damage_add(); test_damage_upload_rects(); test_damage_stamp(); test_rgb565_refresh(); test_backdrop_damage(); test_damage_fuzz(); test_conversion_double_buffer();
     printf("All core tests passed: normalization, alpha, layout bounds, clipping, 65536 blends, reorder, renderer.\n");
     printf("Default cache: %lu bytes/icon; 20 icons: %lu bytes.\n",

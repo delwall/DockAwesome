@@ -2350,7 +2350,59 @@ static void sync_input_ui(App *app)
     Enable();
 }
 
-static void open_menu(App *app, int x, int y, uint32_t pin_id)
+/* --pip-dump: the dock's canvas as PiP shows it, magenta where it shows
+   the screen (coverage 0, or past the visible columns). */
+static void dump_keyed_canvas(App *app, const char *suffix)
+{
+    DockImage keyed = {app->width,app->height,malloc((size_t)app->width*app->height*4)};
+    int visible = pip_visible_width(app), x, y;
+    if (!keyed.pixels || !app->canvas.pixels) { free(keyed.pixels); return; }
+    for (y = 0; y < app->height; ++y) for (x = 0; x < app->width; ++x) {
+        size_t i = (size_t)y*app->width+x;
+        static const unsigned char key[4] = {255,0,255,255};
+        memcpy(keyed.pixels+i*4,x < visible && (!app->coverage || app->coverage[i]) ?
+            app->canvas.pixels+i*4 : key,4);
+    }
+    dump_ppm(app->pip_dump,suffix,&keyed);
+    free(keyed.pixels);
+}
+
+/* The UI's hook for a menu's glass: capture is the screen bitmap at
+   (left,top), which never holds the PiP overlay, and PiP cuts the menu out
+   of the dock, so the glass gets the dock's pixels from the canvas as PiP
+   shows them (open_menu has drawn the frame shown under the menu). Once
+   per opening: the row holds still while a menu is open. */
+void menu_under(void *context, DockImage *capture, int left, int top)
+{
+    App *app = context;
+    unsigned long replaced = 0;
+    if (app->pip_dump[0]) dump_ppm(app->pip_dump,"popupdesk",capture);
+    if (app->pip_visible && app->canvas.pixels)
+        replaced = dock_overlay_onto_capture(capture,left,top,&app->canvas,app->coverage,
+            pip_visible_width(app),app->left,app->top);
+    if (app->pip_dump[0]) {
+        dump_keyed_canvas(app,"popupdock");
+        printf("Menu dump: popup %d,%d %dx%d, dock %d,%d %dx%d visible %d shown %d, dock pixels %lu\n",
+            left,top,capture->width,capture->height,app->left,app->top,app->width,app->height,
+            pip_visible_width(app),app->pip_visible,replaced);
+        fflush(stdout);
+    }
+}
+
+/* --pip-dump: the open menu's glass and its window as the screen shows it. */
+static void dump_menu(App *app)
+{
+    DockImage shown;
+    const DockImage *glass = dock_ui_menu_glass(app->ui);
+    if (glass) dump_ppm(app->pip_dump,"popupglass",glass);
+    if (dock_ui_menu_pixels(app->ui,&shown)) {
+        dump_ppm(app->pip_dump,"popup",&shown);
+        free(shown.pixels);
+    }
+}
+
+/* pending: the loop pass already has a frame to draw. */
+static void open_menu(App *app, int x, int y, uint32_t pin_id, int pending)
 {
     int opened, can_keep = 0, stack = 0, action = DOCK_UI_NONE, sort = DOCK_SORT_NAME;
     int click = DOCK_CLICK_STACK;
@@ -2390,10 +2442,20 @@ static void open_menu(App *app, int x, int y, uint32_t pin_id)
     app->input_context.popup_open = app->input_context.ui_busy = 1;
     app->input_context.active = NULL;
     Enable();
+    /* The menu's glass takes the dock's pixels from the canvas: draw the
+       frame that stays under the menu first (without the hover label, with
+       a new running dot or a field-deferred zoom step). Once per opening,
+       outside the field pacing: it may wait up to a field for a retired
+       PiP buffer before the menu appears. */
+    if (pending || app->gesture_redraw || app->redraw_due) {
+        app->gesture_redraw = app->redraw_due = 0;
+        draw(app);
+    }
     opened = dock_ui_open_popup(app->ui,app->edge,x,y,NULL,
         action,can_keep,stack,sort,click);
     sync_input_ui(app);
     if (opened) {
+        if (app->pip_dump[0]) dump_menu(app);
         app->menu_pin_id = pin_id;
         memcpy(app->target,app->placement,(size_t)app->count*sizeof(*app->placement));
         dock_animation_reset(&app->animation);
@@ -2704,7 +2766,7 @@ static __attribute__((noinline)) void event_loop(App *app)
             if (serial != app->menu_seen) {
                 app->menu_seen = serial;
                 if (!cancelled && screen == app->screen && IntuitionBase->FirstScreen == app->screen &&
-                    !dock_ui_busy(app->ui) && !app->gesture.active) { open_menu(app,x,y,pin_id); redraw = 1; }
+                    !dock_ui_busy(app->ui) && !app->gesture.active) { open_menu(app,x,y,pin_id,redraw); redraw = 1; }
             }
         }
         sync_input_ui(app);
@@ -2926,7 +2988,9 @@ static void usage(void)
          "--ammx and --pip are accepted for compatibility: both are always on.\n"
          "--pip-x-offset and --pip-y-offset set alignment from -128 to 128.\n"
          "--pip-dump writes prefix-source.ppm and prefix-composed.ppm on exit,\n"
-         "and prefix-folder.ppm when a Folder Stack box has opened.\n"
+         "prefix-folder.ppm when a Folder Stack box has opened, and for each\n"
+         "menu prefix-popup.ppm (its window on the screen), -popupglass.ppm,\n"
+         "-popupdesk.ppm (the screen under it) and -popupdock.ppm (the dock).\n"
          "--bench-sweep 1..64 sweeps a synthetic pointer at that many pixels per\n"
          "frame, prints the profile and exits. --damage-check compares every\n"
          "frame with a full composition and PiP conversion and reports mismatches.\n"
@@ -3079,6 +3143,7 @@ int main(int argc, char **argv)
     app->ui = create_ui(app);
     if (!app->ui) { message("Cannot set up the dock controls."); goto done; }
     dock_ui_set_fit_hook(app->ui,ui_fit,app);
+    dock_ui_set_under_hook(app->ui,menu_under,app);
     if (app->profile) dock_ui_set_field_counter(app->ui,&app->vblank.fields);
     use_pixel_backend(app);
     if (!dock_items_fit(&app->settings,app->prefs.count,viewport_limit(app,app->edge))) {

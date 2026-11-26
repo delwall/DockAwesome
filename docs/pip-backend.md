@@ -31,7 +31,8 @@ capture. Keep a separate coverage byte per pixel.
 
 Covered pixels use the latest capture. Uncovered pixels show the desktop
 directly. Check the actual display for alignment and scanout timing.
-`--pip-dump PREFIX` writes source and composite PPM files on exit.
+`--pip-dump PREFIX` writes source and composite PPM files on exit, and
+each menu's window, glass and the dock under it as it opens.
 
 ## Input and drops
 

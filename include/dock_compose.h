@@ -39,6 +39,18 @@ void dock_render_oriented_mask(DockImage *canvas, const DockImage *backdrop,
    never change in place. */
 typedef struct { const DockImage *image; int x, y; unsigned long stamp; } DockOverlay;
 
+/* What the screen shows where the dock's overlay lies over a capture of
+   the screen bitmap (which never holds the overlay). The capture's pixel
+   (0,0) is the screen's (capture_left,capture_top), the canvas's is
+   (canvas_left,canvas_top). Where the canvas is covered (coverage nonzero;
+   NULL counts as covered) in its first visible columns, its pixel replaces
+   the capture's: the canvas is opaque, already blended over the backdrop,
+   so this is the dock blended over the desktop. Returns the pixels
+   replaced. */
+unsigned long dock_overlay_onto_capture(DockImage *capture, int capture_left, int capture_top,
+    const DockImage *canvas, const unsigned char *coverage, int visible,
+    int canvas_left, int canvas_top);
+
 /* The plate as drawn (dock_edge_panel_reach over include) and its corner
    radius. An empty plate is {0,0,0,0} with radius 0. Returns 0 when nothing
    is drawn. */
