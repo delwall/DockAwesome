@@ -519,3 +519,18 @@ void dock_open_glyph_row(const DockOpenGlyph *g, int py, int px0, int count, uns
         }
     }
 }
+
+int dock_menu_covers(DockRect dock, int pointer_x, int pointer_y, const DockRect *menus, int count)
+{
+    int i, dx, dy;
+    if (dock.right <= dock.left || dock.bottom <= dock.top) return 0;
+    if (count >= 0) {
+        for (i = 0; i < count; ++i)
+            if (menus[i].left < dock.right && menus[i].right > dock.left &&
+                menus[i].top < dock.bottom && menus[i].bottom > dock.top) return 1;
+        return 0;
+    }
+    dx = pointer_x < dock.left ? dock.left-pointer_x : pointer_x >= dock.right ? pointer_x-dock.right+1 : 0;
+    dy = pointer_y < dock.top ? dock.top-pointer_y : pointer_y >= dock.bottom ? pointer_y-dock.bottom+1 : 0;
+    return dock.top < DOCK_MENU_REACH || (dx < DOCK_MENU_REACH && dy < DOCK_MENU_REACH);
+}

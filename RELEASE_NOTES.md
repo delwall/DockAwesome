@@ -22,6 +22,11 @@ Draft, not released.
   the plate, through its glass; before, the glass there showed only the
   desktop, as if the dock were not behind it (checked on ApolloOS with
   the dock at the bottom, left and right).
+- On ApolloOS a right-click on the desktop or in a window no longer hides
+  the dock for a moment when the pointer is in the lower part of the
+  screen. The dock now steps aside only when a menu actually opens over
+  it, for example a menu dropping over a dock on the left edge (checked
+  on ApolloOS with the dock at the bottom and on the left).
 
 ## 1.0 beta 6
 

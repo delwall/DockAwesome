@@ -21,6 +21,7 @@ typedef struct {
     int workbench_port; /* the WORKBENCH port: Workbench itself is running */
     int scalos;         /* the SCALOS port: Scalos runs as the desktop */
     int dopus;          /* Directory Opus 5 runs (DOPUS.1 and dopus5.library) */
+    int menu_windows;   /* Intuition V50 (ApolloOS) draws menus in windows */
 } DockCaps;
 
 enum { DOCK_PIXELS_PORTABLE, DOCK_PIXELS_AMMX };

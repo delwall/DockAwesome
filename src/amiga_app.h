@@ -462,6 +462,7 @@ typedef struct App {
     /* Ctrl-Amiga-Amiga was answered: PiP stays off and the loop ends. */
     int resetting;
     int menu_decided, menu_hides; /* the native menu held now: whether PiP steps aside */
+    ULONG menu_press; /* input_context.right_seen when that menu was decided */
     ResetWatch reset; /* amiga_reset.c */
     int drop_preview_slot, displayed_drop_slot, snap_wait_motion, snap_x, snap_y;
     uint32_t next_pin_id, flash_pin_id;

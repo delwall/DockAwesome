@@ -4265,3 +4265,83 @@ non-default values ("stack" for a disk, "folder" for a drawer).
       before; Show Stack on a disk untested there); the running dot on the
       monitor (PiP; seen only in the canvas dump); a real CD or floppy
       taken out (an ejected ADF image stood in).
+
+### Dock hides on a right-click in the lower half of the screen (ApolloOS, 2026-11-27)
+User report and video IMG_2662 (ApolloOS only): the dock row vanishes and
+fades back for each right-click in the lower half of the Workbench screen,
+not in the upper half; no menu near the dock. Build 577 installed; test
+docks used RAM:da.json / RAM:dl.json copies; ENVARC untouched.
+- [x] Observe PiP objectively. PiP2 registers are write-only, so the tool
+      PipWatch (scratch, read-only) read the dock's own `AmigaPip`
+      (`configured` = DMA on, front, physical x/y) through the
+      "DockAwesome.PiP2" lease semaphore, every 2 ms (timer.device, 20-50 s
+      bounded), with an input.device handler at pri 127 logging button
+      events, the pointer, PeekQualifier and the screen's top layers on one
+      EClock.
+- [x] Agent clicks do not reproduce it: amiga_click/amiga_button events
+      carry no button qualifier, PeekQualifier stayed "free", so the dock's
+      `native_menu_held()` never fired (PiP stayed ON in every agent
+      right-click, also a 6 s hold). A tool sending IND_ADDEVENT with
+      IEQUALIFIER_RBUTTON (as the gameport path does) reproduced it.
+- [x] Timeline, build 577 (installed), dock box 208,612-1071,719:
+
+      | right button | pointer (y) | PiP2 |
+      | --- | --- | --- |
+      | click | 400,200 / 300,350 | stays ON |
+      | click | 400,500 / 300,362 / 300,600 | OFF 2.3 ms after down, ON 41 ms after up |
+      | down lower, up upper | 450,650 -> 450,200 | OFF at down, ON 36 ms after up |
+      | down upper, up lower | 450,200 -> 450,650 | stays ON |
+      | left click (control) | 400,560 | stays ON |
+      | Personal window active | 300,600 | OFF / ON as above |
+      | on the dock | 640,705 | dock's own menu, stays ON |
+      | no dock running | 400,500 | no lease (nothing turns PiP on or off) |
+
+      Intuition's menu window is always [0,0-1279,11] (the title bar);
+      the Workbench menu drops to [1,12-164,92]. IControl prefs: ic_Flags
+      $1000C01E, ICF_POPUPMENUS off (pull-down menus).
+- [x] Root cause: the dock. `menu_near_dock()` (commit 7171165, made for
+      MagicMenu's pop-up menus on Coffin) hid PiP for any native menu
+      opened within 256 px of the dock: dock top 612 - 256 = y 357, the
+      "lower half". ApolloOS menus drop from the title bar. 1.0 beta 5
+      (built from the tag) does the same (native_menu_hides=2, OFF at
+      400,500 and 300,650); 577 matched run native_menu_hides=3.
+- [x] Fix (build 578, review fixes in 579): Intuition V50 (ApolloOS) draws menus in windows
+      (`caps.menu_windows`), so while a native menu is held the dock reads
+      the windows in front of its own (AttemptSemaphore only) and steps
+      aside once one overlaps its PiP box, polling at the fast rate until
+      then. Other systems keep the pointer rule, once per menu.
+      `dock_menu_covers()` holds the decision; host test in
+      test_geometry.
+- [x] 578, bottom dock (pw5): right-clicks at y 200 / 500 / 362, press
+      lower release upper, and the Workbench menu dropped and released off
+      it: PiP2 ON throughout, native_menu_hides=0.
+- [x] 578, left dock (dl.json, box 3,13-194,719): right-click at 600,400
+      stays ON (the old rule always hid a dock whose top is < 256); the
+      Window menu dropping over the dock ([73,12-218,154]) turned PiP OFF in
+      the same 2 ms poll, ON again after release; native_menu_hides=2.
+- [x] Hover sweep, 8 relative moves along y 690, one run each: 578
+      render_us_avg 9151, compose 6699 (130 redraws); 577 9993 / 7459
+      (132). No regression (single runs; not claimed as a gain).
+- [x] Independent review (Opus, the diff): one P1 fixed in build 579:
+      any foreign window in front of the dock counted as a menu, so a
+      program's window over the dock would still hide it. Menu windows on
+      R9.5 are borderless with no UserPort (PipWatch: Flags $00040800,
+      Workbench windows $2A24107F with a port); only those count now. P2
+      fixed: a new right press is a new menu even when the loop missed the
+      release (`right_seen`); no layer walk while another screen is in
+      front or a reset runs. P2 left: a layer lock busy for a whole menu
+      leaves the dock up (none seen: layer_busy 0-1 per run); the tested
+      box includes the keyed zoom headroom (as before the change).
+- [x] 579 bottom (pw9): clicks at 400,500 / 300,650 / 400,200 and the
+      Window and Workbench menus dropped: PiP2 ON throughout,
+      native_menu_hides=0; hover sweep render 9500 / compose 7052 (133
+      redraws; 577 9993 / 7459). 579 left (pw10): click at 600,400 stays
+      ON; the Window menu over the dock: OFF 5 ms after its window
+      appeared, ON 82 ms after release; native_menu_hides=1.
+- [x] make host-test, make host-sanitize, make amiga (no warnings).
+- [ ] NOT RUN: Coffin, AmigaOS 3.2.3, 3.9, 3.1.4.1, AmiKit XE (unchanged
+      pointer rule there; plain Intuition pull-down menus on AmigaOS 3.x
+      would hide a bottom dock in the lower half the same way: to check
+      with a qualifier-correct right-click); ApolloOS pop-up menus
+      (ICF_POPUPMENUS); the monitor itself (PiP is not in screenshots: the
+      dock's register writes were observed, not the picture).

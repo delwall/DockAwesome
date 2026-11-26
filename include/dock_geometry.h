@@ -66,6 +66,16 @@ int dock_edge_panel_reach(const DockSettings *settings, DockEdge edge,
     const DockPlacement *placement, int count, int width, int height,
     const DockRect *include, DockRect *out);
 
+/* Whether PiP must step aside for a held native menu (PiP2 lies over
+   menus). dock is the shown PiP box on the screen. Where the system draws
+   its menus in windows (ApolloOS), menus holds the count windows in front
+   of the dock: only one overlapping the dock counts. count < 0: menus are
+   not windows (MagicMenu, AmigaOS 3.x); a menu opened within
+   DOCK_MENU_REACH of the pointer may reach the dock, and so does one that
+   drops from the title bar onto a dock that starts near the top. */
+enum { DOCK_MENU_REACH = 256 };
+int dock_menu_covers(DockRect dock, int pointer_x, int pointer_y, const DockRect *menus, int count);
+
 /* The empty slot a drag or a drop opens in the row, animated like an icon
    so the plate's ends move with the row: at an end nothing else bounds the
    plate, and set at once it jumped there while the icons slid (IMG_2595).

@@ -1024,7 +1024,12 @@ static void live_schedule(App *app)
        second to find PiP hidden. */
     held = IntuitionBase->FirstScreen == app->screen &&
         buttons_engaged(app,ANY_BUTTON) && !native_menu_held(app);
-    fast = animation_needed(app) || (held && !app->input_context.local_motion);
+    /* While a native menu that does not cover the dock is held on
+       ApolloOS, its windows are watched each field: one can open over
+       the dock later (a pop-up menu, a long menu, a submenu). */
+    fast = animation_needed(app) || (held && !app->input_context.local_motion) ||
+        (app->caps.menu_windows && native_menu_held(app) && !app->menu_hides &&
+            app->pip_visible && IntuitionBase->FirstScreen == app->screen);
     /* On Magellan, give a held button the fast capture rate once the
        backdrop moves or there is dock artwork following the gesture. */
     if (!fast && held && app->input_context.local_motion) {

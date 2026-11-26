@@ -781,3 +781,19 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
   derive cheap facts (a path ending in ':') instead. After any change to
   their layout, run the matched hover sweep against the installed build
   before judging the feature.
+
+## Agent right-clicks do not set the button qualifier (ApolloOS, 2026-11-27)
+- The dock hid PiP for every desktop right-click in the lower half (IMG_2662),
+  but agent right-clicks (amiga_click, amiga_button) never did: their events
+  carry no IEQUALIFIER_RBUTTON, so PeekQualifier stayed free and
+  `native_menu_held()` never fired. A test that depends on a held button
+  must send it through IND_ADDEVENT with the qualifier (input.device then
+  sets PeekQualifier, as for the gameport); check PeekQualifier in the log.
+- PiP2 registers are write-only: observe what the dock wrote by reading its
+  `AmigaPip` through the DockAwesome.PiP2 lease semaphore, on one EClock with
+  an input.device spy. That showed OFF 2 ms after the press, ON 40 ms after
+  the release.
+- A rule built for one menu system (MagicMenu pop-ups at the pointer) was
+  applied to every OS. Check how menus open on each target first (ApolloOS:
+  pull-down windows from the title bar, IControl ICF_POPUPMENUS off) and
+  decide from what is there (the menu's windows) where the OS shows it.

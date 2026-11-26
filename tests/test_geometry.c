@@ -604,6 +604,46 @@ static void test_open_glyph(void)
     }
 }
 
+/* PiP steps aside only for a native menu that can reach it (IMG_2662:
+   ApolloOS hid a bottom dock for every right-click in the lower half). */
+static void test_menu_covers(void)
+{
+    const DockRect bottom = {208,612,1056,720}, left = {0,100,96,620};
+    const DockRect bar = {0,0,1280,12}, items = {0,12,180,300}, long_items = {300,12,520,640};
+    const DockRect popup = {380,520,560,700}, left_items = {40,12,220,300};
+    DockRect menus[2];
+    /* Menus are windows (ApolloOS): only their overlap counts, never the pointer. */
+    assert(!dock_menu_covers(bottom,400,650,NULL,0));
+    menus[0] = bar;
+    assert(!dock_menu_covers(bottom,400,650,menus,1));
+    assert(!dock_menu_covers(bottom,450,200,menus,1));
+    menus[1] = items;
+    assert(!dock_menu_covers(bottom,100,600,menus,2));
+    menus[1] = long_items;
+    assert(dock_menu_covers(bottom,400,30,menus,2));
+    menus[0] = popup;
+    assert(dock_menu_covers(bottom,400,520,menus,1));
+    menus[0] = bar; menus[1] = left_items;
+    assert(dock_menu_covers(left,600,5,menus,2));
+    menus[1] = (DockRect){120,12,300,300};
+    assert(!dock_menu_covers(left,600,5,menus,2));
+    /* Touching edges do not overlap (half-open bounds). */
+    menus[0] = (DockRect){0,0,1280,612};
+    assert(!dock_menu_covers(bottom,0,0,menus,1));
+    menus[0].bottom = 613;
+    assert(dock_menu_covers(bottom,0,0,menus,1));
+    /* No menu windows (MagicMenu): the pointer within 256 px, or a dock
+       that starts within 256 px of the top. */
+    assert(dock_menu_covers(bottom,400,650,NULL,-1));
+    assert(dock_menu_covers(bottom,300,612-255,NULL,-1));
+    assert(!dock_menu_covers(bottom,300,612-256,NULL,-1));
+    assert(!dock_menu_covers(bottom,1056+255,700,NULL,-1));
+    assert(dock_menu_covers(bottom,1056+254,700,NULL,-1));
+    assert(dock_menu_covers(left,1200,700,NULL,-1));
+    /* An empty dock box is never covered. */
+    assert(!dock_menu_covers((DockRect){10,10,10,20},10,15,NULL,-1));
+}
+
 int main(void)
 {
     test_layout_and_baseline();
@@ -618,6 +658,7 @@ int main(void)
     test_outside_shown();
     test_button_glyph();
     test_open_glyph();
-    puts("geometry: bottom/left/right layout, upright hit/slot/outside, half-open panel bounds, animation equivalence and centred box buttons (page chevrons, return arrow) and Open Folder glyph PASS");
+    test_menu_covers();
+    puts("geometry: native menu reach, bottom/left/right layout, upright hit/slot/outside, half-open panel bounds, animation equivalence and centred box buttons (page chevrons, return arrow) and Open Folder glyph PASS");
     return 0;
 }

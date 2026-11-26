@@ -117,6 +117,9 @@ int amiga_caps_probe(DockCaps *caps, struct Screen *screen)
     caps->shaped_windows = intuition_extension(858) && LayersBase->lib_Version >= 50;
     caps->window_action = intuition_extension(942);
     caps->status_notify = intuition_extension(930);
+    /* ApolloOS's (AROS) Intuition opens each menu as a window on the
+       screen; AmigaOS 3.x Intuition (V47 and older) and MagicMenu do not. */
+    caps->menu_windows = IntuitionBase->LibNode.lib_Version >= 50;
     caps->apollo_console = apollo_console();
     caps->screen_notify = optional_library("screennotify.library",1,0);
     /* Pins open through workbench.library, which needs Workbench itself;
@@ -230,6 +233,7 @@ void amiga_caps_print(const DockCaps *caps, const DockProfile *profile)
     printf("  %-22s %s\n","alpha_text",yes_no(caps->alpha_text));
     printf("  %-22s %s\n","window_action",yes_no(caps->window_action));
     printf("  %-22s %s\n","status_notify",yes_no(caps->status_notify));
+    printf("  %-22s %s\n","menu_windows",yes_no(caps->menu_windows));
     printf("  %-22s %s\n","apollo_console",yes_no(caps->apollo_console));
     printf("  %-22s %s\n","screen_notify",yes_no(caps->screen_notify));
     printf("  %-22s %d\n","screen_depth",caps->screen_depth);

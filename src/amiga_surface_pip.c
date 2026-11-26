@@ -149,34 +149,59 @@ static int update_drag_mask(App *app, int sample)
     return 1;
 }
 
-/* A native menu opened within this many pixels of the dock may cover it. */
-enum { MENU_REACH = 256 };
-
-/* Whether a native menu opened now can reach the dock: MagicMenu's pop-up
-   opens at the pointer, Intuition's drops from the title bar, so a dock
-   near the top (a side dock) always steps aside. Decided once per menu. */
-static int menu_near_dock(const App *app)
+/* The windows of a native menu that lie in front of the dock, up to max:
+   the count, -1 while the layer list is busy (Intuition's menu task takes
+   it briefly as the menu opens). ApolloOS opens the menu bar, items and
+   subitems as borderless windows without a UserPort (seen on R9.5: Flags
+   $00040800); a program's window in front of the dock has its IDCMP port
+   and is not a menu. Only AttemptSemaphore: never wait on a lock while a
+   menu is held. */
+static int menu_windows(App *app, DockRect *out, int max)
 {
-    int x = app->screen->MouseX, y = app->screen->MouseY;
-    int right = app->left+pip_visible_width(app), bottom = app->top+app->height;
-    int dx = x < app->left ? app->left-x : x >= right ? x-right+1 : 0;
-    int dy = y < app->top ? app->top-y : y >= bottom ? y-bottom+1 : 0;
-    return app->top < MENU_REACH || (dx < MENU_REACH && dy < MENU_REACH);
+    struct Layer *layer;
+    int count = 0;
+    if (!AttemptSemaphore(&app->screen->LayerInfo.Lock)) return -1;
+    for (layer = app->window->WLayer->front; layer && count < max; layer = layer->front) {
+        struct Window *window = layer->Window;
+        if (window && !window->UserPort && (window->Flags & WFLG_BORDERLESS) &&
+            !owns_window(app,window))
+            out[count++] = (DockRect){layer->bounds.MinX,layer->bounds.MinY,
+                layer->bounds.MaxX+1,layer->bounds.MaxY+1};
+    }
+    ReleaseSemaphore(&app->screen->LayerInfo.Lock);
+    return count;
 }
 
-/* PiP2 lies over menus, so the dock steps aside for a native menu that can
-   reach it; one opened further away leaves the dock in place (hiding it
-   for every desktop right-click on Coffin was jarring). The screen is not
-   read while a menu is up: under P96 MagicMenu holds the screen's bitmap
-   lock until it closes. */
+/* PiP2 lies over menus, so the dock steps aside for a native menu that
+   reaches it and stays for one that does not (hiding it for every desktop
+   right-click was jarring). ApolloOS draws menus in windows: the dock
+   watches them for the whole menu and steps aside once one overlaps it;
+   its menus drop from the title bar, so a right-click anywhere leaves a
+   bottom dock in place (IMG_2662: it hid for every click within 256 px).
+   Elsewhere (MagicMenu draws no windows) the pointer decides, once per
+   menu. The screen is not read while a menu is up: under P96 MagicMenu
+   holds the screen's bitmap lock until it closes. */
 static int pip_blocked_by_screen(App *app)
 {
     int menu = native_menu_held(app);
     if (!menu) app->menu_decided = 0;
-    else if (!app->menu_decided) {
-        app->menu_decided = 1;
-        app->menu_hides = menu_near_dock(app);
-        if (app->menu_hides) ++app->stats.menu_suspends;
+    else {
+        DockRect dock = {app->left,app->top,app->left+pip_visible_width(app),app->top+app->height};
+        DockRect windows[8];
+        /* A new press is a new menu, also when the loop missed the
+           release between them. */
+        ULONG press = app->input_context.right_seen;
+        int first = !app->menu_decided || press != app->menu_press, covers = 0, count;
+        if (first) { app->menu_decided = 1; app->menu_hides = 0; app->menu_press = press; }
+        if (app->menu_hides) {}
+        else if (app->caps.menu_windows) {
+            if (!app->resetting && IntuitionBase->FirstScreen == app->screen) {
+                count = menu_windows(app,windows,8);
+                covers = count > 0 && dock_menu_covers(dock,0,0,windows,count);
+            }
+        } else if (first)
+            covers = dock_menu_covers(dock,app->screen->MouseX,app->screen->MouseY,NULL,-1);
+        if (covers) { app->menu_hides = 1; ++app->stats.menu_suspends; }
     }
     if (!app->resetting && IntuitionBase->FirstScreen == app->screen && !(menu && app->menu_hides)) return 0;
     interaction_cancel(app);
