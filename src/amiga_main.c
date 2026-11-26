@@ -3214,7 +3214,11 @@ int main(int argc, char **argv)
         if (!loaded) app->incomplete_pins = 1;
         else {
             app->items[loaded-1].sort = app->prefs.sorts[i];
-            set_click(app,&app->items[loaded-1],app->prefs.clicks[i]);
+            /* A click chosen in the file. pin_path already gave the pin
+               its own path's default, which can differ from the file's
+               path's default (an assign such as "C:" pins a drawer). */
+            if (app->prefs.clicks[i] != dock_click_default(app->prefs.paths[i]))
+                set_click(app,&app->items[loaded-1],app->prefs.clicks[i]);
         }
     }
     initial_count = app->count;

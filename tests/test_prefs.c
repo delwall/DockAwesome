@@ -410,6 +410,12 @@ static void test_disk_clicks(void)
     assert(after.clicks[0] == DOCK_CLICK_FOLDER && after.clicks[1] == DOCK_CLICK_STACK);
     written_json(&after,json,sizeof(json));
     assert(strstr(json,"\"clicks\": {\n    \"Work:\": \"stack\"\n  }\n}\n"));
+    /* The same when that disk was a pin already: it shows its box. */
+    assert(read_text("{\"version\":1,\"folder\":\"work:\",\"paths\":[\"Archives:\",\"Work:\"],"
+        "\"sorts\":{\"Work:\":\"kind\"}}",&after));
+    assert(dock_prefs_migrate(&after) == 1);
+    assert(after.count == 2 && after.clicks[0] == DOCK_CLICK_FOLDER &&
+        after.clicks[1] == DOCK_CLICK_STACK && after.sorts[1] == DOCK_SORT_KIND);
 }
 
 static void test_bad_file(void)

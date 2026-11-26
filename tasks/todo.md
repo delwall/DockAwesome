@@ -4239,3 +4239,29 @@ non-default values ("stack" for a disk, "folder" for a drawer).
       575 had `int volume` in `Item` (App grew 128 bytes): compose 1.4 ms
       slower with unchanged compose code (lessons.md). 576 derives it from
       the path: within 0.5% of 573. Pass.
+- [x] Independent review (Opus, the diff only): no P0/P1; two P2 fixed in
+      build 577: the 1.0 beta 5 Folder Stack that was also a pin kept its
+      default click on migration (a disk then lost its box): now Show
+      Stack either way (host test); at startup a click equal to the file
+      path's default is not applied over the pin's own default (a
+      hand-edited assign such as "C:" pins a drawer and must show its
+      box). 577 on ApolloOS: "C:" + "Archives:" ("stack") config: C: opened
+      its box (698x598), Archives: its box (185x200); hover sweep 10421 /
+      compose 7639 (576: 7648 / 7637), stalled 1.
+- [x] End state: 577 in SYS:WBStartup/DockAwesome (Version 0.577), started
+      with WBRun; FindTask finds one DockAwesome, one DockAwesome.PiP2
+      semaphore, Status lists no CLI dock; with the user's config the
+      Personal: menu shows Open Folder checked and Close (its window is
+      open). The 573 file was "in use" (WBStartup), so it is now
+      SYS:WBStartup/Disabled/DockAwesome-locked-delete; the 569 one from
+      the last session was deleted. ENVARC:DockAwesome.json untouched (588
+      bytes, 17:16:08, as at the start). RAM: holds only Clipboards, ENV, T;
+      DL: assign removed, ENV:dpid deleted, IDF0: empty (the test ADF
+      ejected and deleted). amiagent and ApolloExplorerSrv keep running.
+- [ ] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete (573) after
+      the next ApolloOS boot.
+- [ ] NOT RUN: Coffin, AmigaOS 3.2.3, AmigaOS 3.9, AmigaOS 3.1.4.1, AmiKit
+      XE (a disk's Open Folder there opens a Directory Opus lister, as
+      before; Show Stack on a disk untested there); the running dot on the
+      monitor (PiP; seen only in the canvas dump); a real CD or floppy
+      taken out (an ejected ADF image stood in).

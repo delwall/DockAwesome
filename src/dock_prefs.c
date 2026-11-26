@@ -439,7 +439,9 @@ int dock_prefs_migrate(DockPrefs *prefs)
     int i;
     if (!prefs || !prefs->folder[0]) return 0;
     for (i = 0; i < prefs->count; ++i) if (same_path(prefs->paths[i],prefs->folder)) break;
-    if (i == prefs->count && prefs->count < DOCK_MAX_ITEMS) {
+    /* Already a pin: it keeps its sort and shows its box (a disk too). */
+    if (i < prefs->count) prefs->clicks[i] = DOCK_CLICK_STACK;
+    else if (prefs->count < DOCK_MAX_ITEMS) {
         memcpy(prefs->paths[prefs->count],prefs->folder,sizeof(prefs->folder));
         prefs->sorts[prefs->count] = DOCK_SORT_NAME;
         prefs->clicks[prefs->count++] = DOCK_CLICK_STACK;
