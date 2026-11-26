@@ -649,3 +649,31 @@ One push of folder-stacks; PR opened as a draft and left a draft with a
   DOpus listers were open at the start (rebooted machine), none left open.
 - Installed now: 569 on AmigaOS 3.2.3, 3.1.4.1 and AmiKit XE; 551 on
   ApolloOS, Coffin, 3.9.
+
+## Follow-up: ApolloOS with build 569 (2026-11-26)
+
+- The dock "missing from Status" was running: Status lists only CLI
+  processes; the exec task list showed DockAwesome (551) started from
+  SYS:WBStartup, with its PiP2 semaphore.
+- Build 569 (08de37b; HEAD 866c55d changed only docs; not stale, no
+  warnings) installed in place (551 was locked by WBStartup and waits in
+  SYS:WBStartup/Disabled/DockAwesome-locked-delete until reboot; the old
+  538/550 leftovers are deleted), started with WBRun, the only dock.
+- Box dumps at 36/48/72 (nested drawer, page 2): parent arrow and page
+  buttons 0.00 px by their box (+-0.01; at 72 the backdrop's red nebula
+  under the glass skews the coverage measure, the neutral stroke pixels
+  give 0.00), the Open Folder ring on its icon box (662.00, 522.00 at
+  36); every #dee2e9 pixel at exactly the 3.2.3 positions (0 differ at
+  all three sizes); file names #f2f4f8.
+- Open Folder cell opens a Workbench window; parent arrow, page buttons,
+  quick switch, a program pin with a box open and Click to work.
+- First open (4 runs, 551 controls alternated): 100.2-100.9 / 137.7-139.5
+  ms (551 today 102.6 / 136.0-136.9; recorded 107.2-114.7 / 137.6-150.3),
+  same five frames. Hover sweep 9516 us, stalled 0 (551 9677-9733). No
+  regression; no defect; no code change.
+- RAM:BtnTest stayed locked again (as on 3.1.4.1); two control drawers
+  deleted cleanly, holder unknown. ENVARC:DockAwesome.json untouched by
+  the tests (588 bytes, 18:10:59; it changed between the 551 session and
+  this one).
+- Installed now: 569 on AmigaOS 3.2.3, 3.1.4.1, AmiKit XE and ApolloOS;
+  551 on Coffin and 3.9.

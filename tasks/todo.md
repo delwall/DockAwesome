@@ -3642,3 +3642,103 @@ and Sems before each start).
       reboot.
 - [ ] NOT RUN on AmiKit: a rebuild with an unrelated change to settle the
       layer-stage shift; the native (no AA) path (not used here).
+
+### ApolloOS with build 569 (2026-11-26)
+ApolloOS R9.5 on the Vampire (Kickstart 51.3, 16-bit 1280x720), agent
+input with relative moves. Build 569 = 08de37b (HEAD 866c55d changed only
+docs; `make amiga`: nothing to rebuild, no warnings). Installed before:
+551. Test docks from RAM: with `--config RAM:` copies, exactly one dock at
+a time (Tasks/FindTask/Sems before each start, 5 s or more before each
+stop).
+- [x] "Not in Status": the dock was running. Status lists only CLI
+      processes; the exec task list showed "DockAwesome" (pri 1) and its
+      "DockAwesome Workbench status" task, and the DockAwesome.PiP2
+      semaphore existed. It had started from SYS:WBStartup at boot (551).
+      No WBRun needed.
+- [x] Installed 569 in place: 551 copied to RAM:DockOld for controls,
+      stopped (BreakTask, gone after 5 s); the old leftovers
+      Disabled/DockAwesome-locked-delete (538) and -locked-delete2 (550)
+      were not locked after the reboot and are deleted; 569 copied as
+      DockAwesome.new, the 551 file was "in use" (started from WBStartup),
+      so it is now SYS:WBStartup/Disabled/DockAwesome-locked-delete
+      (delete after the next ApolloOS boot); .new renamed into place,
+      Version 0.569 build 569.
+- [x] Box dumps (`--pip-dump`, RAM:BtnTest = Sub (360 files) + t10-t15;
+      pins CLI, RAM:BtnTest, Editor), nested Sub page 2 (2/4), sizes
+      36/48/72: 698x598, 836x541, 1252x465 as on 3.2.3.
+
+      | control | ApolloOS bbox offset (x / y), 36 / 48 / 72 | 3.2.3 (569) |
+      | --- | --- | --- |
+      | parent arrow | 0.00 / 0.00, +0.01 / -0.01, 0.00 / 0.00 (*) | 0.00 / 0.00 each |
+      | page back "<" | -0.01 / -0.01, -0.01 / 0.00, 0.00 / 0.00 | 0.00 / +0.06, 0.00 / +0.02, 0.00 / 0.00 |
+      | page forward ">" | 0.00 / 0.00, 0.00 / +0.01, -0.01 / +0.01 | 0.00 / +0.03, -0.01 / +0.08, - |
+      | Open Folder ring (36) | 648..676 x 508..536, centre 662.00 / 522.00 = icon box centre | the same |
+
+      (*) At 72 the coverage measure read -0.04 / -0.87: the backdrop's
+      red nebula lies under the glass there. The neutral stroke pixels
+      (min channel > 110 and > 140) give the box 20..27 x 12..21, 0.00 /
+      0.00, the same as 3.2.3's dump. Every full-tone #dee2e9 pixel lies
+      at exactly the 3.2.3 positions: 274 / 431 / 845 pixels at 36 / 48 /
+      72, 0 differ. Ink centroids equal 3.2.3's (arrow 0.24 right / 0.70
+      up; chevrons 0.11-0.15 toward the open side). Tone (36, brightest
+      pixel per element): title, parent arrow, "<", ">", page count, ring
+      and label #dee2e9; file names #f2f4f8; contrast 11.97-13.13 on the
+      glass.
+- [x] Behaviour (569 test docks):
+
+      | check | result |
+      | --- | --- |
+      | Open Folder cell, BtnTest box | Workbench window "BtnTest" opened, box closed |
+      | parent arrow in Sub | back to the BtnTest box (185x200 / 224x246 / 334x342 at 36 / 48 / 72) |
+      | page buttons | ">" to 2/4 at every size; "<" back to page 1 (36) |
+      | quick switch (o.json, 14 pins) | Downloads (anchor 906) -> Games (824) -> Downloads (906) |
+      | program pin with a box open | Downloads box open, pointer moved to Editor, click: Editor started, box closed |
+      | Click to | Open Folder saved "clicks" {Personal:Downloads: folder}; left click opened Workbench window "Downloads", no box; Show Stack removed "clicks"; left click opened the box (356x359) |
+
+      Profile: Input downs=6 ups=6, prefetch stacks=3 pending=0.
+- [x] First open of Downloads after 50 s idle, pointer off the dock,
+      fresh dock per run, ChangeTaskPri -30, o.json (the 550/551 runs'
+      config, migrated each run), 551 controls (the installed binary from
+      RAM:) alternated:
+
+      | run | build | first paint ms | entrance ms | fields |
+      | --- | --- | --- | --- | --- |
+      | n1 | 569 | 100.7 | 138.0 | 01112 |
+      | o1 | 551 | 102.6 | 136.0 | 0121 |
+      | n2 | 569 | 100.2 | 139.5 | 01112 |
+      | o2 | 551 | 102.6 | 136.9 | 01121 |
+      | n3 | 569 | 100.7 | 137.7 | 01112 |
+      | n4 | 569 | 100.9 | 139.0 | 01112 |
+
+      551 recorded earlier: 107.2-114.7 / 137.6-150.3. 569 first paint
+      2 ms under today's 551 runs; entrance 1-3 ms over, the same five
+      frames (the box is 9 px lower with the one-line tile: 356x359
+      against 356x368). Prefetch pending=0 reads=81 every run. Pass.
+- [x] Hover sweep (t.json, 15 pins, relative moves to x 350, 500, 650,
+      800, 950 at y 688, one per call, 45 s idle, -30): render_us_avg
+      9516, max 18313, stalled 0 (551 earlier 9733 / 9677, stalled 2 / 0;
+      old spread 9077-10211). Pass.
+- [x] Seen again (as on 3.1.4.1): RAM:BtnTest stayed "in use" after its
+      contents were deleted (empty drawer, held until reboot). Two control
+      runs on RAM:LockA (box, Sub, ">", "<", parent, Open Folder window,
+      close it, quit) and RAM:LockB (box, Sub, ">", parent, quit with the
+      box open) deleted cleanly, and a drawer opened and closed by WBRun
+      did too. Holder unknown; no dock defect shown, no code change.
+- [x] End state: 569 in SYS:WBStartup/DockAwesome, started with WBRun,
+      FindTask finds it, one DockAwesome.PiP2 semaphore, Status lists no
+      CLI dock; its Downloads box opened (356x359) and closed with the
+      user's config. ENVARC:DockAwesome.json untouched by the tests (588
+      bytes, 18:10:59 on the Amiga clock, already so at the start; the 551
+      session recorded 17:40:52, so it changed between the sessions, not
+      by the tests; 14 pins with Personal:Audio and Personal:). RAM: holds Clipboards, ENV,
+      T and, until reboot, the empty BtnTest drawer; ENV:dpid deleted;
+      DL: assign removed. SYS:WBStartup/Disabled holds WBDock and, until
+      reboot, DockAwesome-locked-delete (551). C:ApolloExplorerSrv
+      (started this session) runs until reboot. Images: scratchpad
+      `design/ao-569-btn-compare-{36,48,72}.png` (10x, 3.2.3 above
+      ApolloOS), `design/ao-569-nested-p2-36-2x.png`, `-48.png`, `-72.png`;
+      also in ~/Downloads/DockAwesome-design/.
+- [ ] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete (551) after
+      the next ApolloOS boot.
+- [ ] NOT RUN on ApolloOS: the native (no AA) path (not used here); Sort
+      by on this build (unchanged since 551, run there).

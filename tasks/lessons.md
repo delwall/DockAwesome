@@ -747,3 +747,15 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
   (`Run >NIL: Wait 1500 >CON:...`) behind the box; desktop icons under
   the glass moved a reading by 1.65 px. The Amiga clock can jump (time
   sync) and end such a Wait early.
+
+## A coloured backdrop under the glass moves a coverage reading (ApolloOS, 2026-11-26)
+- The 72 px parent arrow read -0.87 px vertically on ApolloOS: the
+  backdrop's red nebula lay under the glass there, and the luminance-based
+  coverage measure counted it as stroke. The neutral stroke pixels (min
+  channel > 110) and the full-tone #dee2e9 positions (0 differ from 3.2.3)
+  showed the glyph exact.
+- Rule: when one reading of a box dump disagrees, crop it at 10x and
+  compare full-tone pixel positions with a reference dump before
+  suspecting the code.
+- On ApolloOS, List shows a soft link on an SFS volume as "Dir"; check
+  that it resolves with Version (or Search) on the link path.
