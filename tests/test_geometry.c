@@ -455,7 +455,8 @@ static void test_outside_shown(void)
 
 /* The box's parent drawer and page buttons. The ink (the segments' end
    points grown by the half width) is centred on the disc exactly for the
-   chevrons and one grid step low for the return arrow, at every size; the rasterised pixel bounding box agrees with the
+   chevrons and the return arrow, at every size (by the box, never an
+   optical offset); the rasterised pixel bounding box agrees with the
    disc's; left and right mirror each other sample for sample; from a 15 px
    control on, the disc is 5/6 of the control (below, a 12 px floor). */
 static void button_bounds(int x, int size, int direction, int box[8])
@@ -502,15 +503,7 @@ static void test_button_glyph(void)
         dock_button_glyph(o,o,size,size,direction,&g);
         for (k = 0; k < 2; ++k) {
             int offset = box[k]+box[k+2]-box[k+4]-box[k+6];
-            /* The return arrow sits one grid step u low (2 half pixels at
-               the 19 px control): to the nearest half pixel. */
-            if (direction == DOCK_BUTTON_PARENT) {
-                /* Its grid scales with the disc, so off the 19 px control
-                   its pixel box can differ by half a pixel; at 19 exact. */
-                int u = (g.radius*16+63)/127, shift = k ? 2*u : 0;
-                assert(abs(16*offset-shift) <= 16);
-                if (u == 16) assert(offset == shift/16);
-            } else if (size <= 24) assert(offset == 0);
+            if (size <= 24 && (direction != DOCK_BUTTON_PARENT || size >= 12)) assert(offset == 0);
             else assert(abs(offset) <= 1);
         }
         assert(g.radius >= (size*8 < 96 ? size*8 : 96) && g.radius <= size*8);
@@ -526,8 +519,7 @@ static void test_button_glyph(void)
                 if (b > high) high = b;
             }
             assert(g.ink[k] == low-g.half && g.ink[k+2] == high+g.half);
-            assert(low+high == 2*(k ? g.cy : g.cx)+
-                (direction == DOCK_BUTTON_PARENT && k ? 2*((g.radius*16+63)/127) : 0));
+            assert(low+high == 2*(k ? g.cy : g.cx));
             /* The return arrow: its tip is the leftmost point, its stem
                the rightmost and lowest. */
             if (direction == DOCK_BUTTON_PARENT)
@@ -563,9 +555,52 @@ static void test_button_glyph(void)
             int edge = k ? n.top : n.left, along = direction == DOCK_BUTTON_PARENT ? k == 1 : k == 0;
             if (direction != DOCK_BUTTON_PARENT || size >= 15) assert(lo[k] > edge && hi[k] < edge+n.size-1);
             assert(lo[k]+hi[k]-(2*edge+n.size-1) ==
-                (along && direction != DOCK_BUTTON_PARENT ? 0 : (size+1)%2)+
-                (direction == DOCK_BUTTON_PARENT && k ? 2*(n.size/15 > 1 ? n.size/15 : 1) : 0));
+                (along && direction != DOCK_BUTTON_PARENT ? 0 : (size+1)%2));
         }
+    }
+}
+
+/* The Open Folder tile's glyph: the arrow's outlines are centred on the
+   ring by their box, and the rasterised glyph's pixel box, and the arrow's
+   alone, are centred exactly on the tile's icon box for every icon size
+   and pixel phase. */
+static void test_open_glyph(void)
+{
+    int icon, left, k, i;
+    for (k = 0; k < 2; ++k) {
+        int low = 127, high = -128;
+        for (i = 0; i < DOCK_OPEN_TAIL; ++i) {
+            if (dock_open_arrow_tail[i][k] < low) low = dock_open_arrow_tail[i][k];
+            if (dock_open_arrow_tail[i][k] > high) high = dock_open_arrow_tail[i][k];
+        }
+        for (i = 0; i < DOCK_OPEN_HEAD; ++i) {
+            if (dock_open_arrow_head[i][k] < low) low = dock_open_arrow_head[i][k];
+            if (dock_open_arrow_head[i][k] > high) high = dock_open_arrow_head[i][k];
+        }
+        assert(low+high == 0);
+    }
+    for (icon = 16; icon <= DOCK_MAX_ICON_SIZE; ++icon) for (left = 3; left < 5; ++left)
+        for (k = 0; k < 2; ++k) {
+        int radius = (icon*36+50)/100, thickness = ((icon/2-2)+6)/13, top = left+1, px, py;
+        int box[4] = {INT_MAX, INT_MAX, INT_MIN, INT_MIN};
+        unsigned char covered[2*DOCK_MAX_ICON_SIZE+8];
+        DockOpenGlyph g;
+        if (thickness < 1) thickness = 1;
+        if (thickness > radius/2) thickness = radius/2;
+        dock_open_glyph(left,top,icon,radius,thickness,&g);
+        assert(2*g.cx == 16*(2*left+icon) && 2*g.cy == 16*(2*top+icon));
+        /* k = 1: the arrow alone, without the ring. */
+        if (k) g.outer = g.inner = 0;
+        for (py = top-2; py < top+icon+2; ++py) {
+            dock_open_glyph_row(&g,py,left-2,icon+4,covered);
+            for (px = 0; px < icon+4; ++px) if (covered[px]) {
+                if (left-2+px < box[0]) box[0] = left-2+px;
+                if (py < box[1]) box[1] = py;
+                if (left-2+px > box[2]) box[2] = left-2+px;
+                if (py > box[3]) box[3] = py;
+            }
+        }
+        assert(box[0]+box[2]+1 == 2*left+icon && box[1]+box[3]+1 == 2*top+icon);
     }
 }
 
@@ -582,6 +617,7 @@ int main(void)
     test_gap_motion();
     test_outside_shown();
     test_button_glyph();
-    puts("geometry: bottom/left/right layout, upright hit/slot/outside, half-open panel bounds, animation equivalence and centred box buttons (page chevrons, return arrow) PASS");
+    test_open_glyph();
+    puts("geometry: bottom/left/right layout, upright hit/slot/outside, half-open panel bounds, animation equivalence and centred box buttons (page chevrons, return arrow) and Open Folder glyph PASS");
     return 0;
 }

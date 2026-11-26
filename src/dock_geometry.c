@@ -336,24 +336,22 @@ void dock_button_glyph(int x, int y, int width, int height, int direction, DockB
     out->count = 0;
     if (direction == DOCK_BUTTON_PARENT) {
         /* On a grid of u (one pixel at the box's 19 px control): stem at
-           x 3 from y 5 up to 1, a quarter turn of radius 2 about (1, 1)
-           into the bar at y -1, the bar to x -3, the head's arms from
-           (-1, -3) and (-1, 1). Its box spans y -3..5: one u below the
-           centre, which puts its ink (the bar and head weigh more than the
-           stem) 0.15 px below the centre (0.29 px right) and keeps the
-           lines on whole
-           pixels; centred by the box it read high. Thinner than the
-           chevrons, so its one pixel lines stay crisp at the real size. */
+           x 3 from y 4 up to 0, a quarter turn of radius 2 about (1, 0)
+           into the bar at y -2, the bar to x -3, the head's arms from
+           (-1, -4) and (-1, 0). Its box spans -3..3 by -4..4: centred on
+           the disc exactly, as every control glyph is (by its box, never
+           by an optical offset). One pixel lines (stroke half 9/16 px)
+           keep the head crisp at the real size. */
         static const int turn[5][2] = {{1000,0}, {924,383}, {707,707}, {383,924}, {0,1000}};
         int u = (radius*16+63)/127, i;
         out->half = 9;
-        button_segment(out,3*u,5*u,3*u,u);
+        button_segment(out,3*u,4*u,3*u,0);
         for (i = 0; i < 4; ++i)
-            button_segment(out,u+2*u*turn[i][0]/1000,u-2*u*turn[i][1]/1000,
-                u+2*u*turn[i+1][0]/1000,u-2*u*turn[i+1][1]/1000);
-        button_segment(out,u,-u,-3*u,-u);
-        button_segment(out,-u,-3*u,-3*u,-u);
-        button_segment(out,-u,u,-3*u,-u);
+            button_segment(out,u+2*u*turn[i][0]/1000,-2*u*turn[i][1]/1000,
+                u+2*u*turn[i+1][0]/1000,-2*u*turn[i+1][1]/1000);
+        button_segment(out,u,-2*u,-3*u,-2*u);
+        button_segment(out,-u,-4*u,-3*u,-2*u);
+        button_segment(out,-u,0,-3*u,-2*u);
     } else {
         int sign = direction < 0 ? -1 : 1, reach = radius*3/16, arm = radius*3/8;
         button_segment(out,-sign*reach,-arm,sign*reach,0);
@@ -411,13 +409,12 @@ void dock_button_pixels(int x, int y, int width, int height, int direction, Dock
     if (arm < 1) arm = 1;
     if (direction == DOCK_BUTTON_PARENT) {
         /* The return arrow on a grid of n pixels about the middle pixel,
-           one n low as in dock_button_glyph: stem up from (3, 5) to (3, 1),
-           a 45 degree turn into the bar at y -1, the bar to the tip at
-           x -3, the head's arms from (-1, -3) and (-1, 1). From 15 to 18 px
-           the stem's foot touches the disc's edge, below 15 px it leaves
-           the disc. */
+           as in dock_button_glyph: stem up from (3, 4) to (3, 0), a 45
+           degree turn into the bar at y -2, the bar to the tip at x -3, the
+           head's arms from (-1, -4) and (-1, 0). Below a 15 px control it
+           reaches the disc's edge. */
         static const int lines[3][3][2] = {
-            {{3,5}, {3,1}, {1,-1}}, {{1,-1}, {-3,-1}, {-3,-1}}, {{-1,-3}, {-3,-1}, {-1,1}}};
+            {{3,4}, {3,0}, {1,-2}}, {{1,-2}, {-3,-2}, {-3,-2}}, {{-1,-4}, {-3,-2}, {-1,0}}};
         int n = drawn/15 > 1 ? drawn/15 : 1;
         out->count = 3;
         for (i = 0; i < 3; ++i) for (k = 0; k < 3; ++k) {
@@ -438,6 +435,87 @@ void dock_button_pixels(int x, int y, int width, int height, int direction, Dock
         for (k = 0; k < 3; ++k) {
             out->stroke[i][k][0] = left+(direction < 0 ? size-1-along[k] : along[k]);
             out->stroke[i][k][1] = top+across[k];
+        }
+    }
+}
+
+/* The arrow's two parts in 1/64 of the ring's radius, centred on the ring
+   by their joint bounding box (x -34..34, y -28..28). */
+const signed char dock_open_arrow_tail[DOCK_OPEN_TAIL][2] = {
+    {3,-12}, {-9,-11}, {-18,-8}, {-25,-3}, {-30,5}, {-33,15},
+    {-34,25}, {-32,28}, {-29,27}, {-25,21}, {-20,16}, {-13,13}, {3,11}
+};
+const signed char dock_open_arrow_head[DOCK_OPEN_HEAD][2] = {
+    {0,-25}, {3,-28}, {6,-27}, {32,-3}, {34,0}, {32,4},
+    {6,27}, {3,28}, {0,26}
+};
+
+void dock_open_glyph(int left, int top, int icon, int radius, int thickness, DockOpenGlyph *out)
+{
+    out->cx = left*16+icon*8;
+    out->cy = top*16+icon*8;
+    out->radius = radius;
+    /* thickness native pixels plus half a pixel wide, so the ring keeps
+       its weight once antialiased. */
+    out->outer = radius*16+8;
+    out->inner = out->outer-thickness*16-8;
+}
+
+/* An outline coordinate in 1/16 px, on a multiple of 4 rounded toward
+   zero: samples lie at 2 mod 4, so none falls on a vertex and the
+   half-open crossing rule treats both sides of the centre alike. */
+static int outline_at(int value, int radius)
+{
+    int v = value*radius/4;
+    return v < 0 ? -(-v & ~3) : v & ~3;
+}
+
+/* The span [*left,*right] where the row y (1/16 px from the centre)
+   crosses an outline; positions in 1/16 px. */
+static int outline_span(const signed char (*outline)[2], int count, int radius, int y, int *left, int *right)
+{
+    int i, previous, found = 0;
+    for (i = 0, previous = count-1; i < count; previous = i++) {
+        int y1 = outline_at(outline[previous][1],radius), y2 = outline_at(outline[i][1],radius);
+        if ((y1 > y) != (y2 > y)) {
+            int x1 = outline_at(outline[previous][0],radius), x2 = outline_at(outline[i][0],radius);
+            int hit = x1+(x2-x1)*(y-y1)/(y2-y1);
+            if (!found || hit < *left) *left = hit;
+            if (!found || hit > *right) *right = hit;
+            found = 1;
+        }
+    }
+    return found;
+}
+
+static int isqrt(int value)
+{
+    int root = 0, bit = 1<<28;
+    if (value <= 0) return 0;
+    while (bit > value) bit >>= 2;
+    while (bit) {
+        if (value >= root+bit) { value -= root+bit; root = (root>>1)+bit; }
+        else root >>= 1;
+        bit >>= 2;
+    }
+    return root;
+}
+
+void dock_open_glyph_row(const DockOpenGlyph *g, int py, int px0, int count, unsigned char *covered)
+{
+    int sy, x;
+    memset(covered,0,(size_t)count);
+    for (sy = 0; sy < 4; ++sy) {
+        int dy = py*16+2+4*sy-g->cy, ring_out = -1, ring_in = -1, sx;
+        int tail_l = 0, tail_r = -1, head_l = 0, head_r = -1;
+        if (dy*dy <= g->outer*g->outer) ring_out = isqrt(g->outer*g->outer-dy*dy);
+        if (dy*dy < g->inner*g->inner) ring_in = isqrt(g->inner*g->inner-dy*dy);
+        if (!outline_span(dock_open_arrow_tail,DOCK_OPEN_TAIL,g->radius,dy,&tail_l,&tail_r)) tail_r = tail_l-1;
+        if (!outline_span(dock_open_arrow_head,DOCK_OPEN_HEAD,g->radius,dy,&head_l,&head_r)) head_r = head_l-1;
+        for (x = 0; x < count; ++x) for (sx = 0; sx < 4; ++sx) {
+            int dx = (px0+x)*16+2+4*sx-g->cx, ax = dx < 0 ? -dx : dx;
+            if ((ax <= ring_out && ax >= ring_in) || (dx >= tail_l && dx <= tail_r) ||
+                (dx >= head_l && dx <= head_r)) ++covered[x];
         }
     }
 }

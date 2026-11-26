@@ -61,11 +61,14 @@ enum { POPUP_RADIUS = 6, LABEL_GAP = DOCK_UI_LABEL_GAP, LABEL_MARGIN = 4, LABEL_
     LABEL_VPAD = 5 };
 enum {
     MENU_SURFACE, MENU_RIM, MENU_HOVER, MENU_TEXT, MENU_HOVER_TEXT,
-    FOLDER_MUTED, MENU_COLORS
+    FOLDER_MUTED, FOLDER_GLYPH, MENU_COLORS
 };
 static const ULONG menu_colors[MENU_COLORS] = {
     0xff1b1f27UL, 0xff4b515cUL, 0xff374153UL, 0xfff2f4f8UL, 0xfff2f4f8UL,
-    0xffaeb8c7UL
+    /* FOLDER_GLYPH: every control in a Folder Stack box (page and parent
+       buttons, the Open Folder tile, title, page count and notices); the
+       menu text 30% of the way to the muted tone, 15% less contrast. */
+    0xffaeb8c7UL, 0xffdee2e9UL
 };
 typedef struct { const char *label; int action; } MenuItem;
 /* The menu's Click to row and the Folder Stack box's last tile: both open
@@ -757,7 +760,7 @@ static void prepare_popup_colors(DockUI *ui)
 {
     static const UWORD fallback[MENU_COLORS] = {
         BACKGROUNDPEN, SHADOWPEN, FILLPEN, TEXTPEN, FILLTEXTPEN,
-        TEXTPEN
+        TEXTPEN, TEXTPEN
     };
     struct ColorMap *map = ui->screen->ViewPort.ColorMap;
     int i, last_pen;
@@ -772,6 +775,8 @@ static void prepare_popup_colors(DockUI *ui)
         ui->popup_pen[MENU_SURFACE] = ui->draw->dri_Pens[BACKGROUNDPEN];
         ui->popup_pen[MENU_TEXT] = ui->draw->dri_Pens[TEXTPEN];
     }
+    if (ui->popup_pen[FOLDER_GLYPH] == ui->popup_pen[MENU_SURFACE])
+        ui->popup_pen[FOLDER_GLYPH] = ui->draw->dri_Pens[TEXTPEN];
     if (ui->popup_pen[MENU_HOVER] == ui->popup_pen[MENU_SURFACE] ||
         ui->popup_pen[MENU_HOVER] == ui->popup_pen[MENU_HOVER_TEXT]) {
         ui->popup_pen[MENU_HOVER] = ui->draw->dri_Pens[FILLPEN];
@@ -1132,18 +1137,10 @@ static void centered_folder_text(DockUI *ui, struct RastPort *rp, DockImage *tar
     }
 }
 
-/* The two parts of the arrow each cover one span per row. Coordinates are
-   relative to the ring center in units of 1/64 of its radius. */
-static const BYTE arrow_tail[][2] = {
-    {4,-15}, {-8,-14}, {-17,-11}, {-24,-6}, {-29,2}, {-32,12},
-    {-33,22}, {-31,25}, {-28,24}, {-24,18}, {-19,13}, {-12,10}, {4,8}
-};
-static const BYTE arrow_head[][2] = {
-    {1,-28}, {4,-31}, {7,-30}, {33,-6}, {35,-3}, {33,1},
-    {7,24}, {4,25}, {1,23}
-};
+/* The Open Folder arrow natively, from dock_open_arrow_tail/head: each
+   part covers one span per row. */
 static void fill_arrow_part(struct RastPort *rp, int x, int y, int radius,
-    const BYTE (*outline)[2], int count)
+    const signed char (*outline)[2], int count)
 {
     int row;
     for (row = -radius/2; row <= radius/2; ++row) {
@@ -1176,79 +1173,39 @@ static int folder_open_weight(int icon)
     return dock_clamp((radius+6)/13,1,folder_open_radius(icon)/2);
 }
 
+/* Natively the ring is centred on pixel (x, y): for an even icon half a
+   pixel right of and below the icon box's centre (DrawEllipse draws whole
+   pixel circles). */
 static void folder_open_glyph(DockUI *ui, struct RastPort *rp, int x, int y, int radius, int thickness)
 {
     int inset;
-    popup_color(ui,rp,FOLDER_MUTED);
+    popup_color(ui,rp,FOLDER_GLYPH);
     for (inset = 0; inset < thickness; ++inset)
         DrawEllipse(rp,x,y,radius-inset,radius-inset);
-    fill_arrow_part(rp,x,y,radius,arrow_tail,sizeof(arrow_tail)/sizeof(arrow_tail[0]));
-    fill_arrow_part(rp,x,y,radius,arrow_head,sizeof(arrow_head)/sizeof(arrow_head[0]));
+    fill_arrow_part(rp,x,y,radius,dock_open_arrow_tail,DOCK_OPEN_TAIL);
+    fill_arrow_part(rp,x,y,radius,dock_open_arrow_head,DOCK_OPEN_HEAD);
 }
 
-/* The span [*left,*right] where a sample row y crosses an outline given in
-   1/64 of the radius, as fill_arrow_part fills it; positions in 1/16 px. */
-static int outline_span(const BYTE (*outline)[2], int count, int radius, int y, int *left, int *right)
-{
-    int i, previous, found = 0;
-    for (i = 0, previous = count-1; i < count; previous = i++) {
-        int y1 = outline[previous][1]*radius/4, y2 = outline[i][1]*radius/4;
-        if ((y1 > y) != (y2 > y)) {
-            int x1 = outline[previous][0]*radius/4, x2 = outline[i][0]*radius/4;
-            int hit = x1+(x2-x1)*(y-y1)/(y2-y1);
-            if (!found || hit < *left) *left = hit;
-            if (!found || hit > *right) *right = hit;
-            found = 1;
-        }
-    }
-    return found;
-}
-
-static int isqrt(int value)
-{
-    int root = 0, bit = 1<<28;
-    if (value <= 0) return 0;
-    while (bit > value) bit >>= 2;
-    while (bit) {
-        if (value >= root+bit) { value -= root+bit; root = (root>>1)+bit; }
-        else root >>= 1;
-        bit >>= 2;
-    }
-    return root;
-}
-
-/* folder_open_glyph antialiased into an RGBA target: 4x4 samples per pixel.
-   Each sample row is resolved to spans once (the ring, the arrow's tail and
-   head), then the samples only compare positions. */
-static void folder_open_glyph_aa(DockImage *target, int cx, int cy, int radius, int thickness,
-    uint32_t color)
+/* folder_open_glyph antialiased into an RGBA target, centred exactly on
+   the tile's icon box (icon pixels square at left, top): 4x4 samples per
+   pixel, each sample row resolved to spans once (dock_open_glyph_row). */
+static void folder_open_glyph_aa(DockImage *target, int left, int top, int icon, int radius,
+    int thickness, uint32_t color)
 {
     unsigned int red = (color>>16)&255, green = (color>>8)&255, blue = color&255;
-    /* The ring: thickness native pixels plus half a pixel wide, so it keeps
-       its weight once antialiased. Radii and positions in 1/16 px. */
-    int outer = radius*16+8, inner = outer-thickness*16-8;
     unsigned char covered[2*DOCK_MAX_ICON_SIZE+4];
-    int x, y, size = 2*radius+3;
+    DockOpenGlyph glyph;
+    int x, y, x0, y0, size = 2*radius+4;
     if (radius < 4 || size > (int)sizeof(covered) || !target || !target->pixels) return;
+    dock_open_glyph(left,top,icon,radius,thickness,&glyph);
+    x0 = (glyph.cx-glyph.outer)/16-1;
+    y0 = (glyph.cy-glyph.outer)/16-1;
     for (y = 0; y < size; ++y) {
-        int py = cy-radius-1+y, sy;
+        int py = y0+y;
         if (py < 0 || py >= target->height) continue;
-        memset(covered,0,(size_t)size);
-        for (sy = 0; sy < 4; ++sy) {
-            int dy = (py-cy)*16+2+4*sy-8, ring_out = -1, ring_in = -1, sx;
-            int tail_l = 0, tail_r = -1, head_l = 0, head_r = -1;
-            if (dy*dy <= outer*outer) ring_out = isqrt(outer*outer-dy*dy);
-            if (dy*dy < inner*inner) ring_in = isqrt(inner*inner-dy*dy);
-            if (!outline_span(arrow_tail,sizeof(arrow_tail)/sizeof(arrow_tail[0]),radius,dy,&tail_l,&tail_r)) tail_r = tail_l-1;
-            if (!outline_span(arrow_head,sizeof(arrow_head)/sizeof(arrow_head[0]),radius,dy,&head_l,&head_r)) head_r = head_l-1;
-            for (x = 0; x < size; ++x) for (sx = 0; sx < 4; ++sx) {
-                int dx = (x-radius-1)*16+2+4*sx-8, ax = dx < 0 ? -dx : dx;
-                if ((ax <= ring_out && ax >= ring_in) || (dx >= tail_l && dx <= tail_r) ||
-                    (dx >= head_l && dx <= head_r)) ++covered[x];
-            }
-        }
+        dock_open_glyph_row(&glyph,py,x0,size,covered);
         for (x = 0; x < size; ++x) {
-            int px = cx-radius-1+x;
+            int px = x0+x;
             if (!covered[x] || px < 0 || px >= target->width) continue;
             amiga_blend_coverage(target->pixels+((size_t)py*target->width+px)*4,
                 red,green,blue,(covered[x]*255+8)/16);
@@ -1294,7 +1251,7 @@ static void folder_button(DockUI *ui, struct RastPort *rp, int direction,
     dock_button_pixels(x,y,width,height,direction,&b);
     popup_color(ui,rp,MENU_HOVER);
     fill_rounded(rp,b.left,b.top,b.size,b.size,b.size/2);
-    popup_color(ui,rp,MENU_TEXT);
+    popup_color(ui,rp,FOLDER_GLYPH);
     for (i = 0; i < b.count; ++i) {
         Move(rp,b.stroke[i][0][0],b.stroke[i][0][1]);
         Draw(rp,b.stroke[i][1][0],b.stroke[i][1][1]);
@@ -1307,7 +1264,9 @@ static void folder_button(DockUI *ui, struct RastPort *rp, int direction,
    and a round-capped chevron or return arrow stroke. */
 static void folder_button_aa(DockImage *target, int direction, int x, int y, int width, int height)
 {
-    ULONG color = menu_colors[MENU_TEXT];
+    /* The disc keeps the text colour's faint tint, the glyph the shared
+       control tone. */
+    ULONG tint = menu_colors[MENU_TEXT], color = menu_colors[FOLDER_GLYPH];
     unsigned int red = (color>>16)&255, green = (color>>8)&255, blue = color&255;
     DockButtonGlyph glyph;
     int px, py;
@@ -1321,7 +1280,7 @@ static void folder_button_aa(DockImage *target, int direction, int x, int y, int
             if (px < 0 || px >= target->width) continue;
             stroke = dock_button_coverage(&glyph,px,py,&disc);
             pixel = target->pixels+((size_t)py*target->width+px)*4;
-            if (disc) amiga_blend_coverage(pixel,red,green,blue,(unsigned int)disc*3);
+            if (disc) amiga_blend_coverage(pixel,(tint>>16)&255,(tint>>8)&255,tint&255,(unsigned int)disc*3);
             if (stroke) amiga_blend_coverage(pixel,red,green,blue,((unsigned int)stroke*255+8)/16);
         }
     }
@@ -1351,12 +1310,12 @@ static void paint_folder_content(DockUI *ui, struct RastPort *rp, int parts, Doc
     if (!target) SetDrMd(rp,JAM1);
     SetFont(rp,folder_font(ui));
     if (labels)
-        centered_folder_text(ui,rp,target,title,offset+width/2,(f->header-font_height)/2,width-4*control,MENU_TEXT);
+        centered_folder_text(ui,rp,target,title,offset+width/2,(f->header-font_height)/2,width-4*control,FOLDER_GLYPH);
     if (folder_nested(f))
         folder_control(ui,rp,target,parts,DOCK_BUTTON_PARENT,offset+f->pad,(f->header-control)/2,control,control);
     if (labels && !f->count) {
         centered_folder_text(ui,rp,target,f->read_ok ? "Empty drawer" : "Cannot read drawer",
-            offset+width/2,f->header,width-2*f->pad,MENU_TEXT);
+            offset+width/2,f->header,width-2*f->pad,FOLDER_GLYPH);
     }
     for (i = 0; i <= visible; ++i) {
         int open = i == visible;
@@ -1366,14 +1325,14 @@ static void paint_folder_content(DockUI *ui, struct RastPort *rp, int parts, Doc
         /* The open glyph is antialiased wherever the labels are (into an
            RGBA target); a native pass draws it only with native labels. */
         if (open && labels && target)
-            folder_open_glyph_aa(target,center,top+icon/2,folder_open_radius(icon),
-                folder_open_weight(icon),menu_colors[FOLDER_MUTED]);
+            folder_open_glyph_aa(target,center-icon/2,top,icon,folder_open_radius(icon),
+                folder_open_weight(icon),menu_colors[FOLDER_GLYPH]);
         else if (glyphs && (open ? labels : !f->loaded[i].pixels))
             folder_glyph(ui,rp,center,top+icon/2,!open && f->entries[first+i].drawer,open);
         if (!labels) continue;
-        /* The tile in the headings' muted tone, behind the real icons. */
+        /* The tile in the shared control tone, behind the real icons. */
         centered_folder_text(ui,rp,target,open ? FOLDER_OPEN_LABEL : f->entries[first+i].name,
-            center,label_top,f->cell_width-6,open ? FOLDER_MUTED : MENU_TEXT);
+            center,label_top,f->cell_width-6,open ? FOLDER_GLYPH : MENU_TEXT);
     }
     if (folder_last_page(f)) {
         int y = f->body_height-f->footer;
@@ -1381,7 +1340,7 @@ static void paint_folder_content(DockUI *ui, struct RastPort *rp, int parts, Doc
             char page[36];
             snprintf(page,sizeof(page),"%lu / %lu",(unsigned long)f->page+1,
                 (unsigned long)folder_last_page(f)+1);
-            centered_folder_text(ui,rp,target,page,offset+width/2,y+(control-font_height)/2,width,MENU_TEXT);
+            centered_folder_text(ui,rp,target,page,offset+width/2,y+(control-font_height)/2,width,FOLDER_GLYPH);
         }
         if (f->page) folder_control(ui,rp,target,parts,DOCK_BUTTON_LEFT,offset+f->pad,y,control,control);
         if (f->page < folder_last_page(f))

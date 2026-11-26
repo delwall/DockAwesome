@@ -97,8 +97,7 @@ DockRect dock_gap_rect(const DockGap *gap);
    Positions and lengths in 1/16 px: the glyph is count segments
    segment[i] = {x0, y0, x1, y1} stroked half wide with round caps; ink is
    the bounding box of their end points grown by half, centred on the
-   disc's centre (cx, cy), the return arrow's one grid step (a pixel at a
-   19 px control) lower so that it reads centred. */
+   disc's centre (cx, cy): every glyph exactly by its box. */
 enum { DOCK_BUTTON_LEFT = -1, DOCK_BUTTON_RIGHT = 1, DOCK_BUTTON_PARENT = 2 };
 /* ink: the stroke's box {left, top, right, bottom}, inclusive, 1/16 px. */
 typedef struct { int cx, cy, radius, half, count, segment[8][4], ink[4]; } DockButtonGlyph;
@@ -111,8 +110,19 @@ int dock_button_coverage(const DockButtonGlyph *glyph, int px, int py, int *disc
    degree or straight lines: a chevron two pixels wide, the return arrow
    one pixel. Centred on the control: a chevron exactly along the direction
    it points and to half a pixel across it when the control is an even
-   number of pixels; the arrow to half a pixel both ways then, and one grid
-   step low like its antialiased form. */
+   number of pixels; the arrow to half a pixel both ways then. */
 typedef struct { int left, top, size, count, stroke[3][3][2]; } DockButtonPixels;
 void dock_button_pixels(int x, int y, int width, int height, int direction, DockButtonPixels *out);
+
+/* The Open Folder tile's glyph: a ring with an arrow, centred exactly on
+   the tile's icon box (icon pixels square at left, top); positions in
+   1/16 px. The arrow's outlines are in 1/64 of the ring's radius. */
+enum { DOCK_OPEN_TAIL = 13, DOCK_OPEN_HEAD = 9 };
+extern const signed char dock_open_arrow_tail[DOCK_OPEN_TAIL][2];
+extern const signed char dock_open_arrow_head[DOCK_OPEN_HEAD][2];
+typedef struct { int cx, cy, radius, outer, inner; } DockOpenGlyph;
+void dock_open_glyph(int left, int top, int icon, int radius, int thickness, DockOpenGlyph *out);
+/* Row py sampled 4x4: covered[x] = samples (0..16) of pixel px0+x in the
+   ring or the arrow, for count pixels. */
+void dock_open_glyph_row(const DockOpenGlyph *glyph, int py, int px0, int count, unsigned char *covered);
 #endif
