@@ -597,3 +597,25 @@ One push of folder-stacks; PR opened as a draft and left a draft with a
   tone FOLDER_GLYPH #dee2e9 (15% less contrast than the old #f2f4f8; the
   tile was #aeb8c7). File names keep #f2f4f8. Installed: 569 on AmigaOS
   3.2.3 (WBRun, the only dock).
+
+## Follow-up: AmigaOS 3.1.4.1 with build 569 (2026-11-26)
+
+- Build 569 (HEAD d175ad7, not stale, no warnings) installed in place on
+  3.1.4.1 (553 was locked by WBRun and waits in
+  SYS:WBStartup/Disabled/DockAwesome-locked-delete until reboot), started
+  with WBRun, the only dock.
+- Box dumps at 36/48/72 (nested drawer, page 2): parent arrow and page
+  buttons centred 0.00 px by their box, the Open Folder ring on its icon
+  box (662.00, 522.00 at 36), every control #dee2e9, file names #f2f4f8:
+  the same pixels as on 3.2.3. One 48 px ">" lies over the backdrop logo
+  and does not measure.
+- Tile, parent arrow, page buttons, quick switch, program pin with a box
+  open, Sort by and Click to all work. First open (4 runs): 94.0-94.3 /
+  139.1-140.8 ms (553: 98.9-99.5 / 135.6-136.5, same field pattern);
+  hover sweep within the old builds' spread.
+- No defect; no code change. RAM:BtnTest stayed locked by an unknown
+  holder (not reproduced with the dock); two stuck runs of a diagnostic
+  tool and RAM:cd.txt stay until reboot. Details: tasks/todo.md,
+  "AmigaOS 3.1.4.1 with build 569".
+- Installed now: 569 on AmigaOS 3.2.3 and 3.1.4.1; 556 on AmiKit XE; 551
+  on ApolloOS, Coffin, 3.9.

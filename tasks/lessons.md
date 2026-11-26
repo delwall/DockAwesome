@@ -722,3 +722,16 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
 - Rule: before changing a colour for a group of controls, measure every
   element's colour in a dump: the box mixed #f2f4f8 and #aeb8c7 for
   controls without anyone deciding it.
+
+## Diagnostics must not block in DOS calls (3.1.4.1, 2026-11-26)
+- A tool that called NameFromLock on every process's pr_CurrentDir and
+  pr_HomeDir (to find who held an empty RAM: drawer) blocked inside DOS
+  twice; Break did not reach it, amiga_abandon left it running and its
+  output file locked until reboot.
+- Rule: never send packets on other processes' locks from a probe; and
+  before suspecting a leak, reproduce it with the dock against a control
+  drawer (five runs here deleted cleanly, so no dock defect was shown).
+- Fetch dumps with an assign (`Assign DL: RAM:dl`, acp `host:DL:`): only
+  that drawer comes down; `host:RAM:` also tried to read a file the test
+  dock still had open and hung until the watchdog. Copy a box dump only
+  about 2 s after a page click: it is written once the page has settled.

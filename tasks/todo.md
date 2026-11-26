@@ -3427,3 +3427,100 @@ rejected; the owner now chooses from candidates A-E, the build carries A).
       - Images: scratchpad `design/btn-compare-{36,48,72}.png`,
         `design/tone-compare-36.png`, `design/btn-{before,after}-36-nested-p2-2x.png`,
         also in ~/Downloads/DockAwesome-design/.
+
+### AmigaOS 3.1.4.1 with build 569 (2026-11-26)
+AmigaOS 3.1.4.1 on the Vampire (Kickstart 46.143, Workbench 45.194),
+24-bit 1280x720, agent warps 1:1. Build 569 = HEAD d175ad7 (the last
+commit touched only docs; `make amiga`: nothing to rebuild, no warnings).
+Installed before: 553 from WBStartup. ApolloExplorerSrv started with
+Run >NIL:. Test docks from RAM: with `--config RAM:` copies, exactly one
+dock at a time (Status, FindTask and Sems checked before each start, 5 s
+or more before each stop).
+- [x] Installed 569 in place: 553 stopped (BreakTask, gone after 5 s),
+      569 copied to SYS:WBStartup/DockAwesome.new, the old file was "in
+      use" so it became SYS:WBStartup/Disabled/DockAwesome-locked-delete,
+      .new renamed into place (Version 0.569); WBRun started it, FindTask
+      finds it, one DockAwesome.PiP2 lease.
+- [x] Box dumps (`--pip-dump`, RAM:BtnTest = Sub (360 files) + t10-t15;
+      pins Shell, RAM:BtnTest, Editor), nested Sub page 2, sizes 36/48/72:
+      the same box sizes as on 3.2.3 (698x598, 836x541, 1252x465).
+
+      | control | 3.1.4.1 bbox offset (x / y) | 3.2.3 (569) |
+      | --- | --- | --- |
+      | parent arrow, 36 / 48 / 72 | 0.00 / 0.00 each | 0.00 / 0.00 |
+      | page back "<", 36 / 48 / 72 | 0.00 / -0.01, 0.00 / +0.02, 0.00 / 0.00 | 0.00 / +0.06, 0.00 / +0.02, 0.00 / 0.00 |
+      | page forward ">", 36 / 72 | 0.00 / -0.03, -0.01 / 0.00 | 0.00 / +0.03, - (over the backdrop logo) |
+      | page forward ">", 48 | over the backdrop's bright "OS3" logo: does not measure; its full-tone pixel at the same place as on 3.2.3 | 0.00 / +0.08 |
+      | Open Folder ring box, 36 | 648..676 x 508..536, centre 662.00 / 522.00 = icon box centre | the same |
+
+      Footer y readings within +-0.03 are the glass gradient. Ink centroids
+      equal 3.2.3's (arrow 0.24 right / 0.71 up; chevrons 0.12-0.13 toward
+      the open side). The tile's full-tone pixels (ring, arrow, label) lie
+      at exactly the 3.2.3 positions at all three sizes (198 / 354 / 767
+      pixels). The fixed `ring.py` threshold read the 3.1.4.1 backdrop
+      texture under the glass; `ring2.py` (mean > 70) measures both dumps
+      the same.
+- [x] Tone (36, brightest pixel of each element): title, parent arrow,
+      "<", ">", page count, Open Folder ring and label all #dee2e9; file
+      names #f2f4f8; contrast on the glass 12.67-13.26 (3.2.3: 13.00-13.26).
+- [x] Downloads box at the dock's own size (36, a RAM: copy of the user's
+      ENVARC file): 356x359, 30 entries, the tile last with the small ring
+      and "Open Folder" on one line, both #dee2e9; title #dee2e9, names
+      #f2f4f8.
+- [x] Behaviour (569 test docks):
+
+      | check | result |
+      | --- | --- |
+      | Open Folder tile (BtnTest; Downloads) | Workbench window "BtnTest" / "Downloads" (1034,599 169x96) opened, box closed |
+      | parent arrow in Sub | back to the BtnTest box (185x200) |
+      | page buttons | ">" to 2/4 (36), 2/5 (48), 2/8 (72); "<" back to page 1 (no "<" shown there) |
+      | quick switch (pl copy, 15 pins) | Downloads -> Games (box anchor 744 -> 667) -> Downloads (746) |
+      | program pin with a box open | Editor started, box closed |
+      | Sort by | Date Modified saved "sorts": {"Personal:Downloads": "date"}, check moved |
+      | Click to | Open Folder saved "clicks", left click opened the window, no box; Show Stack removed "clicks", left click opened the box |
+
+      A dump copied right after a page click still showed the previous
+      page: the dump is written when the new page has settled with its
+      icons. Wait 2 s before copying.
+- [x] First open after 50 s idle, pointer off the dock, fresh dock per
+      run, ChangeTaskPri -30, o.json (1.0b5 format, migrated each run):
+
+      | run | first paint ms | entrance ms | fields |
+      | --- | --- | --- | --- |
+      | 1 | 94.1 | 140.7 | 01112 |
+      | 2 | 94.3 | 139.5 | 01112 |
+      | 3 | 94.0 | 140.8 | 01112 |
+      | 4 | 94.2 | 139.1 | 01112 |
+
+      553 on 3.1.4.1: 98.9-99.5 / 135.6-136.5. First paint 5 ms faster;
+      entrance 3-4 ms longer with the same five frames and field pattern
+      (no extra field; a phase within the last field, the known
+      memory-placement spread; 3.2.3 showed 136-150 for one binary).
+      Prefetch pending=0 reads=84 every run. Pass.
+- [x] Hover sweep (relative moves to x 350, 500, 650, 800, 950 at y 692,
+      one per call, 50 s idle, pl copy, -30): render_us_avg 10680, max
+      101715 (the first frame after idle), stalled 2. 553: 9610 / 18504 /
+      1; v1.0b5: 9529 and 10719 (max 100610) / stalled 1 and 0. Within the
+      old builds' spread. Pass.
+- [x] Seen: RAM:BtnTest stayed "in use" after its contents were deleted
+      (empty drawer, held until reboot). Not reproduced in five control
+      runs on RAM:LockA (box, Sub, page 2, parent, tile window, close;
+      quit with the box open on page 2; Break right after a page click;
+      the same with --pip-dump) nor with acp downloads of an assign or of
+      RAM: (killed mid-way and complete): every drawer deleted. The holder
+      is unknown; no dock defect shown, no code change.
+- [x] My diagnostic tool CDirs (NameFromLock on every process's current
+      and home directory) blocked inside a DOS call, twice, and ignores
+      Break; two "RAM:CDirs" processes and the empty RAM:cd.txt stay until
+      reboot. Do not call NameFromLock on other processes' locks.
+- [x] End state: 569 in SYS:WBStartup/DockAwesome, started with WBRun,
+      FindTask finds it, one DockAwesome.PiP2 lease, no CLI dock; its
+      Downloads box opened and closed. ENVARC:DockAwesome.json untouched
+      (582 bytes, 02-Aug-25 15:35:16, the migration date at the reboot
+      after 553). RAM: holds Clipboards, ENV, T and, until reboot, the
+      empty BtnTest drawer and cd.txt; ENV:dpid deleted; DL: assign removed.
+      SYS:WBStartup/Disabled holds WBDock and, until reboot (locked by
+      WBRun), DockAwesome-locked-delete (553). Images: scratchpad
+      `design/3141-569-*.png`, also in ~/Downloads/DockAwesome-design/.
+- [ ] NOT RUN on 3.1.4.1: the native (no AA) path (not used here); DOpus
+      lister (Workbench is the desktop).

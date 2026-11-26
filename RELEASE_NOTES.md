@@ -24,7 +24,8 @@ Coffin, AmigaOS 3.2.3, AmigaOS 3.9, AmigaOS 3.1.4.1 and AmiKit XE.
   line, with a smaller ring in the muted grey of the menu headings, so it
   no longer outweighs the real icons; at small icon sizes the box is one
   text line shorter (checked on AmiKit XE at sizes 36, 48 and 72; the tile
-  opens a Directory Opus lister there).
+  opens a Directory Opus lister there, and a Workbench window on AmigaOS
+  3.2.3 and AmigaOS 3.1.4.1).
 - The page buttons in a stack's box draw their **<** and **>** exactly in
   the middle of a slightly smaller disc (before, half a pixel toward the
   open side); the button that goes back to the parent drawer shows a
@@ -32,8 +33,8 @@ Coffin, AmigaOS 3.2.3, AmigaOS 3.9, AmigaOS 3.1.4.1 and AmiKit XE.
   button; the box's **Open Folder** tile sits exactly on its icon cell
   (before, half a pixel off). All of the box's controls (buttons, tile,
   title, page count) now share one slightly softer tone; file names keep
-  theirs. The click areas are unchanged (checked on AmigaOS 3.2.3 at icon
-  sizes 36, 48 and 72).
+  theirs. The click areas are unchanged (checked on AmigaOS 3.2.3 and
+  AmigaOS 3.1.4.1 at icon sizes 36, 48 and 72).
 - The Folder Stack setting is gone from **Settings**. A Folder Stack set in
   1.0 beta 5 becomes the last pin on the first start.
 - The divider before the last icon is gone: all icons are evenly spaced.
