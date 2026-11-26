@@ -20,6 +20,10 @@ Install
 Use
   Drag icons from Workbench onto the dock to pin them. Drag a pin off the
   dock to remove it. Right-click the dock for Settings, About and Quit.
+  A pinned drawer is a Folder Stack: click it to browse its contents above
+  the dock. Right-click a stack to sort it (Name, Date Modified, Kind) or
+  to make a click open the drawer as a window (Open Folder). Disks stay
+  ordinary pins that open a window.
   Programs with a window on screen get a dot under their pin, or a
   temporary icon while they run.
 

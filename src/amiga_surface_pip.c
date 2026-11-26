@@ -409,6 +409,7 @@ static void pip_show(App *app, const DockImage *frame)
     uint64_t started = app->profile ? profile_clock() : 0, encoded, converted;
     if (pip_blocked_by_screen(app)) return;
     encoded = app->profile ? profile_clock() : 0;
+    if (app->profile && amiga_pip_back_busy(app->pip)) ++app->stats.retire_waits;
     buffer = amiga_pip_back_buffer(app->pip);
     back = amiga_pip_back_index(app->pip);
     stride = amiga_pip_stride(app->pip);

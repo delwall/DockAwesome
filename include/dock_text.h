@@ -20,6 +20,13 @@ size_t dock_title_document_alias(const char *title, const char *path, char *cand
    escapes " and itself. Returns 0 when it does not fit in `size` bytes. */
 int dock_shell_quote(char *out, size_t size, const char *text);
 
+/* The Directory Opus 5 command that opens `path` in a lister. DOpus takes
+   the rest of the line as the path, quotes included: a quoted path opens a
+   lister on a volume named with the quote ("device (or volume) is not
+   mounted", AmiKit XE). Returns 0 for an empty path, a control code or no
+   room in `size` bytes. */
+int dock_dopus_lister_new(char *out, size_t size, const char *path);
+
 /* The bytes read as text: no control codes but tab, line ends, form feed
    and escape. An empty range is not text. */
 int dock_text_bytes(const unsigned char *bytes, size_t count);

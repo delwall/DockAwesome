@@ -1,5 +1,69 @@
 # Release notes
 
+## 1.0 beta 6
+
+Changes since 1.0 beta 5. Checked on ApolloOS, Coffin, AmigaOS 3.2.3,
+AmigaOS 3.9, AmigaOS 3.1.4.1 and AmiKit XE.
+
+**Folder Stacks**
+- Every drawer you pin is a Folder Stack: a click opens its contents above
+  the dock. Disks stay ordinary pins that open a window.
+- Stacks move and are removed like any other pin. A click on another stack
+  closes the open one and opens the one you clicked.
+- Right-click a stack to choose what a click on it does: **Show Stack**
+  (its contents above the dock, the default) or **Open Folder** (its
+  drawer as a window, as a pinned drawer did in 1.0 beta 5; a Directory
+  Opus lister on AmiKit). The choice is saved per stack and kept when the
+  stack is moved (checked on ApolloOS, Coffin, AmigaOS 3.2.3, AmigaOS 3.9,
+  AmigaOS 3.1.4.1 and AmiKit XE).
+- Each stack can be sorted by **Name**, **Date Modified** (newest first) or
+  **Kind** (drawers first, then by file type) from its right-click menu;
+  the choice is saved per stack.
+- Stacks show no running dot.
+- The tile at the end of a stack's box is now **Open Folder** on one
+  line, with a smaller ring in the muted grey of the menu headings, so it
+  no longer outweighs the real icons; at small icon sizes the box is one
+  text line shorter (checked on AmiKit XE at sizes 36, 48 and 72; the tile
+  opens a Directory Opus lister there, and a Workbench window on AmigaOS
+  3.2.3, AmigaOS 3.1.4.1, ApolloOS, Coffin and AmigaOS 3.9).
+- The page buttons in a stack's box draw their **<** and **>** exactly in
+  the middle of a slightly smaller disc (before, half a pixel toward the
+  open side); the button that goes back to the parent drawer shows a
+  return arrow (up, then left), so it no longer looks like the page-back
+  button; the box's **Open Folder** tile sits exactly on its icon cell
+  (before, half a pixel off). All of the box's controls (buttons, tile,
+  title, page count) now share one slightly softer tone; file names keep
+  theirs. The click areas are unchanged (checked on AmigaOS 3.2.3,
+  AmigaOS 3.1.4.1, AmiKit XE, ApolloOS, Coffin and AmigaOS 3.9 at icon
+  sizes 36, 48 and 72).
+- The Folder Stack setting is gone from **Settings**. A Folder Stack set in
+  1.0 beta 5 becomes the last pin on the first start.
+- The divider before the last icon is gone: all icons are evenly spaced.
+- While the dock idles, the first page of every stack is read ahead, so the
+  first opening is as quick as with the single stack of 1.0 beta 5.
+
+**Fixes**
+- With a Folder Stack open, a quick click on another pin closes the stack
+  and starts that pin (or opens that stack). Before, only the stack closed
+  (seen on Coffin, also in 1.0 beta 5; checked on Coffin, AmigaOS 3.2.3,
+  AmigaOS 3.9, AmigaOS 3.1.4.1, ApolloOS and AmiKit XE).
+- Zoom: when one frame ran late, every later frame of the same motion
+  waited up to 30 ms for the display, and the zoom stuttered until the row
+  came to rest (also in 1.0 beta 5). The dock now draws such a frame at the
+  next field and keeps pace (checked on AmigaOS 3.2.3 and Coffin).
+- AmiKit (Directory Opus 5 as the desktop): disk pins open a Directory
+  Opus lister again, and so do Open Folder stacks and the box's Open
+  Folder tile. Before, Directory Opus showed an
+  empty lister titled "DOS error: device (or volume) is not mounted" (also
+  in 1.0 beta 5; checked on AmiKit XE).
+- A Ctrl-C (Break) that reaches the dock while it starts no longer makes
+  it quit half closed. Before, it could quit without removing its input
+  hook and display overlay: the mouse stopped moving and the next start
+  said "PiP2 is already in use" until a reboot (seen on AmigaOS 3.1.4.1;
+  1.0 beta 5 quits the same way). Checked on AmigaOS 3.1.4.1, AmigaOS
+  3.2.3 and AmiKit XE: a Break during a start and during --bench-sweep
+  leaves nothing behind.
+
 ## 1.0 beta 5
 
 Changes since 1.0 beta 4.

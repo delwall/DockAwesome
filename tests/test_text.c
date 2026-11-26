@@ -79,6 +79,25 @@ static void test_shell_quote(void)
     assert(guarded[8] == '#' && guarded[9] == '#');
 }
 
+/* Directory Opus 5 reads the path unquoted, spaces and quotes included. */
+static void test_dopus_lister_new(void)
+{
+    char out[32], guarded[20];
+    assert(dock_dopus_lister_new(out,sizeof(out),"Personal:Audio"));
+    assert(!strcmp(out,"lister new Personal:Audio"));
+    assert(dock_dopus_lister_new(out,sizeof(out),"RAM:T/a \"b\"") &&
+        !strcmp(out,"lister new RAM:T/a \"b\""));
+    assert(!dock_dopus_lister_new(out,sizeof(out),"") && !out[0]);
+    assert(!dock_dopus_lister_new(out,sizeof(out),"RAM:a\nlister close all") && !out[0]);
+    /* "lister new " + "RAM:abcd" + NUL is exactly 20 bytes. */
+    memset(guarded,'#',sizeof(guarded));
+    assert(dock_dopus_lister_new(guarded,20,"RAM:abcd") && !strcmp(guarded,"lister new RAM:abcd"));
+    memset(guarded,'#',sizeof(guarded));
+    assert(!dock_dopus_lister_new(guarded,19,"RAM:abcd") && !guarded[0] && guarded[19] == '#');
+    memset(guarded,'#',sizeof(guarded));
+    assert(!dock_dopus_lister_new(guarded,0,"RAM:") && guarded[0] == '#');
+}
+
 /* What may run as a script: text only. */
 static void test_text_bytes(void)
 {
@@ -110,8 +129,9 @@ int main(void)
     test_title_names();
     test_title_alias();
     test_shell_quote();
+    test_dopus_lister_new();
     test_text_bytes();
     test_strnicmp();
-    puts("text rules: title matching, aliases, Shell quotes, text detection PASS");
+    puts("text rules: title matching, aliases, Shell quotes, DOpus lister paths, text detection PASS");
     return 0;
 }

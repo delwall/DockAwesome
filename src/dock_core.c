@@ -6,7 +6,7 @@
 
 DockSettings dock_settings_default(void)
 {
-    DockSettings s = {32, 64, 33, 5, 8, 16UL * 1024UL * 1024UL, 0, 0};
+    DockSettings s = {32, 64, 33, 5, 8, 16UL * 1024UL * 1024UL, 0};
     return s;
 }
 
@@ -15,18 +15,13 @@ int dock_settings_valid(const DockSettings *s)
     return s && s->base_size >= DOCK_MIN_ICON_SIZE && s->max_size >= s->base_size &&
         s->max_size <= DOCK_MAX_ICON_SIZE && s->levels >= 2 && s->levels <= DOCK_MAX_LEVELS &&
         s->gap >= 0 && s->gap <= 32 && s->padding >= 0 && s->padding <= 64 &&
-        s->end_gap >= 0 && s->end_gap <= 32 && s->edge_padding >= -DOCK_DESKTOP_GAP && s->edge_padding <= 32;
+        s->edge_padding >= -DOCK_DESKTOP_GAP && s->edge_padding <= 32;
 }
 
 int dock_row_length(const DockSettings *s, int count)
 {
     if (!count) return 0;
-    return count*s->base_size+(count-1)*s->gap+(count > 1 ? s->end_gap : 0);
-}
-
-static int extra_gap(const DockSettings *s, int count, int left)
-{
-    return left >= 0 && left == count-2 ? s->end_gap : 0;
+    return count*s->base_size+(count-1)*s->gap;
 }
 
 int dock_scaled_size(int size, int scale_percent)
@@ -508,7 +503,7 @@ static void logical_positions(const DockSettings *s, int count, int width, int m
         total += sizes[i];
         gaps[i] = 0;
         if (i+1 < count) {
-            gaps[i] = (s->gap+extra_gap(s,count,i))*256-
+            gaps[i] = s->gap*256-
                 reduction*(sizes[i]+sizes[i+1]-s->base_size*512)/(2*range);
             total += gaps[i];
         }
@@ -522,9 +517,8 @@ static void logical_positions(const DockSettings *s, int count, int width, int m
         mapped = sizes[0]/2;
         for (i = 0; i+1 < count; ++i) {
             int span = (sizes[i]+sizes[i+1])/2+gaps[i];
-            int rest_pitch = pitch+extra_gap(s,count,i)*256;
-            if (focus <= rest_pitch) { mapped += focus*span/rest_pitch; break; }
-            mapped += span; focus -= rest_pitch;
+            if (focus <= pitch) { mapped += focus*span/pitch; break; }
+            mapped += span; focus -= pitch;
         }
     }
     origin = (int64_t)mx*256-mapped;
@@ -598,24 +592,23 @@ int dock_layout(const DockSettings *s, int count, int width, int height,
     if (!active || mx < 0 || mx >= width || my < 0 || my >= height) {
         int y = baseline-s->base_size;
         for (i = 0, x = start; i < count; ++i, x += pitch)
-            out[i] = (DockPlacement){x+extra_gap(s,count,i-1), y, s->base_size, 0};
+            out[i] = (DockPlacement){x, y, s->base_size, 0};
         return 1;
     }
-    total = count > 1 ? s->end_gap : 0;
+    total = 0;
     {
-        /* The pointer in resting slots (Q16), with the wider end-gap pitch
-           counting as one slot, floored once: every icon sees the same phase,
-           as logical_positions maps the pointer between the same centers. */
+        /* The pointer in resting slots (Q16), floored once: every icon sees
+           the same phase, as logical_positions maps the pointer between the
+           same centers. */
         int focus = mx-(start+s->base_size/2), reach = 6*pitch;
         if (focus < -reach) focus = -reach;
         slot = 0;
         for (i = 0; focus >= 0 && i+1 < count; ++i) {
-            int span = pitch+extra_gap(s,count,i);
-            if (focus < span) break;
-            focus -= span; slot += 65536;
+            if (focus < pitch) break;
+            focus -= pitch; slot += 65536;
         }
         if (focus > reach) focus = reach;
-        slot += focus >= 0 ? focus*65536/(pitch+(i+1 < count ? extra_gap(s,count,i) : 0)) :
+        slot += focus >= 0 ? focus*65536/pitch :
             -((-focus*65536+pitch-1)/pitch);
     }
     for (i = 0; i < count; ++i) {
@@ -657,10 +650,9 @@ int dock_layout(const DockSettings *s, int count, int width, int height,
                every gap. Doubled centers retain odd-size half pixels until
                the final rounding, without changing cached artwork sizes. */
             for (i = 0; i+1 < count; ++i) {
-                int extra = extra_gap(s,count,i);
-                int pitch2 = 2*(pitch+extra);
+                int pitch2 = 2*pitch;
                 int span2 = out[i].size+out[i+1].size+
-                    2*(pair_gap(s, out[i].size, out[i+1].size)+extra);
+                    2*pair_gap(s, out[i].size, out[i+1].size);
                 if (focus2 <= pitch2) {
                     mapped2 += focus2*span2/pitch2;
                     break;
@@ -678,8 +670,8 @@ int dock_layout(const DockSettings *s, int count, int width, int height,
                 }
                 relative -= s->base_size; mapped += out[i].size;
                 if (i == count-1) { mapped += relative; break; }
-                relative -= s->gap+extra_gap(s,count,i);
-                mapped += pair_gap(s, out[i].size, out[i+1].size)+extra_gap(s,count,i);
+                relative -= s->gap;
+                mapped += pair_gap(s, out[i].size, out[i+1].size);
             }
         }
         x = mx-mapped;
@@ -690,7 +682,7 @@ int dock_layout(const DockSettings *s, int count, int width, int height,
         out[i].x = x;
         out[i].y = baseline-out[i].size;
         x += out[i].size;
-        if (i+1 < count) x += pair_gap(s, out[i].size, out[i+1].size)+extra_gap(s,count,i);
+        if (i+1 < count) x += pair_gap(s, out[i].size, out[i+1].size);
     }
     if (!constrained && s->max_size > s->base_size)
         logical_positions(s, count, width, mx, start, logical_size, out);

@@ -238,10 +238,12 @@ struct InputEvent *dock_input_observe(struct InputEvent *events, void *context)
                 int x = held_screen ? held_screen->MouseX-c->held_left : 0;
                 int y = held_screen ? held_screen->MouseY-c->held_top : 0;
                 int same_screen = held_screen && IntuitionBase->FirstScreen == held_screen;
-                int hit = clean && same_screen && s && s->screen == c->held_screen ? snapshot_hit(s, x, y) : -1;
+                int published = s && s->screen == c->held_screen;
+                int hit = clean && same_screen && published ? snapshot_hit(s, x, y) : -1;
                 unsigned int flags = (clean ? DOCK_INPUT_COORDS_VALID : 0) |
                     (same_screen ? DOCK_INPUT_SAME_SCREEN : 0) |
-                    (c->held_dragged ? DOCK_INPUT_DRAGGED : 0);
+                    (c->held_dragged ? DOCK_INPUT_DRAGGED : 0) |
+                    (clean && same_screen && !published ? INPUT_HIT_UNRESOLVED : 0);
                 if (!clean || !same_screen || c->held_cancelled || (e->ie_Qualifier & IEQUALIFIER_RBUTTON))
                     flags |= DOCK_INPUT_CANCELLED;
                 /* The original DOWN reserved this slot, including through rebuilds. */

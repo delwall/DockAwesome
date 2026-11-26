@@ -330,8 +330,9 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
 - Commit titles describe intent; the verification notes describe what is true.
 
 ## AmiKit: Directory Opus is the desktop (2026-11-10)
-- Synthetic input from amiagent does not reach the dock or Intuition windows on
-  AmiKit (`Input: downs=0`). Ask the user for clicks and drags there.
+- WRONG until 2026-11-25: "agent input does not reach the dock on AmiKit".
+  It does; the agent's warp lands elsewhere. See "AmiKit: agent clicks land
+  at twice the coordinates" below.
 - `a || b` on bit flags collapses them to 1, which is RUNNING_WORKBENCH: a
   window's dot became Workbench evidence that is kept while the Workbench list
   cannot be read (no Workbench). Combine flags with `|`.
@@ -534,3 +535,237 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
 - Rule: when an agent gesture fails, check downs/ambiguous in the profile
   and rerun it on the previous build before treating it as a regression.
   Also: the dock writes only ENVARC:DockAwesome.json; ENV: is the boot copy.
+
+## Bound every Amiga listing (2026-11-25)
+- `List Archives: ALL PAT=...` over a large volume ran past the agent's
+  timeout; the first Break went to two processes and could have stopped the
+  test dock. List one drawer level with a pattern instead, and check Status
+  after any Break the agent sends.
+- A Codex review run in the repository follows AGENTS.md and writes its
+  own section into tasks/todo.md: check `git status` after every Codex run.
+
+## A quick click is not a long hold (Coffin, 2026-11-25)
+- With a Folder Stack open, a quick click on another stack only closed the
+  box, while my press-wait-release test switched stacks. The release lost
+  its pin: the box's closing motion, started by the press, withdrew the
+  input handler's hit snapshot; a 1 s hold released after the motion.
+  The same loss kept a program pin from starting, also in 1.0 beta 5.
+- Rule: test clicks at normal speed (amiga_click) as well as held presses,
+  and when a release does nothing, log what the release carried (pin,
+  hit, flags) before theorising.
+- A pin's hit test follows its artwork's alpha: Coffin's Prefs drawer icon
+  is a flat bar, so a click at the row's middle height missed it
+  (downs=0). Aim at the artwork from a --pip-dump.
+
+## First-open runs need the pointer off the dock (3.2.3, 2026-11-25)
+- A first-open run started right after a click on the dock kept the pointer
+  over it: the read-ahead waits while the pointer is on the dock, so the
+  profile said reads=0 pending=3 after 45 s idle.
+- Rule: move the pointer off the dock before every idle wait, and accept a
+  first-open run only when its prefetch line reads pending=0.
+- The trace's convert_us includes the PiP back-buffer retirement wait
+  (WaitTOF in amiga_pip_back_buffer): a slow "convert" with few pixels is
+  a wait for a field, not CPU. Count the waits before blaming other tasks.
+
+## Compare the same row before blaming a feature (3.2.3, 2026-11-25)
+- The 3.2.3 hover failure was put on the stacks beside the hovered pin.
+  v1.0b5 had looked normal only because its divider put other icons under
+  the same pointer x; with the same 15 evenly spaced pins (no "folder")
+  v1.0b5 failed the same way. The cause was an old pacing cascade (a late
+  present makes every later frame wait in WaitTOF), triggered by heavier
+  icons at that rest.
+- Rule: for a hover/zoom regression, first run the old build with the same
+  pixel layout (same pin count and spacing, canvas width in the profile
+  header) and the same gestures; a control that swaps icons also swaps the
+  compose cost. Read the frame trace for the first late frame (done_us near
+  20 ms) before looking for other tasks or features.
+
+
+## Quote rules are per receiver: DOpus 5 keeps quotes in `lister new` (2026-11-25)
+- `lister new "<path>"` was written from Shell/ARexx habit and shipped from
+  1.0 beta 2 to 542 unrun on DOpus 5; DOpus 5 takes the rest of the line as
+  the path, quotes included, and showed "device (or volume) is not mounted".
+- Before sending a command string to another program, run the exact string
+  against that program once (ARexx from amiga_arexx is enough) with a plain
+  path, a path with a space and one with a quote.
+- A "not mounted" error for a mounted path: look at the exact path the
+  error names (here `"Personal:Audio"/`) before suspecting DOS or devices.
+
+## AmiKit: agent clicks land at twice the coordinates (2026-11-25)
+- amiga_move_mouse/amiga_click/amiga_drag warp with IECLASS_POINTERPOS. On
+  AmiKit XE (1280x720, 24-bit) the pointer lands at screen = 2*w-4 on both
+  axes: a click "at 476,690" pressed at 948,719, beside the dock, so the
+  profile said `Input: downs=0`. One such click was taken as "input does not
+  reach the dock" and every AmiKit gesture went to the user for weeks.
+- The button events themselves are fine: an input.device spy (handlers at
+  pri 127 and 59 around the dock's 60) showed RAWMOUSE LBUTTON, qualifier
+  0x8000, ie_X/Y 0, and the dock nulled both (captured). No other handler
+  sits above the dock (commodities 53, intuition 50, console 0).
+- Works on AmiKit: pass w = ((X+4)/2, (Y+4)/2) to amiga_click, amiga_drag and
+  amiga_move_mouse; check with amiga_pointer first. relative:true is not
+  exact (pointer acceleration: 32 ticks gave ~35 px). amiga_ui_click uses the
+  unscaled warp and misses. Screenshots and amiga_ui_tree report real pixels.
+- The dock and the Folder Stack box are drawn in PiP (not in screenshots);
+  the box's window position and size are in amiga_ui_tree, and the stack and
+  dock menus are real windows that screenshots show.
+- Rule: when an agent gesture "does nothing", read amiga_pointer after the
+  move before concluding anything about the target program.
+
+## Stop a CLI test dock by its CLI, not by task name (ApolloOS, 2026-11-25)
+- BreakTask/FindTask "DockAwesome" find the dock only when Workbench
+  started it (WBStartup, WBRun). A dock run from an Execute script is a
+  CLI process named after its CLI, so BreakTask said "not found", the
+  first test dock kept running and the next start showed "PiP2 is already
+  in use".
+- Rule: stop CLI-started docks with `Status COM=<binary>` + `Break <n>`
+  (stop.s) and check that Status lists none before the next start; use
+  BreakTask only for the Workbench-started dock.
+
+## A relative amiga_drag is not a hold; first-open runs need quiet (Coffin, 2026-11-25)
+- amiga_drag with relative:true and from == to homes the pointer with the
+  button down, so the dock saw a drag of the pin, not a 1 s hold: the box
+  closed and nothing opened. Send holds as an absolute amiga_drag (settle
+  50) once a relative click has put the pointer on the dock.
+- At ChangeTaskPri -30 every task an agent command starts runs above the
+  dock. The only slow last entrance frames (one 60 ms, two 3 ms over)
+  came in runs that sent "Wait 1" right after the click, though one such
+  run was clean; the cause is not proven. Time first-open clicks alone
+  (the next agent call seconds later) and repeat a run before calling it
+  a regression.
+
+## libnix aborts on a pending Ctrl-C inside any write (3.1.4.1, 2026-11-25)
+- A test dock got its Break within a second of starting. libnix's write()
+  called __chkabort, which printed "***Break" and exited past main's
+  cleanup: the input handler, the PiP lease and the receiver window
+  stayed behind and Intuition took no more input. The output file held
+  only "***Break"; that line is the tell.
+- Rule: an Amiga program that owns system resources defines an empty
+  `__chkabort` and handles Ctrl-C itself. Test "Break at startup" by
+  running the program in-process with Ctrl-C already pending (RunCommand
+  after SetSignal), not by racing a Break against the start.
+- My procedure caused the "PiP2 is already in use." the user saw: I sent
+  stop.s within a second of starting a test dock, it died with the lease
+  held, and my next test dock hit the lease. Give a just-started test
+  dock a few seconds before stop.s; before every start check Status (CLI
+  docks), FindTask (the Workbench dock) and the PiP2 lease
+  (FindSemaphore): exactly one owner or none.
+- A requester that frozen input cannot reach can still be answered: send
+  its window the IDCMP_GADGETUP its OK gadget would send (PutMsg to the
+  window's UserPort with your own reply port).
+
+## The end icon moves when the row zooms (3.2.3, 2026-11-25)
+- Five agent clicks at the last stack's rest centre did nothing
+  (`downs=0`, `presses_unarmed=1`; an input spy showed the press passing
+  through): the zoomed row shifts the end icon about 8 px outward, so the
+  rest centre lies in the gap. At rest the centres are 640 + 41*(k-(n-1)/2)
+  on a 1280 px screen at size 36.
+- Rule: aim at an end icon from a --pip-dump taken with the pointer on it,
+  or a few px outward; a right-click there that opens the plate menu
+  (Settings/About/Quit) says "gap".
+
+## A per-binary timing gap is not a code regression until a rebuild agrees (3.2.3, 2026-11-25)
+- 553 composed --bench-sweep frames 0.9 ms (20%) slower than v1.0b5 on the
+  same damage, frame for frame, while the compose code was unchanged; a
+  30-line diagnostic in another file moved the same code by -1.5 to +0.9 ms,
+  and -falign-* flags did not pin it. The 43 ms entrance frame followed the
+  memory state (gone with a 32 KB shift and later in the session).
+- Rule: before calling a performance difference between two builds a
+  regression, rebuild each with an unrelated change (and run one with a
+  memory shift, tool Hold) and see whether the gap survives; diff the
+  functions that run in the measured window.
+
+## A warp click from a zoomed row misses far pins (AmiKit, 2026-11-25)
+- With a box open and the row zoomed around a stack, amiga_click warped
+  straight to Shell or Clock: the press arrived before the row zoomed
+  around the new pointer position, where the drawn row had no icon
+  (`downs` not counted, `presses_unarmed` +1). It looked like the old
+  "program pin does not start from an open box" defect.
+- Rule: before a click on a pin away from where the pointer rests on the
+  dock, move the pointer onto it in its own call (as a mouse does), or
+  click from off the dock (row at rest). Check `Input: downs` before
+  calling a missed click a dock defect.
+
+## See the PiP-only Folder Stack box with --pip-dump (AmiKit, 2026-11-25)
+- Screenshots do not show the box. `--pip-dump prefix` now writes
+  `prefix-folder.ppm` once a box page has settled with its icons; build
+  the "before" binary with the dump alone to compare a visual change.
+- At size 72 a test dock took over 10 s before its first press counted
+  (`Input: downs=0`, profile `elapsed_ms` 4 s of a 14 s run). Wait 20 s
+  after starting a large-size test dock, and check `downs` before calling
+  a missed click a defect.
+- Repeated: several amiga_move_mouse calls in one message are not a
+  sweep; the run was discarded and redone one move per call.
+
+## AmigaDOS script loops ran away (3.2.3, 2026-11-26)
+- A test-file loop `Set i 100 / Lab / Echo >f$i / Set i \`Eval $i + 1\` /
+  If $i LT 400 / Skip BACK` never stopped: If compared the numbers as
+  strings ("1000" < "400"), and `If VAL` did not stop the next version
+  either. It wrote about 17000 files to RAM:, amiga_break did not reach
+  it, and two unbounded `List` calls of the result flooded the session.
+- What stopped it: `Status` to find the script's CLI (a "No command
+  loaded" process with the agent's 262144 stack), then `Break <n> D`
+  (Ctrl-D ends a script; Ctrl-C did not).
+- Rule: generate test files with a straight-line script written on the
+  Mac (one Echo per file), never an AmigaDOS counting loop; bound every
+  listing of a test drawer with a narrow PAT and NOHEAD.
+
+## Centre by the bounding box, never by an optical offset (2026-11-26)
+- I set the parent-drawer return arrow one pixel below its disc's centre
+  because, box-centred, its ink looked high. The owner: "Alltid exakt!"
+  Every control glyph is centred exactly by its bounding box.
+- The Open Folder ring had sat half a pixel off its icon cell since it was
+  added (its centre was a pixel centre, the icon box's an edge for even
+  sizes); a host test on the rasterised box would have caught it.
+- Rule: centre glyphs by their box and assert it on the rasterised pixels
+  in a host test for every size; also check the reference box (cell or
+  control) is the one the user sees, not a pixel coordinate near it.
+- Rule: before changing a colour for a group of controls, measure every
+  element's colour in a dump: the box mixed #f2f4f8 and #aeb8c7 for
+  controls without anyone deciding it.
+
+## Diagnostics must not block in DOS calls (3.1.4.1, 2026-11-26)
+- A tool that called NameFromLock on every process's pr_CurrentDir and
+  pr_HomeDir (to find who held an empty RAM: drawer) blocked inside DOS
+  twice; Break did not reach it, amiga_abandon left it running and its
+  output file locked until reboot.
+- Rule: never send packets on other processes' locks from a probe; and
+  before suspecting a leak, reproduce it with the dock against a control
+  drawer (five runs here deleted cleanly, so no dock defect was shown).
+- Fetch dumps with an assign (`Assign DL: RAM:dl`, acp `host:DL:`): only
+  that drawer comes down; `host:RAM:` also tried to read a file the test
+  dock still had open and hung until the watchdog. Copy a box dump only
+  about 2 s after a page click: it is written once the page has settled.
+
+## Start a dock from a script that ends (AmiKit, 2026-11-26)
+- A script `Stack 400000` + `SYS:WBStartup/DockAwesome` run with
+  `Run >NIL: Execute` stays "in use" while the dock runs, so it cannot be
+  deleted; `Stack 400000` + `Run >NIL: <dock>` gave the dock only 131072.
+- Rule: put `Run >NIL: Stack 400000 +` and the dock on the next line in
+  the script and Execute it: the new CLI gets the stack (Status FULL: stk
+  400000) and the script ends at once and can be deleted.
+- Measure box glyphs over an even background: a CON window with no text
+  (`Run >NIL: Wait 1500 >CON:...`) behind the box; desktop icons under
+  the glass moved a reading by 1.65 px. The Amiga clock can jump (time
+  sync) and end such a Wait early.
+
+## A coloured backdrop under the glass moves a coverage reading (ApolloOS, 2026-11-26)
+- The 72 px parent arrow read -0.87 px vertically on ApolloOS: the
+  backdrop's red nebula lay under the glass there, and the luminance-based
+  coverage measure counted it as stroke. The neutral stroke pixels (min
+  channel > 110) and the full-tone #dee2e9 positions (0 differ from 3.2.3)
+  showed the glyph exact.
+- Rule: when one reading of a box dump disagrees, crop it at 10x and
+  compare full-tone pixel positions with a reference dump before
+  suspecting the code.
+- On ApolloOS, List shows a soft link on an SFS volume as "Dir"; check
+  that it resolves with Version (or Search) on the link path.
+
+## An empty drawer "in use" can be Workbench's (Coffin, 2026-11-26)
+- RAM:BtnTest stayed "in use" after its contents were deleted, on
+  3.1.4.1, ApolloOS and Coffin, while control drawers through the same
+  dock gestures deleted cleanly. Stopping the dock did not free it;
+  ARexx `address WORKBENCH; 'WINDOW "RAM:BtnTest" OPEN'` then `CLOSE`
+  did, at once: Workbench held it.
+- Rule: before calling a held drawer a dock leak, open and close it as a
+  Workbench window by ARexx and try Delete again; only a lock that
+  survives that is worth a bisect.

@@ -312,33 +312,6 @@ static void test_zoom_room_after_insertion(void)
     assert(small_peak == 46 && grown_peak >= s.max_size-2);
 }
 
-static void test_stack_gap(void)
-{
-    DockSettings s = dock_settings_default();
-    DockPlacement rest[N], zoom[N], insert[N];
-    int edge, w, h, x, y;
-    s.end_gap = 12;
-    assert(dock_row_length(&s,1) == s.base_size);
-    for (edge = DOCK_EDGE_BOTTOM; edge <= DOCK_EDGE_RIGHT; ++edge) {
-        int previous, stack;
-        dimensions((DockEdge)edge,&w,&h);
-        assert(dock_edge_layout(&s,edge,N,w,h,0,0,0,rest));
-        previous = edge == DOCK_EDGE_BOTTOM ? rest[N-2].x : rest[N-2].y;
-        stack = edge == DOCK_EDGE_BOTTOM ? rest[N-1].x : rest[N-1].y;
-        assert(stack-previous-rest[N-2].size == s.gap+s.end_gap);
-        actual_point(edge,stack+s.base_size/2,70,&x,&y);
-        assert(dock_edge_layout(&s,edge,N,w,h,x,y,1,zoom));
-        previous = edge == DOCK_EDGE_BOTTOM ? zoom[N-2].x : zoom[N-2].y;
-        stack = edge == DOCK_EDGE_BOTTOM ? zoom[N-1].x : zoom[N-1].y;
-        assert(zoom[N-1].size == s.max_size);
-        assert(stack-previous-zoom[N-2].size >= s.end_gap);
-        assert(dock_edge_insertion_layout(&s,edge,N,w,h,N-1,insert));
-        previous = edge == DOCK_EDGE_BOTTOM ? insert[N-2].x : insert[N-2].y;
-        stack = edge == DOCK_EDGE_BOTTOM ? insert[N-1].x : insert[N-1].y;
-        assert(stack-previous == 2*(s.base_size+s.gap)+s.end_gap);
-    }
-}
-
 static int along_low(DockEdge edge, DockRect r) { return edge == DOCK_EDGE_BOTTOM ? r.left : r.top; }
 static int along_high(DockEdge edge, DockRect r) { return edge == DOCK_EDGE_BOTTOM ? r.right : r.bottom; }
 
@@ -480,6 +453,157 @@ static void test_outside_shown(void)
     }
 }
 
+/* The box's parent drawer and page buttons. The ink (the segments' end
+   points grown by the half width) is centred on the disc exactly for the
+   chevrons and the return arrow, at every size (by the box, never an
+   optical offset); the rasterised pixel bounding box agrees with the
+   disc's; left and right mirror each other sample for sample; from a 15 px
+   control on, the disc is 5/6 of the control (below, a 12 px floor). */
+static void button_bounds(int x, int size, int direction, int box[8])
+{
+    DockButtonGlyph g, m;
+    int px, py;
+    dock_button_glyph(x,x,size,size,direction,&g);
+    if (direction != DOCK_BUTTON_PARENT) dock_button_glyph(x,x,size,size,-direction,&m);
+    box[0] = box[1] = box[4] = box[5] = INT_MAX;
+    box[2] = box[3] = box[6] = box[7] = INT_MIN;
+    for (py = x; py < x+size; ++py) for (px = x; px < x+size; ++px) {
+        int disc, stroke = dock_button_coverage(&g,px,py,&disc), mirror_disc;
+        if (direction != DOCK_BUTTON_PARENT)
+            assert(dock_button_coverage(&m,2*x+size-1-px,py,&mirror_disc) == stroke && mirror_disc == disc);
+        if (stroke) {
+            if (px < box[0]) box[0] = px;
+            if (py < box[1]) box[1] = py;
+            if (px > box[2]) box[2] = px;
+            if (py > box[3]) box[3] = py;
+        }
+        if (disc) {
+            if (px < box[4]) box[4] = px;
+            if (py < box[5]) box[5] = py;
+            if (px > box[6]) box[6] = px;
+            if (py > box[7]) box[7] = py;
+        }
+    }
+}
+
+static void test_button_glyph(void)
+{
+    static const int directions[3] = {DOCK_BUTTON_LEFT, DOCK_BUTTON_RIGHT, DOCK_BUTTON_PARENT};
+    int size, x, d;
+    for (size = 8; size <= 40; ++size) for (x = 0; x < 3; ++x) for (d = 0; d < 3; ++d) {
+        int direction = directions[d], o = 5+x, box[8], k, i;
+        int lo[2] = {INT_MAX, INT_MAX}, hi[2] = {INT_MIN, INT_MIN};
+        DockButtonGlyph g;
+        DockButtonPixels n;
+        button_bounds(o,size,direction,box);
+        assert(box[0] <= box[2] && box[4] <= box[6]);
+        /* Centres in half pixels: stroke and disc agree exactly up to a
+           24 px control (the box's fonts give 18 or 19); above, a cap's
+           faint edge sample can add half a pixel. */
+        dock_button_glyph(o,o,size,size,direction,&g);
+        for (k = 0; k < 2; ++k) {
+            int offset = box[k]+box[k+2]-box[k+4]-box[k+6];
+            if (size <= 24 && (direction != DOCK_BUTTON_PARENT || size >= 12)) assert(offset == 0);
+            else assert(abs(offset) <= 1);
+        }
+        assert(g.radius >= (size*8 < 96 ? size*8 : 96) && g.radius <= size*8);
+        if (size >= 15) assert(g.radius*6 >= size*40-6 && g.radius*6 <= size*40+6);
+        assert(g.count == (direction == DOCK_BUTTON_PARENT ? 8 : 2));
+        for (k = 0; k < 2; ++k) {
+            int low = INT_MAX, high = INT_MIN;
+            for (i = 0; i < g.count; ++i) {
+                int a = g.segment[i][k], b = g.segment[i][k+2];
+                if (a < low) low = a;
+                if (b < low) low = b;
+                if (a > high) high = a;
+                if (b > high) high = b;
+            }
+            assert(g.ink[k] == low-g.half && g.ink[k+2] == high+g.half);
+            assert(low+high == 2*(k ? g.cy : g.cx));
+            /* The return arrow: its tip is the leftmost point, its stem
+               the rightmost and lowest. */
+            if (direction == DOCK_BUTTON_PARENT)
+                assert(g.segment[6][k+2] == (k ? (g.segment[6][1]+g.segment[7][1])/2 : low) &&
+                    g.segment[0][k] == high);
+        }
+        if (direction != DOCK_BUTTON_PARENT)
+            assert(direction*(g.segment[0][2]-g.cx) > 0 && g.segment[0][3] == g.cy);
+        /* Native: a centred disc inside the control; the lines are 45
+           degree or straight, their pixels span the end points: centred
+           exactly along the pointing direction, to half a pixel across it
+           for an even control. */
+        dock_button_pixels(o,o,size,size,direction,&n);
+        assert(2*(n.left-o)+n.size == size && 2*(n.top-o)+n.size == size);
+        assert(n.count == (direction == DOCK_BUTTON_PARENT ? 3 : 2));
+        for (i = 0; i < n.count; ++i) for (k = 0; k < 3; ++k) {
+            int c;
+            if (k) {
+                int dx = abs(n.stroke[i][k][0]-n.stroke[i][k-1][0]);
+                int dy = abs(n.stroke[i][k][1]-n.stroke[i][k-1][1]);
+                assert(dx == dy || !dx || !dy);
+            }
+            for (c = 0; c < 2; ++c) {
+                if (n.stroke[i][k][c] < lo[c]) lo[c] = n.stroke[i][k][c];
+                if (n.stroke[i][k][c] > hi[c]) hi[c] = n.stroke[i][k][c];
+            }
+        }
+        /* The native return arrow: the stem's foot is the right bottom
+           corner, the head's tip the leftmost point. */
+        if (direction == DOCK_BUTTON_PARENT)
+            assert(n.stroke[0][0][0] == hi[0] && n.stroke[0][0][1] == hi[1] && n.stroke[2][1][0] == lo[0]);
+        for (k = 0; k < 2; ++k) {
+            int edge = k ? n.top : n.left, along = direction == DOCK_BUTTON_PARENT ? k == 1 : k == 0;
+            if (direction != DOCK_BUTTON_PARENT || size >= 15) assert(lo[k] > edge && hi[k] < edge+n.size-1);
+            assert(lo[k]+hi[k]-(2*edge+n.size-1) ==
+                (along && direction != DOCK_BUTTON_PARENT ? 0 : (size+1)%2));
+        }
+    }
+}
+
+/* The Open Folder tile's glyph: the arrow's outlines are centred on the
+   ring by their box, and the rasterised glyph's pixel box, and the arrow's
+   alone, are centred exactly on the tile's icon box for every icon size
+   and pixel phase. */
+static void test_open_glyph(void)
+{
+    int icon, left, k, i;
+    for (k = 0; k < 2; ++k) {
+        int low = 127, high = -128;
+        for (i = 0; i < DOCK_OPEN_TAIL; ++i) {
+            if (dock_open_arrow_tail[i][k] < low) low = dock_open_arrow_tail[i][k];
+            if (dock_open_arrow_tail[i][k] > high) high = dock_open_arrow_tail[i][k];
+        }
+        for (i = 0; i < DOCK_OPEN_HEAD; ++i) {
+            if (dock_open_arrow_head[i][k] < low) low = dock_open_arrow_head[i][k];
+            if (dock_open_arrow_head[i][k] > high) high = dock_open_arrow_head[i][k];
+        }
+        assert(low+high == 0);
+    }
+    for (icon = 16; icon <= DOCK_MAX_ICON_SIZE; ++icon) for (left = 3; left < 5; ++left)
+        for (k = 0; k < 2; ++k) {
+        int radius = (icon*36+50)/100, thickness = ((icon/2-2)+6)/13, top = left+1, px, py;
+        int box[4] = {INT_MAX, INT_MAX, INT_MIN, INT_MIN};
+        unsigned char covered[2*DOCK_MAX_ICON_SIZE+8];
+        DockOpenGlyph g;
+        if (thickness < 1) thickness = 1;
+        if (thickness > radius/2) thickness = radius/2;
+        dock_open_glyph(left,top,icon,radius,thickness,&g);
+        assert(2*g.cx == 16*(2*left+icon) && 2*g.cy == 16*(2*top+icon));
+        /* k = 1: the arrow alone, without the ring. */
+        if (k) g.outer = g.inner = 0;
+        for (py = top-2; py < top+icon+2; ++py) {
+            dock_open_glyph_row(&g,py,left-2,icon+4,covered);
+            for (px = 0; px < icon+4; ++px) if (covered[px]) {
+                if (left-2+px < box[0]) box[0] = left-2+px;
+                if (py < box[1]) box[1] = py;
+                if (left-2+px > box[2]) box[2] = left-2+px;
+                if (py > box[3]) box[3] = py;
+            }
+        }
+        assert(box[0]+box[2]+1 == 2*left+icon && box[1]+box[3]+1 == 2*top+icon);
+    }
+}
+
 int main(void)
 {
     test_layout_and_baseline();
@@ -490,9 +614,10 @@ int main(void)
     test_external_insertion();
     test_zoomed_reorder_gap();
     test_zoom_room_after_insertion();
-    test_stack_gap();
     test_gap_motion();
     test_outside_shown();
-    puts("geometry: bottom/left/right layout, upright hit/slot/outside, half-open panel bounds and animation equivalence PASS");
+    test_button_glyph();
+    test_open_glyph();
+    puts("geometry: bottom/left/right layout, upright hit/slot/outside, half-open panel bounds, animation equivalence and centred box buttons (page chevrons, return arrow) and Open Folder glyph PASS");
     return 0;
 }

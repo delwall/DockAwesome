@@ -211,34 +211,6 @@ static void panel_edge(unsigned char *pixel, const unsigned char *background,
         pixel[c] = (unsigned char)((rim[c] * alpha + pixel[c] * (255 - alpha) + 127) / 255);
 }
 
-static void draw_divider(DockImage *canvas, const DockRect *panel,
-    const DockPlacement *previous, const DockPlacement *last, int edge, int max_gap,
-    const DockRect *clip)
-{
-    int bottom = edge == DOCK_EDGE_BOTTOM;
-    int64_t gap_start = (int64_t)(bottom ? previous->x : previous->y)+previous->size;
-    int64_t gap_end = bottom ? last->x : last->y;
-    int start = bottom ? panel->top : panel->left;
-    int end = bottom ? panel->bottom : panel->right;
-    int inset = (end-start)/5;
-    int cross;
-    int64_t line;
-    /* Leave a vacant drop slot on the ordinary-icon side of the divider. */
-    if (gap_start < gap_end-max_gap) gap_start = gap_end-max_gap;
-    line = gap_start+(gap_end-gap_start)/2;
-    if (gap_end <= gap_start || line < (bottom ? panel->left : panel->top) ||
-        line >= (bottom ? panel->right : panel->bottom)) return;
-    if (line < (bottom ? clip->left : clip->top) || line >= (bottom ? clip->right : clip->bottom)) return;
-    start += inset; end -= inset;
-    if (start < (bottom ? clip->top : clip->left)) start = bottom ? clip->top : clip->left;
-    if (end > (bottom ? clip->bottom : clip->right)) end = bottom ? clip->bottom : clip->right;
-    for (cross = start; cross < end; ++cross) {
-        int x = bottom ? (int)line : cross, y = bottom ? cross : (int)line;
-        unsigned char *pixel = canvas->pixels+((size_t)y*canvas->width+x)*4;
-        panel_edge(pixel,pixel,255,0,88);
-    }
-}
-
 /* Pixels [first, first+count) of the canvas from the backdrop, or the flat fill. */
 static void background_span(unsigned char *pixels, const unsigned char *backdrop,
                             const unsigned char *flat, size_t first, size_t count)
@@ -397,8 +369,6 @@ void dock_render_oriented_clip(DockImage *canvas, const DockImage *backdrop,
             }
         }
     }
-    if (s->end_gap && count > 1)
-        draw_divider(canvas,&rect,&p[count-2],&p[count-1],edge,s->gap+s->end_gap,&c);
     for (i = 0; i < count; ++i) {
         const DockImage *image = level_image(icons[i], p[i].level);
         if (!image) continue;

@@ -242,6 +242,14 @@ unsigned char *amiga_pip_back_buffer(AmigaPip *p)
 #endif
     return p->pixels[p->front^1];
 }
+int amiga_pip_back_busy(const AmigaPip *p)
+{
+#ifdef DOCK_AMMX
+    return p && p->retirement_pending && field_counter()==p->last_present_field;
+#else
+    (void)p; return 0;
+#endif
+}
 const unsigned char *amiga_pip_front_buffer(const AmigaPip *p)
 {
     return p ? p->pixels[p->front] : NULL;

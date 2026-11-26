@@ -15,11 +15,12 @@ Pointer -> layout -> renderer -> frame -> native window or PiP2
 | Module | Role |
 | --- | --- |
 | `dock_core.c` | Settings, icon caches, layout, animation, and pixel conversion kernels |
-| `dock_compose.c` | Compositor: plate, glass rows, divider, and icon and overlay blending |
+| `dock_compose.c` | Compositor: plate, glass rows, and icon and overlay blending |
 | `dock_geometry.c` | Bottom, left, and right geometry and hit testing |
 | `dock_interaction.c` | Button pairs, drag state, and pin actions |
 | `dock_renderer.c` | Pixel backend selection, damage tracking, and damaged PiP conversion |
 | `dock_prefs.c` | JSON preferences |
+| `dock_sort.c` | Folder Stack orders: name, date modified, kind |
 | `dock_text.c` | Text rules without OS calls: window titles that name a document, Shell quoting, text detection |
 | `dock_profile.c` | Feature choice from probed capabilities, and why PiP cannot run |
 | `amiga_caps.c` | CPU, chipset and OS capability probes, `--caps` |
@@ -165,8 +166,7 @@ rebuilt cache can reuse a freed address, so freeing, rebuilding, swapping
 or reordering caches needs no full redraw; the Folder Stack morph blends
 into one buffer and restamps it only when its inputs change. Changed
 slots add their old and new image rectangles, moved plate ends a strip that
-reaches the corner radius plus one pixel inward, the divider its old and new
-span, and running dots and the dragged icon, which the renderer now draws as
+reaches the corner radius plus one pixel inward, and running dots and the dragged icon, which the renderer now draws as
 overlays, their old and new rectangles. A different canvas, backdrop,
 coverage buffer, edge, centered plate, setting, item count, corner radius or
 plate thickness redraws everything, as does `dock_renderer_invalidate`. Each
@@ -221,11 +221,52 @@ Window regions must outlive their windows. See [Hardware](hardware.md) for
 the input and layer ABI notes.
 
 Settings use GadTools. The Size slider stops at the largest size that fits
-the draft's edge, scale, and Folder Stack, using the same check as Save.
+the draft's edge and scale, using the same check as Save.
 Build candidate caches before swapping them in; the dialog shows progress and
 disables its controls meanwhile. Restore the previous settings and caches if
 saving or opening the surface fails. The JSON file stores the edge. A missing
-edge defaults to bottom.
+edge defaults to bottom. A `"folder"` key from 1.0 beta 5 and older is read,
+moved to the end of `"paths"` (`dock_prefs_migrate`) and never written again.
+`"sorts"` maps a stack's path to its order (`"date"` or `"kind"`); stacks
+sorted by name are not listed, and a key or path this build does not know
+reads as name. `"clicks"` maps a stack's path to `"folder"` the same way
+(the same reader and writer for both maps): stacks that show their box are
+not listed, and anything else reads as Show Stack. Older builds skip both
+keys. Both follow the pin's `Item` through reorder, removal and
+`save_config`, and are matched by path, not by position.
+
+Every pinned drawer that is a directory and not a volume root is a Folder
+Stack: a click opens its box, and the pin moves and is removed like any
+other, without a running dot. While the dock idles with the pointer off it,
+the event loop reads one more icon of a stack's first page per live tick,
+round robin over the stacks from the one nearest the pointer, into a
+512-entry icon cache that this read-ahead never evicts from.
+
+Each stack has its own order, chosen in its menu: Name, Date Modified or
+Kind (`dock_sort.c`, host-tested). `amiga_folder_read` reads the whole
+drawer as before, sorts it by name to pair icons with their entries, then
+in the stack's order; the box, the drawers opened inside it and the
+read-ahead all use that order, so the page read ahead is the page shown.
+A new choice is saved at once and reads that stack's first page again.
+
+Each stack also chooses what a left click does ("Click to" in its menu):
+Show Stack opens the box; Open Folder opens the drawer through
+`launch_pin`, as a drawer pin did in 1.0 beta 5 (a Workbench window, a
+Directory Opus lister when Directory Opus is the desktop). An Open Folder
+stack keeps the stack menu, has no running dot and no Close row (it goes to
+the status worker as kind 0 like every stack), records no launch for an app
+to claim, and is not read ahead (`stack_box`); the profile's `stacks=`
+counts only Show Stack stacks. Choosing Show Stack again reads its first
+page ahead.
+
+The box ends every page with an Open Folder tile that opens the shown
+drawer the same way. It is drawn in the muted heading colour
+(`FOLDER_MUTED`): a ring about 72% of the icon size (`folder_open_radius`)
+at the icon's centre, with the ring weight it had at full size
+(`folder_open_weight`), and a one-line label. `folder_grid` makes every cell
+wide enough for "Open Folder" and "Workbench 0", so the label never wraps
+and the box has no extra row for it. `--pip-dump` also writes the settled
+box as `prefix-folder.ppm`, since screenshots do not show PiP.
 
 ## References
 

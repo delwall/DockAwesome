@@ -1605,8 +1605,9 @@ to the same slot (inverted offset test, store attributes required).
       RAM Disk at slot 7 (drops added=1) and dragging it out removed it;
       prefs as before; clean Ctrl-C. Restarted with WBRun; RAM: clean.
       The idle 20-60 ms polls passes show here too (pre-existing).
-- [ ] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete after the
-      next ApolloOS boot.
+- [x] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete after the
+      next ApolloOS boot (done 2026-11-25, see "ApolloOS rerun with build
+      550").
 - [x] Coffin (2026-11-24, 24-bit Workbench, so the new capture path runs
       without the Magellan motion path): the old -locked-delete deleted;
       8f55e11 installed (release 1.0b4 is the new
@@ -1633,8 +1634,2367 @@ to the same slot (inverted offset test, store attributes required).
       Coffin, 3.2.3). Ready to push with the branch.
 
 ## Release 1.0 beta 5 (2026-11-24)
-- [ ] PR after-1.0b4 -> main, merge; tag v1.0b5 on the merge commit.
-- [ ] make release RELEASE="1.0 beta 5"; pack DockAwesome-1.0b5.lha with
-      LhA on the Amiga; lha t and compare the files with build/release.
-- [ ] GitHub prerelease "DockAwesome 1.0 beta 5" with the LHA and notes.
-- [ ] Install the release binary on the booted system.
+- [x] PR #13 (after-1.0b4) merged into main (989cfa7); tag v1.0b5; GitHub
+      prerelease "DockAwesome 1.0 beta 5" with DockAwesome-1.0b5.lha
+      (171,903 bytes, SHA-256 79f5d996...63088c0b9), packed with LhA 2.15
+      on AmigaOS 3.2.3; lha t passes and all five files match build/release.
+- [x] AmigaOS 3.2.3: release binary (1.0 beta 5) installed and started with
+      WBRun; both old binaries (1.0b4, 0.527) deleted; RAM: clean.
+- [ ] Install the release binary on AmiKit XE, ApolloOS and Coffin (they run
+      0.527, the same code) at their next boot, and delete the
+      Disabled/DockAwesome-locked-delete left on ApolloOS and Coffin.
+
+## Folder Stacks for every pinned drawer, no divider (2026-11-24)
+Plan: tasks/plan-folder-stacks.md (D1-D17). Branch folder-stacks, one PR.
+- [x] §4.2 goldens filtered from the 384-entry table (keep i with bit 2
+      clear, new index ((i>>3)<<2)|(i&3)) before the renderer changed.
+- [x] D1 divider out of the core (end_gap, extra_gap, draw_divider,
+      add_divider, STACK_DIVIDER_GAP).
+- [x] D2 dock_prefs_migrate; "folder" read, never written; startup saves
+      once after migrating (not while a pin is missing).
+- [x] D3-D9 every pinned directory (not a volume root) is a stack; append
+      at the end; stacks move and are removed like pins; open-stack
+      identity by pin id; a click on another stack closes the box and
+      opens the other; no running state for stacks.
+- [x] D10 stack menu: Show Contents, Open in Workbench (DOCK_UI_OPEN_DRAWER).
+- [x] D11 Settings without the Folder Stack section, ASL and blocking hook.
+- [x] D12-D15 close button on the first stack, round-robin prefetch with
+      the real page size, 512-entry hashed cache without prefetch
+      eviction, profile line.
+- [x] D16 host tests; D17 documents.
+- [x] Self-review against plan §3 (one fix: an open box is dismissed when
+      its stack is removed).
+- [x] make host-test, make host-sanitize (after replacing a sprintf the
+      sanitizer build rejected), make amiga: green, no warnings.
+- [x] impeccable polish (in-thread; its detector is web-only): Settings is
+      Size, Scale, Position, Cancel/Save with equal 12 px margins above and
+      below; the stack menu's two rows are sized by the longer label. No
+      change needed; both checked in screenshots on ApolloOS.
+- [x] Agent smoke run, ApolloOS R9.5 (build 530, --config RAM:mig.json, a
+      copy of the user's 1.0b5 file with "folder": "Personal:Downloads"):
+      --caps identical to the baseline; after start the file had no
+      "folder" and Personal:Downloads last in "paths"; a second start left
+      the file untouched. The stack opened (first paint 104.8 ms) and closed
+      by its pin. A dropped volume (Archives:) opened a window, its menu
+      showed Close. A dropped drawer (Archives:Games) became a stack; with
+      it open, one click on Downloads closed it and opened Downloads. Menu
+      rows "Show Contents" and "Open in Workbench" and the box's tile all
+      worked; with the Downloads window open the menu showed no Close.
+      Reordered a stack to slot 0 (saved first), dragged a stack out
+      (removed from the file). Settings had no Folder Stack section; Save
+      wrote the file. Profile: prefetch stacks=1 pending=0 reads=63
+      cache=63/512 evicted=0; Input downs=7 ups=7. --pip-dump: the first and
+      last of 13 icons 492 px apart = 12 x 41 (5 px gaps, no divider).
+- [x] Opus round 1: no P0/P1; one P2 (a legacy "folder" that no longer
+      loads blocks saving like any missing pin) is plan assumption A5, kept
+      as designed and listed for the owner. No code change, so no round 2.
+- [x] Codex round 1: P2, a finished prefetch slot kept its old first page
+      after Scale moved the anchor; fixed (slot starts over when the
+      anchor moves, 3f1fe03). Codex round 2: no findings.
+- [x] Hardware matrix §4.4, ApolloOS R9.5 (Kickstart 51.51, core 12856),
+      builds 530 (steps 2-8, smoke run above) and 533 (reviewed):
+      1 --caps of build 533 identical to the 1.0b5 baseline (diff).
+      2 migration passed (smoke run; again in each build-533 run below).
+      3 no divider: 13 icons at a 41 px pitch (--pip-dump, build 530).
+      4-8 passed with build 530 (smoke run). Build 533 differs only in the
+      prefetch slot reset; with it three stacks opened and closed, and the
+      user's real file migrated.
+      9 build 533 installed in place (SYS:WBStartup/DockAwesome), started
+      with WBRun, its Downloads stack opened from the dock; RAM: clean.
+      ENVARC:DockAwesome.json migrated: no "folder", Personal:Downloads
+      last. The old 0.527 binary is SYS:WBStartup/Disabled/
+      DockAwesome-locked-delete (in use until reboot).
+- [x] Performance, ApolloOS (extra; not one of the required boots), build
+      533 against main 989cfa7 built in a worktree, same config (13 pins
+      including Archives:Games and ApolloOS:Prefs, "folder" Downloads),
+      45 s idle with the pointer off the dock before the first click:
+
+      | run | stack | first paint ms | entrance ms |
+      | --- | --- | --- | --- |
+      | old 1 | Downloads | 110.5 | 148.3 |
+      | new | Downloads | 106.3 | 132.2 |
+      | new | Games (30 entries, same box) | 109.9 | 149.9 |
+      | new | Prefs (smaller page) | 70.3 | 153.4 |
+      | old 2 | Downloads | 110.2 | 174.7 |
+
+      New: prefetch stacks=3 pending=0 reads=81 cache=81/512 evicted=0.
+      Pass: every new value is under the old maximum (110.5 / 174.7).
+      Hover, --bench-sweep 8 (synthetic sweep), two old/new/old sets:
+      render_us_avg 6800/6802/6793 and 7091/6967/7106; stalled 0 in all
+      six runs. New lies within the spread of the old runs (6793-7106).
+- [ ] NOT RUN: matrix on Coffin, AmigaOS 3.2.3, 3.9, 3.1.4.1 and AmiKit XE;
+      first-open comparison on AmiKit; hover comparison on Coffin and
+      AmiKit. Only ApolloOS was booted and no user was available for
+      reboots or the AmiKit gestures.
+- [x] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete after the
+      next ApolloOS boot (done 2026-11-25, build 550 rerun).
+- [x] Fable final pass: no code blocker; merge blocked only by the hardware
+      not run (above) and the owner's decision on A5.
+- [x] Handover (tasks/handover-folder-stacks-pr1.md), release-notes draft.
+- [x] One push; PR opened as a draft, left a draft (blocked on hardware).
+
+### Owner decision A5: missing migrated Folder Stack is dropped (ApolloOS, build 0.534)
+- [x] Code: App.migrated_pin; a pin appended by the migration whose drawer cannot be locked is skipped at start; the first save removes it.
+- [x] make host-test green, make amiga builds without warnings.
+- [x] ApolloOS, --config RAM:ta.json with "folder": "RAM:DoesNotExist": no message, dock runs, file after start has paths ["Personal:Downloads"] and no "folder".
+- [x] Control, "folder": "SYS:Prefs" not in paths: appended last as ApolloOS:Prefs, no "folder" key.
+- [ ] Not run: the other boots, a host test for the missing-drawer case (the skip lives in amiga_main.c).
+
+### Folder Stack Sort by per stack (2026-11-25, owner request)
+Scope: the stack's right-click menu gets Sort by Name / Date Modified /
+Kind (check mark on the active one) above Show Contents and Open in
+Workbench, saved per stack; the read-ahead uses the stack's order.
+Out of scope: Date Added/Created (not in AmigaDOS), Display as, View
+content as, Options.
+- [x] dock_sort.c/h (host): Stricmp-style fold (ASCII + Latin-1 to
+      capitals, so "_tmp" stays after "zebra" as before), newest first by
+      the entry's own DateStamp (not its .info), drawers then extension
+      (none first) then name; ties end in byte order (total order).
+- [x] amiga_folder_read(path, sort, ...): reads the whole drawer as before,
+      sorts by name to pair .info files, then in the stack's order. No
+      extra directory reads.
+- [x] Prefs: "sorts": {path: key}, only non-name stacks written; read by
+      path (case-insensitive), before or after "paths"; unknown keys,
+      non-string values, other shapes read as name. Item.sort follows the
+      Item through reorder/removal; save_config writes it; migration
+      appends the old Folder Stack as name.
+- [x] UI: drawer_items with a muted heading, three sort rows, a 7 px
+      separator row; variable row tops (popup_top), check column,
+      heading/separator inert (a click keeps the menu). Other menus keep
+      their geometry (top 3+i*row, width label+24).
+- [x] Prefetch: slot keyed by sort too; a new choice saves at once (reverts
+      if the save fails) and re-arms that stack.
+- [x] Tests: tests/test_sort.c (fold, date, kind, permutation stability,
+      keys); test_prefs test_sorts (write format, round trip, order of
+      keys, case, unknown/odd values, duplicate keys, reorder, removal,
+      hand-edited order, migration) and bad files.
+- [x] 1.0 beta 5 compatibility: v1.0b5's dock_prefs.c (git archive) built
+      on the host read a file written by this build with "sorts" (paths
+      intact).
+- [x] make host-test, make host-sanitize green; make amiga clean rebuild,
+      no warnings (build 537).
+- [x] impeccable polish (in-thread; detector is web-only): separator inset
+      10 px both sides like the labels; checked on ApolloOS screenshots.
+- [x] ApolloOS R9.5, build 537 from RAM:, --config RAM:t1.json (copy of the
+      user's file, Downloads stack, 35 entries on one page):
+      Name order as before; menu showed the check on Name; Date Modified
+      saved "sorts": {"Personal:Downloads": "date"} and the box showed
+      newest first (SAGADriver.readme/.lha first: their DateStamp is day
+      46751 = 2106, List shows "01-Jan-06"); Kind saved "kind": drawers,
+      files without extension, .adf, .jic, .key, .lha, .readme, .zip.
+      A click on the heading kept the menu. After a restart the box kept
+      Kind and the menu showed the check on Kind; Date the same.
+- [x] ApolloOS, RAM:t2.json (CLI, Games date, Downloads kind, Prefs):
+      Downloads dragged to slot 0 -> file order Downloads, CLI, Games,
+      Prefs with Downloads kind / Games date; Games dragged out -> gone
+      with its sort, Downloads kind kept; menus: Downloads Kind, Prefs Name;
+      Show Contents still opens the box.
+- [x] ApolloOS, RAM:t3.json with "folder": "Archives:Games" and "sorts"
+      before "paths": after start Games last, "folder" gone, Downloads
+      "date" kept.
+- [x] First open after 45 s idle, fresh dock per run, Downloads (Input
+      downs/ups matched, prefetch pending=0 evicted=0 each run):
+
+      | sort | first paint ms | entrance ms |
+      | --- | --- | --- |
+      | Name | 106.9 | 132.6 |
+      | Name | 107.7 | 132.8 |
+      | Date Modified | 107.7 | 137.6 |
+      | Date Modified | 108.1 | 131.6 |
+      | Kind | 117.2 | 144.2 |
+      | Kind | 109.1 | 132.8 |
+
+      Reference build 533 Name 106.3 / 132.2; 1.0 beta 5 max 110.5 / 174.7.
+      One Kind run (117.2) is above that maximum; the repeat was 109.1, so
+      it reads as run noise (one run is noise, lessons). Every other run is
+      under 110.5.
+- [x] Large drawer, ApolloOS:C (253 entries, 3 pages of 119), timing probe
+      at ChangeTaskPri -30, 10 reads each, whole amiga_folder_read and
+      the sort alone:
+
+      | sort | read+sort ms | sort alone ms |
+      | --- | --- | --- |
+      | Name | 102.1 | 4.3 |
+      | Date Modified | 108.4 | 6.6 |
+      | Kind | 116.4 | 14.6 |
+
+      Downloads (30): 16.8 / 17.2 / 17.9 ms. The directory read dominates;
+      sorting by pointers instead of moving the 128-byte entries measured
+      no gain (14.0 ms Kind) and was reverted. In the dock the box of
+      ApolloOS:C opened in every order (first paint 335-384 ms, set by how
+      many of the 119 icons were cached), dock frames during its motion
+      us_avg=4049, prefetch evicted=0.
+- [x] Opus review: one P2 (a press on the heading/separator did not
+      disarm an earlier press, so a later drag onto that row fired it);
+      fixed in ad454f3; on ApolloOS (build 538) press Show Contents ->
+      release on the separator, press heading -> release on Show Contents:
+      the menu closed, no box opened.
+- [x] Codex review (base main): no findings; tree unchanged after it.
+- [x] Build 538 installed in place (SYS:WBStartup/DockAwesome, WBRun,
+      running); the user's ENVARC:DockAwesome.json has no "sorts" (all
+      Name) and its Downloads menu shows Name checked. RAM: clean.
+- [x] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete,
+      -locked-delete2 and -locked-delete3 after the next ApolloOS boot
+      (done 2026-11-25: not locked after the reboot, deleted).
+- [ ] NOT RUN: Coffin, AmigaOS 3.2.3, 3.9, 3.1.4.1, AmiKit XE (not booted).
+
+### Coffin hardware matrix and performance (2026-11-25)
+Coffin r65 on the Vampire (Kickstart 45.57, Workbench 45.5, core 12856,
+24-bit 1280x720), agent input. Builds: 539 (HEAD 57d6ef8) for steps 1-2,
+540 (= 539 + the release-hit fix below) for the rest; baseline tag v1.0b5
+(989cfa7) built in a scratch worktree outside the repo. All destructive
+runs used --config RAM:<file>.json; the user's ENVARC:DockAwesome.json
+(1.0b5 format, "folder": "Personal:Downloads") was only copied.
+- [x] 1 --caps: installed 0.527, new 539 and v1.0b5 identical (Diff).
+- [x] 2 Migration: a copy of the user's file -> after start no "folder",
+      Personal:Downloads last in "paths"; a second start left it
+      byte-identical (Diff).
+- [x] 3 No divider (--pip-dump, 18 icons): icon lefts at 135 + 37k up to
+      the Downloads stack at 764, so the last two icons are 5 px apart.
+      v1.0b5 with the same file: 17 icons at 37 px, then 12 px more before
+      its Folder Stack.
+- [x] 4 Drop a drawer (Archives:Games) -> stack appended last; click
+      opens, a click on its pin (close button) closes; with two stacks a
+      click on the other closes one and opens the other, both ways (after
+      the fix below; before it, only the box closed).
+- [x] 5 Drop a volume (Ram Disk:) -> click opened its window; its menu
+      showed Close, which closed the window.
+- [x] 6 Stack menu: Sort by heading, Name/Date Modified/Kind with the
+      check, separator, Show Contents, Open in Workbench; no Close, also
+      with the drawer's window open. The box's Open in Workbench tile and
+      the menu row each opened a Workbench window.
+- [x] 7 Downloads dragged to slot 0 (saved first); Games dragged out
+      (gone from "paths").
+- [x] 8 Settings: Size, Scale, Position, Cancel/Save, no Folder Stack
+      section; Save rewrote the file and kept "sorts".
+- [x] Sort by: Date Modified saved "sorts": {"Personal:Downloads":
+      "date"}, box newest first (SAGA readme/lha first, as on ApolloOS);
+      Kind saved "kind"; after a restart the box kept Kind (drawers, no
+      extension, .adf, .jic, .key, .lha, .readme, .zip) and the menu showed
+      Kind checked; a click on the heading kept the menu; Name removed the
+      "sorts" key. The other stack's menu kept Name.
+- [x] A5: "folder": "RAM:DoesNotExist" -> no message, dock running, file
+      saved with paths [EditPad, Personal:Downloads] and no "folder".
+- [x] Defect found (also in v1.0b5): with a box open, a quick click on
+      another pin only closed the box; the other stack did not open and a
+      program pin (EditPad) did not start; a 1 s hold worked. Diagnostic
+      build: the press reached apply_gesture with the right pin, the
+      release came with hit_id=0, because the box's closing motion
+      (started by the press activating another window) made
+      input_publish withdraw the handler's snapshot. Fix: the handler marks
+      such a release INPUT_HIT_UNRESOLVED and the main task hit-tests the
+      row it drew (still while the UI holds the dock). Build 540: switch
+      Games->Downloads and Downloads->Games with quick clicks, EditPad
+      started and the box closed, the open stack's own pin still only
+      closes it.
+- [x] make host-test, make host-sanitize green; make amiga no warnings
+      (build 540).
+- [x] Opus review of the fix: no P0/P1. P2 fixed: message() now cancels a
+      press held when its requester opens (else that press's release came
+      unresolved and launched after OK); comment says "the row as last
+      drawn". P2 not fixed (older, same root, at the press): a press during
+      the ~130 ms box motion is not taken by the handler and goes to what
+      lies under the dock; left for the owner (changing what "the UI holds
+      the dock" means for input touches every caps branch).
+- [x] Build 541 (540 + those P2 fixes): host-test, host-sanitize green,
+      make amiga no warnings. Coffin, RAM:tq.json: Downloads->Games switch
+      with quick clicks, EditPad started from an open box; a double-click
+      on a pin whose file was deleted showed one requester and nothing
+      after OK (Input downs=4 ups=4).
+- [x] First open after 45 s idle, pointer off the dock, fresh dock per
+      run, config = the user's file + Archives:Games + System:Prefs
+      (old: 19 pins + Folder Stack Downloads; new: migrated, 3 stacks):
+
+      | run | stack | first paint ms | entrance ms |
+      | --- | --- | --- | --- |
+      | old 1 (v1.0b5) | Downloads | 101.4 | 135.9 |
+      | new (540) | Downloads | 85.1 | 134.5 |
+      | new (540) | Games (30 entries, same box) | 86.4 | 133.2 |
+      | new (540) | Prefs (58 entries, larger box) | 141.1 | 154.0 |
+      | old 2 (v1.0b5) | Downloads | 89.6 | 130.3 |
+
+      New: prefetch stacks=3 pending=0 reads=120 cache=120/512 evicted=0.
+      Pass: Downloads and Games under the old maximum (101.4 / 135.9);
+      Prefs has a larger first page (exempt by §4.5).
+- [x] Hover, agent sweep (relative moves to x 350, 500, 650, 800, 950,
+      then off, one per message, after 45 s idle), old/new/old:
+      render_us_avg 10400 / 9410 / 10525, stalled 3 / 3 / 4, redraws
+      101 / 100 / 100. Each old run holds one ~104 ms frame (max 103745 /
+      104206; without it ~9466 / ~9579); new max 18760. New stalled within
+      the old spread; render average below it.
+- [x] Hover, --bench-sweep 8, old/new/old/new/old: render_us_avg 7898 /
+      5546 / 7435 / 5900 / 5805, stalled 50 / 49 / 49 / 51 / 49 of
+      195-199 frames (the synthetic sweep stalls a quarter of its frames
+      on this 24-bit screen with either build).
+- [x] 9 Build 541 installed in place: SYS:WBStartup/DockAwesome.new
+      copied, the boot's 0.527 (in use) renamed to
+      SYS:WBStartup/Disabled/DockAwesome-locked-delete (the older one there
+      from Saturday deleted), .new renamed into place, started with WBRun;
+      its Downloads stack opened and closed from the dock; Status shows no
+      other dock. ENVARC:DockAwesome.json migrated by it (no "folder",
+      Personal:Downloads last); the tests only copied it. RAM: clean; the
+      v1.0b5 binary deleted from RAM:, its worktree removed on the Mac.
+- [x] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete (0.527) on
+      Coffin after its next boot (done 2026-11-25, not locked).
+- [ ] NOT RUN on Coffin: nothing of §4.4/§4.5 is left; AmigaOS 3.2.3,
+      3.9 (plain), 3.1.4.1 and AmiKit XE not booted; ApolloOS not rerun
+      with build 540.
+
+### AmigaOS 3.2.3 hardware matrix and performance (2026-11-25)
+AmigaOS 3.2.3 on the Vampire (Kickstart 47.115, Workbench 47.5, core
+12856, 24-bit 1280x720), agent input (Input downs=11 ups=11 in the main
+run). Build 541 (HEAD e6f433b; `make amiga` had nothing to rebuild);
+baseline tag v1.0b5 (989cfa7) built in a scratch worktree outside the
+repo. All destructive runs used --config RAM:<file>.json; the user's
+ENVARC:DockAwesome.json (1.0b5 format, "folder": "Personal:Downloads") was
+only copied (its date stayed 24-Nov 23:30:55 until the installed build
+started).
+- [x] 1 --caps: installed 1.0 beta 5 and 541 identical (diff on the Mac).
+- [x] 2 Migration: a copy of the user's file -> after start no "folder",
+      Personal:Downloads last in "paths"; a second start did not rewrite
+      it (cmp against a copy: identical).
+- [x] 3 No divider (--pip-dump, 13 icons): icon centres 41 px apart
+      (36 + 5) up to the Downloads stack, last two 620 / 661.5.
+- [x] 4 Drop a drawer (Archives:Games) -> stack appended last; a click
+      opens it, a click on its pin closes it. Switch Games -> Downloads and
+      Downloads -> Games with quick clicks and with 1 s holds, both ways.
+      With the Games box open, a quick click on the TextEdit pin closed the
+      box and started TextEdit (fix 32e645f).
+- [x] 5 Drop a volume (RAM Disk:) -> a click opened its window; its menu
+      showed Close, which closed the window.
+- [x] 6 Stack menu: Sort by heading, Name (checked), Date Modified, Kind,
+      separator, Show Contents, Open in Workbench; no Close, also with the
+      drawer's window open. The box's Open in Workbench tile and the menu
+      row each opened a Workbench window; Show Contents opened the box.
+- [x] Sort by: a click on the heading kept the menu; Date Modified saved
+      "sorts": {"Personal:Downloads": "date"}, box newest first (SAGA
+      readme/lha first, as on the other boots); Kind saved "kind" (drawers,
+      no extension, .adf, .jic, .key, .lha, .readme, .zip); the Games menu
+      kept Name; after a restart the box kept Kind and the menu showed Kind
+      checked; Name removed the "sorts" key.
+- [x] 7 Downloads dragged to slot 0 (first in "paths", "kind" kept);
+      Games dragged out (gone from "paths").
+- [x] 8 Settings: Size, Scale, Position, Cancel/Save, no Folder Stack
+      section; Save rewrote the file and kept "sorts".
+- [x] A5: "folder": "RAM:DoesNotExist" -> no requester, dock running, file
+      saved with paths [TextEdit, Personal:Downloads] and no "folder".
+- [x] First open after 45 s idle, pointer off the dock, fresh dock per
+      run, config = the user's file + Archives:Games + SYS:Prefs (old: 14
+      pins + Folder Stack Downloads; new: migrated, 3 stacks):
+
+      | run | stack | first paint ms | entrance ms |
+      | --- | --- | --- | --- |
+      | old 1 (v1.0b5) | Downloads | 98.7 | 134.3 |
+      | new 1 (541) | Downloads | 93.3 | 145.4 |
+      | new 1 | Games (same box) | 92.7 | 146.3 |
+      | new 1 | Prefs (smaller box) | 72.8 | 142.2 |
+      | old 2 | Downloads | 99.0 | 137.6 |
+      | new 2 | Downloads | 94.3 | 134.7 |
+      | new 2 | Games | 92.9 | 134.0 |
+      | old 3 | Downloads | 110.2 | 146.8 |
+
+      New: prefetch stacks=3 pending=0 reads=86 cache=86/512 evicted=0.
+      Pass: every new value is under the old maximum (110.2 / 146.8).
+      new 2's Games entrance drew one frame (134 ms, fields=0); not seen in
+      the ~20 other entrances this session. A discarded new run had the
+      pointer left on the dock from the previous click: reads=0 pending=3
+      (prefetch waits while the pointer is on the dock), 86.4 / 133.6.
+- [x] Hover, --bench-sweep 8 at ChangeTaskPri -30, old/new/old/new/old:
+      render_us_avg 6799 / 6602 / 6804 / 7707 / 7889, stalled 41 / 41 /
+      42 / 41 / 44 of ~166 frames. Pass.
+- [x] Hover, agent sweep (relative moves to x 350, 500, 650, 800, 950,
+      then off, one per message, after 45 s idle): FAILED with build 541;
+      cause found and fixed in build 542, see "Hover pacing on AmigaOS
+      3.2.3" below (not a Folder Stack effect: v1.0b5 shows it with the
+      same row).
+      At ChangeTaskPri -30, old/new/old/new/old: render_us_avg 10076 /
+      12049 / 9569 / 14718 / 9557, stalled 1 / 6 / 0 / 14 / 0. At the
+      shell's priority (1), old/new: 9549 / 12087, stalled 0 / 7.
+      Isolated: the slow frames are the label frames while the pointer
+      rests at x 800 (the SD-Card pin, beside the Games and Prefs stacks):
+      "convert" 9-30 ms instead of ~2 ms. Control, same build with Games
+      and Prefs replaced by two program pins: normal (10788 / 1 stall and
+      10171 / 0); v1.0b5 at the same rest: normal. A task sampler (pri 100,
+      2 ms) showed no other task taking more CPU than in the control. A
+      diagnostic build (scratch worktree, not committed) counted 23 draws,
+      all on a field pass, vblank rate ok, and 9 back-buffer retirement
+      waits: amiga_pip_back_buffer WaitTOFs because GfxBase->VBCounter
+      still equals the last present's field, so the time is a wait for a
+      field, not CPU. That wait is unchanged since 1.0 beta 5. Why the
+      stacks beside the hovered pin trigger it was not found; not fixed.
+- [x] 9 Build 541 installed in place: SYS:WBStartup/DockAwesome.new
+      copied, the 1.0 beta 5 binary deleted (not locked), .new renamed
+      into place, started with WBRun; its Downloads stack opened and closed
+      from the dock; no CLI dock in Status. ENVARC:DockAwesome.json
+      migrated by it (no "folder", Personal:Downloads last). RAM: clean;
+      the v1.0b5 binary and all tools deleted; both scratch worktrees
+      removed on the Mac. SYS:WBStartup/Disabled holds only the user's
+      WBDock.
+- [ ] NOT RUN on 3.2.3: nothing of §4.4/§4.5 is left except the failed
+      agent hover comparison above. Still not booted: plain 3.9, 3.1.4.1,
+      AmiKit XE.
+
+### Hover pacing on AmigaOS 3.2.3 (2026-11-25)
+Build 542 (541 + this fix), AmigaOS 3.2.3 on the Vampire, agent input,
+ChangeTaskPri -30, all runs with --config RAM: copies (ENVARC untouched).
+Configs: pn = the user's 12 pins + Archives:Games + AOS32:Prefs +
+Personal:Downloads (3 stacks, Games and Prefs beside SD-Card); pl = the
+same 15 paths for v1.0b5 (no "folder": the same evenly spaced row, canvas
+896, Games/Prefs/Downloads plain drawer pins); po = v1.0b5 with Downloads
+as its Folder Stack (divider, canvas 928), as in the earlier runs.
+- [x] Root cause (pre-existing since 1.0 beta 5, in the frame pacing, not
+      in the stacks): when one frame's present lands after the next VBlank
+      (wake 3.5-4 ms + compose 10-12.5 ms at the large zoom levels + convert
+      > 20 ms), its flip waits for the following field. The pass for the
+      field already crossed is pending, so the next frame starts at once,
+      composes, and blocks in `amiga_pip_back_buffer`'s WaitTOF until the
+      next field; its present again lands just after a VBlank, and so on:
+      every later frame of the motion waits 9-30 ms (every fourth or so
+      misses a field when the check races the VBlank), until the row
+      rests. Trace (build 541 and v1.0b5 pl): one frame with done_us
+      17-20.7 ms, then convert_us 9-30 ms on every frame of the long tick-8
+      tail at the x 800 / x 950 rests.
+- [x] Evidence it is not the stacks: v1.0b5 with the same 15-pin row (pl,
+      no stack code involved) fails the same way, render_us_avg 13508 /
+      13561 / 10679, stalled 10 / 10 / 4. The divider of the old layout put
+      other icons under x 800, which is why v1.0b5 (po) looked normal; po
+      also shows the cascade sometimes (this session 10931, stalled 3, with
+      35 ms frames). The earlier control (Time/Locale in the stacks'
+      places) changed the artwork at that rest, so compose stayed short.
+      Ruled out earlier and still: prefetch (pending=0, reads=86 before the
+      sweep; it only runs while the pointer is off the dock), other tasks
+      (sampler), CPU in the main task.
+- [x] Fix: `amiga_pip_back_busy()`; a field pass that finds the last
+      present in the current field moves its redraw to the next field
+      (once per redraw; the WaitTOF stays as the safeguard). Profile line
+      `Frame pacing:` gains `retire_waits` (presents that waited) and
+      `retire_defers`.
+- [x] Hover agent sweep, pn/pl, order L1 (moves sent together) / F1 / L2 /
+      F2 / L3 / N1 / F3, plus po:
+
+      | run | build | config | render_us_avg | stalled | max us |
+      | --- | --- | --- | --- | --- | --- |
+      | L1 | v1.0b5 | pl | 13508 | 10 | 37116 |
+      | F1 | 542 | pn | 9695 | 2 | 18533 |
+      | L2 | v1.0b5 | pl | 13561 | 10 | 36706 |
+      | F2 | 542 | pn | 9697 | 3 | 18165 |
+      | L3 | v1.0b5 | pl | 10679 | 4 | 35921 |
+      | N1 | 541 | pn | 14096 | 9 | 112418 |
+      | F3 | 542 | pn | 9711 | 2 | 18172 |
+      | P1 | v1.0b5 | po | 10931 | 3 | 36300 |
+
+      542: retire_waits=0, retire_defers=2 in each run; the x 800 / 950
+      tails convert in ~1.8 ms. Pass: 542 below every old run.
+- [x] First open (45 s idle, pointer off the dock, Downloads): 542 first
+      paint 95.8 / 95.5 ms, entrance 139.5 / 138.6 ms; 541 this session
+      95.4 / 144.5; v1.0b5 (po) 98.1 / 138.8. prefetch pending=0 reads=86
+      evicted=0. Pass (under the old maximum of the earlier 3.2.3 table).
+- [x] --bench-sweep 8 (ChangeTaskPri -30), v1.0b5 po / 542 pn / v1.0b5 po:
+      render_us_avg 6836 / 6582 / 6826, stalled 41 / 41 / 42 (542
+      retire_waits=0). Pass.
+- [x] make host-test, make host-sanitize green; make amiga no warnings
+      (build 542); Opus review of the delta: no P0/P1/P2.
+- [x] Build 542 installed in place on 3.2.3: copied to
+      SYS:WBStartup/DockAwesome.new, 541 deleted (not locked), renamed,
+      started with WBRun; FindTask finds DockAwesome. RAM: clean (only
+      amiagent's RAM:T files); ENVARC:DockAwesome.json not written by the
+      tests (date 10:45:25, from 541's migration); scratch worktree removed.
+- [ ] Not run: Coffin and ApolloOS with 542 (the fix is in the shared PiP
+      path; Coffin's earlier sweep had stalled 3 / 3 / 4 with either
+      build); AmiKit XE, plain 3.9, 3.1.4.1 not booted.
+
+
+### AmiKit XE: checks without gestures (2026-11-25)
+AmiKit XE 11.5 on the Vampire (Kickstart 47.96, Workbench 47.2, core
+12856, 24-bit 1280x720, Directory Opus desktop; the Amiga clock says
+02-Aug-25). Build 542 (HEAD 98bbf1a, `make amiga` had nothing to rebuild);
+baseline tag v1.0b5 (989cfa7) built in a scratch worktree outside the
+repo. All runs used --config RAM: copies; ENVARC:DockAwesome.json (1.0b5
+format, "folder": "Personal:Downloads") was only copied.
+- [x] Agent input: an amiga_click on a pin gave `Input: downs=0` (as
+      before on AmiKit). Agent pointer moves DO reach the dock: hover is
+      polled from the screen's pointer (redraws=20 after two moves), so
+      the hover sweep below was run by the agent.
+- [x] 1 --caps: installed 0.527, 542 and v1.0b5 identical (diff on the
+      Mac): dopus yes, workbench_port no, shaped_windows no, depth 24.
+- [x] 2 Migration: a copy of the user's file -> after start no "folder",
+      Personal:Downloads last in "paths"; a second start did not rewrite it
+      (date unchanged). Every pinned drawer is now a stack: 5 stacks
+      (AmiKit:Utilities/RiVA, AmiKit:Utilities/AmigaAMP, Personal:Pictures,
+      Personal:Demos, Personal:Downloads); RiVA and AmigaAMP opened a
+      window in 1.0 beta 5 (D3 as planned).
+- [x] A5 + Sort by persistence: "folder": "RAM:DoesNotExist", paths
+      [SYS:System/Shell, Personal:Pictures], "sorts": {"Personal:Pictures":
+      "kind"} -> no requester (screenshot), dock running, file saved with
+      the two paths, no "folder", "sorts" kept.
+- [x] 3 No divider (--pip-dump, 10 icons, canvas 704x114): icon lefts
+      151 + 41k (36 + 5), the last two (Demos, Downloads) 41 px apart;
+      v1.0b5 with the same file: 41 px up to Demos, then 53 px (12 px
+      divider) to its Folder Stack.
+- [x] --bench-sweep 8 at ChangeTaskPri -30 (render_us_avg / compose_us_avg
+      / stalled):
+
+      | config | v1.0b5 | 542 |
+      | --- | --- | --- |
+      | user's file (old: divider + Folder Stack) | 7112/5248/42, 7061/5224/39, 7052/5222/37 | 7359/5716/38, 7382/5737/37 |
+      | same 10-pin row (old: Downloads a plain pin) | 6524/4826/40, 6521/4832/36, 7348*/4832/36 | 7391/5737/38, 7374/5732/41 |
+      | 5 pins, no drawers (no stacks) | 5567/4164/20, 5580/4176/20 | 6248/4860/20, 6237/4840/20 |
+
+      (*one 100 ms frame.) Stalled frames equal. FINDING: compose is
+      ~0.7-0.9 ms (+16-19 %) slower per frame in 542 with the same row,
+      also with no stack at all; the installed 0.527 matches v1.0b5
+      (4177 / 4837). Same 5-pin row per commit: v1.0b5 4164, 3f1fe03 4269,
+      70cc053 4444, 10843c9 4767, 32e645f 4779, 98bbf1a 4867. The compose
+      code itself changed only by the divider's removal, and 70cc053 (+175
+      us) touches only amiga_main.c/amiga_app.h, which link before
+      dock_compose.o: points to code or data placement, not to stack
+      logic. Cause not found; open for the owner.
+- [x] Hover, agent sweep (relative moves to x 350, 500, 650, 800, 950 at
+      y 690, then off, one per message, after 45 s idle; x 350 and 950 lie
+      beside this 10-pin plate), old (same row) / new / old / new / old:
+      render_us_avg 7034 / 8497 / 10629* / 10700* / 6914, stalled 1 / 0 /
+      2 / 1 / 1, redraws 41 / 41 / 41 / 41 / 39 (*one ~100 ms frame each;
+      without it 6849 / 8301 / 8421 / 8452 / 6715). 542 retire_waits=0,
+      prefetch stacks=5 pending=0 reads=153 cache=153/512 evicted=0.
+      Stalled within the old spread; the first new run's average lies
+      inside the old spread, the second 71 us above it (both runs with the
+      100 ms frame); without that frame new is at the top of the old
+      spread, consistent with the compose finding above.
+- [x] Build 542 installed in place: SYS:WBStartup/DockAwesome.new copied,
+      0.527 deleted (not locked), renamed; Version says 0.542 build 542.
+      v1.0b5 and bisect binaries deleted from RAM:, worktrees removed.
+- [x] Gesture batch: the user did part of it by hand (Personal:Audio
+      finding below); the rest ran agent-driven with build 544 (next
+      section "AmiKit XE: agent gestures").
+- [x] After the batch: test dock stopped, installed dock started, RAM:
+      cleaned (next section).
+
+### AmiKit XE: "dos device not mounted" for Personal:Audio (2026-11-25)
+User, mid gesture batch: dropping Personal:Audio on the dock and clicking it
+gave a window saying "dos device not mounted"; Downloads and Demos work as
+stacks.
+- [x] Personal:Audio (shell only): a plain directory on Personal: (DH12,
+      mounted, 61G), not an assign, link or volume; Personal:Audio.info is
+      a PNG icon whose icOn type is 2 (WBDRAWER). Contents Apollo.mp3, MOD,
+      MP3, Streams (all ordinary). RAM:ak.json stores "Personal:Audio"
+      (canonical). The dock's --profile showed stacks=6 (Audio among them)
+      and a 185x156 box (Audio's 4 entries + Open cell), so it opened as a
+      stack.
+- [x] Window: a Directory Opus 5 lister titled `DOS error: device (or
+      volume) is not mounted`, path `"Personal:Audio"/`. Reproduced through
+      ARexx without the dock: `lister new "Personal:Audio"` gives exactly
+      that lister; `lister new Personal:Audio` opens the drawer. DOpus 5
+      takes the rest of the line as the path, quotes included; unquoted,
+      `RAM:T/a b` (space) and `RAM:T/q"x` (quote) opened correctly too
+      (`lister query <h> path` = `RAM:T/a b/`, `RAM:T/q"x/`).
+- [x] Cause: the dock's own command, `lister new "<path>"` in
+      launch_object (src/amiga_launch.c, since 050f9c8 / 1.0 beta 2;
+      identical in v1.0b5). Every drawer the dock opens without Workbench
+      (Open in Workbench in a stack's box or menu, a drawer or disk pin)
+      opened such an error lister on AmiKit. Not a DOS requester: the
+      folder reads already run with pr_WindowPtr -1, and the prefetch did
+      not raise anything. Todo item "3. Drawers and disks without
+      Workbench" was never run on DOpus 5 before.
+- [x] Fix (build 544, Opus review: no P0/P1/P2): `dock_dopus_lister_new` (dock_text.c, host-tested)
+      builds `lister new <path>` unquoted; refuses an empty path, control
+      codes and no room; the quote refusal is gone (DOpus takes quotes).
+      make host-test, host-sanitize green; make amiga no warnings.
+- [x] Installed: build 544 in place of 542 (SYS:WBStartup/DockAwesome, 542
+      deleted, Version 0.544). The test dock was stopped (stop.s) and
+      restarted with the same arguments (run.s, --config RAM:ak.json
+      --profile >RAM:ak.prof); the batch profile before the restart is
+      saved as RAM:T/ak-batch1.prof and on the Mac.
+- [x] End to end through the dock (agent, build 544, next section): Open
+      in Workbench on Personal:Audio opens a lister on `Personal:Audio/`,
+      no DOS error; the Archives: pin opens a lister on `Archives:`.
+
+### AmiKit XE: agent gestures, first open, compose (2026-11-25)
+Build 544 (HEAD 4ed4e32), installed in SYS:WBStartup; every test dock used
+--config RAM: copies; v1.0b5 built from the tag in a scratch worktree.
+- [x] Agent input works on AmiKit. The warp (IECLASS_POINTERPOS) lands at
+      screen = 2*w-4 on both axes, so earlier clicks pressed beside the
+      dock (`downs=0`). An input.device spy (pri 127 / 59 around the
+      dock's 60) showed the agent's button events reach the dock and are
+      captured; no handler above the dock. Working path: amiga_click /
+      amiga_drag / amiga_move_mouse at ((X+4)/2, (Y+4)/2), checked with
+      amiga_pointer; relative moves are accelerated (~1.1x), ui_click
+      misses. tasks/lessons.md has the rule.
+- [x] §4.4 on AmiKit, agent, profile `Input: downs=18 ups=18 right_seen=6`:
+
+      | check | result |
+      | --- | --- |
+      | Clock pin | starts Clock |
+      | Personal:Audio menu -> Open in Workbench | DOpus lister `Personal:Audio/`, no DOS error (fix 4ed4e32) |
+      | Archives: pin (volume) | DOpus lister `Archives:` |
+      | stack -> other stack, quick click | switches (Downloads->Demos 3x, Pictures->RiVA) |
+      | program pin with a box open | Shell starts: quick click 3 of 4 (plus 1 of 1 with the diagnostic build), 1 s hold 1 of 1 |
+      | Sort by rows | heading, Name/Date Modified/Kind, check mark moves Name->Kind->Name; file keeps only Demos "date" |
+      | reorder (Audio to slot 3) | saved in RAM:ak.json |
+      | drag out (Audio) | removed from RAM:ak.json |
+      | Settings | no Folder Stack section; Save writes the file |
+
+      The one failed quick click (Demos box open, receiver not armed) is
+      the lost-first-press finding below. A .png in Personal:Pictures
+      opened from the box gave "Could not open ... object not found": its
+      icon's default tool is DH0:Utilities/MysticView/MysticView and DH0:
+      does not exist on AmiKit (correct). Not run: the box's Open in
+      Workbench tile and the "no dot" check (both only in PiP).
+- [x] §4.5 first open after 47 s idle, pointer off the dock, Pictures
+      (584x527, 190 entries) as v1.0b5's Folder Stack (RAM:o.json = the
+      user's file with "folder": "Personal:Pictures") and as a stack in
+      544 (RAM:n.json = migrated user's file + Demos "date"):
+
+      | run | build | first paint ms | entrance ms | frames (fields) |
+      | --- | --- | --- | --- | --- |
+      | o1 | v1.0b5 | 363.5 | 159.4 | 4 (0223) |
+      | n2 | 544 | 238.7 | 164.7 | 4 (0124) |
+      | o2 | v1.0b5 | 282.8 | 134.3 | 3 (023) |
+      | n3 | 544 | 285.8 | 154.2 | 4 (0132) |
+      | o3 | v1.0b5 | 251.8 | 136.1 | 4 (0123) |
+      | n4 | 544 | 285.4 | 174.2 | 4 (0124) |
+      | o4 | v1.0b5 | 239.2 | 138.5 | 3 (023) |
+      | n5 | 544 | 254.5 | 132.5 | 3 (023) |
+
+      First paint: every new run under the old maximum (363.5), mean 266
+      vs 284: pass. Entrance: FAIL by the §4.5 rule: n2 and n4 lie above
+      the old maximum (159.4), mean 156 vs 142. Both are 4-frame entrances
+      whose last frame came at 61-65 ms (o1's at 59 ms); box compose per
+      frame is alike (new 13.9-23.3 ms, old 15.0-20.6). Not fixed: no
+      cause in the stack code found; AmiKit's 20-65 ms main-loop "polls"
+      passes (pre-existing, above) are the candidate. Open for the owner.
+      Other stacks, 544 (n3; n1 in brackets), first paint / entrance ms:
+      RiVA 242x209 69.8 / 148.3 (66.7 / 132.7), AmigaAMP 299x262 92.7 /
+      147.2 (101.1 / 138.5), Demos 185x209 54.8 / 145.0 (40.4 / 139.4),
+      Downloads 356x368 109.9 / 134.6 (127.5 / 131.7); prefetch stacks=5
+      pending=0 reads=153 cache=153/512 evicted=0 in every run.
+- [ ] FINDING (pre-existing, also v1.0b5): the first click after the dock
+      has idled can be lost: no box, the press goes to the receiver or the
+      desktop (`downs=0`, `presses_armed=1`). Seen on n2, n5, o3 and a
+      diagnostic run (4 of 12 fresh-start first clicks after 47 s; the
+      second click always worked). A diagnostic build (counters only, not
+      committed) showed `nosnap=1`: the handler's hit snapshot was
+      withdrawn at the press, after 38 withdrawals in that run (a normal
+      run has 1). Which input_publish condition withdrew it is not split
+      yet. A physical mouse moves onto the dock first (the zoom republishes),
+      so users see it less. Not this PR; open for the owner.
+- [x] Compose finding (compose_us_avg +16-19 % in --bench-sweep 8): not a
+      code regression. 5-pin row (Shell, Clock, AmiKit:, Archives:,
+      MultiView), ChangeTaskPri -30:
+
+      | binary | compose_us_avg per run |
+      | --- | --- |
+      | v1.0b5 | 3778, 3783, 3793 |
+      | 544 installed | 3820, 3837 |
+      | HEAD + 0..28 byte code pad (8 binaries, 2 batches) | 3767-3848, outliers 5378 (pad 4), 5323 (pad 24), 5391 (pad 0) |
+      | HEAD with address log, 12 runs | 3799-3830, one 5329 |
+
+      The 12 logged runs had the same code (dock_render_oriented_clip at
+      07a88d28) and canvas address; the outliers come and go per run of
+      the same binary (pad 4 and 24 slow in batch 1, normal in batch 2),
+      so they are run-level interference by other tasks above pri -30,
+      not code or data placement. Clean runs: 544 is within 1 % of v1.0b5.
+- [x] End state: test docks stopped (Ctrl-C; stop.s confirmed none left);
+      the installed 544 started with Run from a Stack 400000 script (WBRun
+      fails under DOpus, see above) and running, the only dock (Status);
+      ENVARC:DockAwesome.json migrated by it as designed (no "folder",
+      Personal:Downloads last), tests only used RAM: copies; RAM: and
+      RAM:T clean (configs, profiles, scripts, FindTask, InputSpy,
+      v1.0b5 and diagnostic binaries, ENV:dpid); scratch worktrees removed.
+
+### ApolloOS rerun with build 550 (2026-11-25)
+ApolloOS R9.5 on the Vampire (Kickstart 51.3, core 12856, 16-bit
+1280x720), freshly rebooted, agent input. Build 550 = HEAD 2f42fad: the
+repo's build/ held build 549 from the AmiKit pad/address-log runs, so
+obj080 and the binary were rebuilt clean (`make amiga`, no warnings;
+`make host-test` green). No code change in this follow-up. Baseline tag
+v1.0b5 built in a scratch worktree outside the repo. Every test dock used
+--config RAM: copies; ENVARC:DockAwesome.json (migrated by 533, 12 paths,
+Downloads last) kept its date (18:06:15 on the Amiga clock) throughout.
+- [x] Old leftovers: SYS:WBStartup/Disabled/DockAwesome-locked-delete,
+      -2 and -3 were not locked after the reboot and are deleted.
+- [x] Install in place: 550 copied to SYS:WBStartup/DockAwesome.new; the
+      running 538 stopped (BreakTask), but its file stayed "in use"
+      (started from WBStartup at boot), so it is now
+      SYS:WBStartup/Disabled/DockAwesome-locked-delete (delete after the
+      next ApolloOS boot); .new renamed into place, Version 0.550.
+- [x] §4.4 checks the fixes touch (configs: the user's 11 pins + "folder"
+      Downloads, plus Archives:Games, ApolloOS:Prefs and Archives: where
+      needed; three stacks after migration):
+
+      | check | result |
+      | --- | --- |
+      | --caps | 550, v1.0b5 and 538 identical (diff on the Mac) |
+      | migration | no "folder", Downloads last; a second start left the file identical (cmp) |
+      | no divider | --pip-dump, 12 icons at lefts 142 + 41k, last two 552 / 593 (36 + 5) |
+      | stack switch, quick click | Downloads -> Games and Games -> Downloads |
+      | stack switch, 1 s hold | Downloads -> Games and Games -> Downloads |
+      | program pin with a box open, quick click | Editor started, box closed (from Downloads and from Games, 2 of 2) |
+      | volume pin (Archives:) | Workbench window; its menu shows Close, which closes it |
+      | stack menu | Sort by heading, Name/Date Modified/Kind, separator, Show Contents, Open in Workbench; no Close with the drawer's window open |
+      | Open in Workbench | menu row (Games) and box tile (Downloads) each opened a Workbench window |
+      | Sort by | Date saved "sorts" {"Personal:Downloads": "date"}, box newest first (SAGA readme first); heading click keeps the menu; Kind saved "kind"; Games kept Name; after a restart Kind checked and the box in Kind order; Name removed "sorts" |
+      | A5 | "folder": "RAM:DoesNotExist" -> no requester, dock running, file saved with paths [Editor] only |
+
+      Profile of the gesture run: Input downs=9 ups=9; prefetch stacks=3
+      pending=0 evicted=0.
+- [x] §4.5 first open after 45 s idle, pointer off the dock, fresh dock
+      per run (config = the user's 11 pins + Archives:Games +
+      ApolloOS:Prefs + "folder" Downloads; new: migrated, 3 stacks):
+
+      | run | stack | first paint ms | entrance ms | frames (fields) |
+      | --- | --- | --- | --- | --- |
+      | o1 v1.0b5 | Downloads | 107.6 | 130.9 | 4 (0112) |
+      | n1 550 | Downloads | 104.6 | 133.9 | 5 (01112) |
+      | n1 | Games (same box) | 107.7 | 146.1 | 5 (01121) |
+      | n1 | Prefs (smaller box) | 70.3 | 149.4 | 6 (011111) |
+      | o2 v1.0b5 | Downloads | 107.8 | 131.7 | 4 (0112) |
+      | n2 550 | Downloads | 105.1 | 141.2 | 5 (01121) |
+      | n2 | Games | 107.4 | 145.7 | 5 (01121) |
+      | o3 v1.0b5 | Downloads | 108.1 | 149.8 | 5 (01121) |
+
+      New prefetch: stacks=3 pending=0 reads=81 cache=81/512 evicted=0.
+      Pass: every new value is under the old maximum (108.1 / 149.8).
+      The entrance is a 130 ms timed motion; whether a fifth frame fits
+      before 130 ms decides 131 vs 141-150 ms in both builds (o3 shows it
+      in v1.0b5; the motion code is unchanged since v1.0b5).
+- [x] §4.5 hover, agent sweep (relative moves to x 350, 500, 650, 800,
+      950 at y 688, then off, one per message, after 45 s idle; same 15-pin
+      row for both builds: the 14 paths above + Downloads as a plain path,
+      canvas 896), ChangeTaskPri -30:
+
+      | run | build | render_us_avg | stalled | redraws |
+      | --- | --- | --- | --- | --- |
+      | ho1 | v1.0b5 | 10211 | 0 | 93 |
+      | hn1 | 550 | 9174 | 0 | 88 |
+      | ho2 | v1.0b5 | 9185 | 0 | 88 |
+      | hn2 | 550 | 9236 | 1 | 87 |
+      | ho3 | v1.0b5 | 9118 | 0 | 88 |
+      | hn3 | 550 | 9185 | 0 | 88 |
+      | ho4 | v1.0b5 | 9077 | 0 | 88 |
+
+      render_us_avg: every new run inside the old spread (9077-10211).
+      Stalled: hn1 and hn3 0 as old; hn2 1 (outside the old 0). That
+      stall is the 542 pacing defer (retire_defers=1, retire_waits=0): a
+      rest frame composed 14 ms after a late wake and presented after
+      the VBlank, so the next frame was drawn at the following field. The
+      old path would wait in WaitTOF in that frame instead and show it at
+      the same field; the old runs did not hit a late present at all
+      (max done_us 17.4 ms). Not a code defect; noted for the owner (the
+      stall counter counts a defer, not a WaitTOF).
+- [x] Lesson: BreakTask finds a dock by task name only when Workbench
+      started it; a CLI-started test dock is named after its CLI, so the
+      second start ran beside the first ("PiP2 is already in use"; OK
+      clicked, rerun cleanly). Stop CLI docks with Status COM= + Break.
+- [x] End state: 550 started with WBRun from SYS:WBStartup (the user's
+      ENVARC config), FindTask finds it, Status shows no CLI dock; its
+      Downloads stack opened and closed. RAM: and RAM:T clean (tools,
+      configs, profiles, dumps, ENV:dpid deleted); scratch worktree
+      removed on the Mac. C:ApolloExplorerSrv (started this session) runs
+      until the next reboot.
+- [ ] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete (538, in
+      use) after the next ApolloOS boot.
+- [ ] NOT RUN on ApolloOS this time: drawer/volume drops (pins came from
+      the config), reorder and drag-out, Settings, --bench-sweep.
+
+### Folder Stack "Click to": Show Stack / Open Folder per stack (2026-11-25, owner request)
+Scope: the stack menu's action rows Show Contents / Open in Workbench become
+options under a muted "Click to" heading: Show Stack (default, the box) or
+Open Folder (a left click opens the drawer as a Workbench window, a DOpus
+lister when DOpus is the desktop, through launch_pin as the old menu row
+and the 1.0b5 drawer pins). Saved per stack as "clicks": {path: "folder"}
+like "sorts". Open Folder stacks are not read ahead, have no running dot
+(plan decision 3 / D9: stacks go to the status worker as kind 0) and no
+Close row. The box's Open in Workbench tile stays.
+- [x] dock_prefs: DockClick; "sorts" and "clicks" share one path-map
+      reader (read_map + parse callback) and writer (write_map); "clicks"
+      lists only "folder" stacks, after "sorts"; unknown values, other
+      shapes, paths for no pin read as Show Stack; migration appends Show
+      Stack.
+- [x] amiga_main: Item.click (loaded with the path, saved by save_config,
+      moved by dock_reorder, gone with remove_pin); stack_box(); a left
+      click on an Open Folder stack closes an open box and calls
+      launch_pin(path,1) + status_changed, no record_launch (no app may
+      claim it); stack_next_pin and the read-ahead only for Show Stack
+      stacks (`stacks=` in the profile counts those); click_menu_item saves
+      at once, reverts on a failed save, re-arms the read-ahead on Show
+      Stack.
+- [x] amiga_ui: drawer_items = Sort by group, separator, "Click to" heading,
+      Show Stack, Open Folder; popup_checked is a row mask; the
+      DOCK_UI_SHOW_CONTENTS / DOCK_UI_OPEN_DRAWER actions are gone
+      (DOCK_UI_CLICK_STACK / _FOLDER).
+- [x] Tests: test_prefs test_clicks (no key when all Show Stack, exact
+      format alone and after "sorts", round trip, before "paths", case,
+      unknown/odd values, duplicate keys, empty and array shapes, reorder,
+      removal, hand-edited order, migration, out-of-range not written) and
+      three bad files.
+- [x] 1.0 beta 5 compatibility: v1.0b5's dock_prefs.c (git archive, host)
+      read a file written by this build with "sorts" and "clicks" (paths
+      intact); build 550's reader too.
+- [x] make host-test, make host-sanitize green; make amiga no warnings
+      (build 551).
+- [x] impeccable polish (in-thread; the detector is web-only): the menu on
+      ApolloOS shows Sort by / Name / Date Modified / Kind, the hairline,
+      Click to / Show Stack / Open Folder; headings muted, checks in one
+      column, labels aligned past it, 115x146 px. No change needed: the
+      group order matches the macOS Dock (Sort by, then Display as) and the
+      heading reads as a sentence with each option.
+- [x] ApolloOS R9.5, build 551 from RAM:, --config RAM:t1.json (the user's
+      14 pins + Archives:Games + ApolloOS:Prefs, Downloads last; four
+      stacks: Audio, Games, Prefs, Downloads):
+
+      | check | result |
+      | --- | --- |
+      | menu | Sort by group, separator, Click to, check on Show Stack |
+      | Downloads -> Open Folder | file gains "clicks": {"Personal:Downloads": "folder"}; menu check on Open Folder |
+      | left click, Open Folder | Workbench window "Downloads", no box window |
+      | Show Stack again | "clicks" removed; left click opens the box (356x368) |
+      | Games, Audio -> Open Folder | both in "clicks" |
+      | restart | Games menu checked Open Folder; left click opens window "Games" |
+      | box open + quick click on Audio | box closed, window "Audio" opened |
+      | reorder Games to slot 0 | paths start with Archives:Games, "clicks" kept for Games and Audio; click at slot 0 opens window "Games"; Prefs (Show Stack) still opens its box |
+      | drag Audio out | Audio gone from paths and "clicks"; Games kept |
+      | migration (RAM:t3.json: "clicks" and "sorts" before "paths", "folder" Downloads) | Downloads appended, no "folder", Games "date" and "folder" kept, Downloads not in "clicks" |
+
+      Profile after the first session: stacks=2 (Prefs, Downloads; Audio and
+      Games were Open Folder at exit).
+- [x] First open after 45 s idle, pointer off the dock, fresh dock per run,
+      config o.json (the build-550 runs' config: user's 11 pins of then +
+      Games + Prefs + "folder" Downloads); of.json = the same with Games as
+      Open Folder:
+
+      | run | config | first paint ms | entrance ms | frames | prefetch |
+      | --- | --- | --- | --- | --- | --- |
+      | n1 551 | o.json | 107.8 | 142.0 | 5 | stacks=3 reads=81 |
+      | n2 551 | of.json | 114.7 | 150.3 | 4 | stacks=2 reads=48 |
+      | n3 551 | o.json | 107.7 | 138.4 | 5 | stacks=3 reads=81 |
+      | n4 551 | of.json | 107.4 | 137.6 | 4 | stacks=2 reads=48 |
+      | n5 551 | of.json | 107.2 | 138.2 | 5 | stacks=2 reads=48 |
+
+      Build 550 (same config): 104.6 / 105.1 ms, 133.9 / 141.2 ms; v1.0b5
+      max 108.1 / 149.8. Pending=0 evicted=0 in every run. n2 is one run
+      above the old maximum: one prepare stage took 15.7 ms (7.4-7.7 in the
+      other runs); n4/n5 with the same config are at 107 ms, so it reads as
+      run noise. The Open Folder stack is skipped by the read-ahead (reads
+      48 instead of 81).
+- [x] Hover agent sweep (t.json, 15 pins, canvas 896, ChangeTaskPri -30,
+      x 350/500/650/800/950 at y 688, relative, one per message):
+      551 render_us_avg 9733 / 9677, stalled 2 / 0; 550 (installed
+      binary, same run) 9492, stalled 1. Old spread from the 550 runs
+      9077-10211. The two 551 stalls are the first two frames after idle.
+      No hover code changed.
+- [x] Opus review (fresh, diff only): no P0/P1/P2. Its note: switching a
+      stack to Open Folder leaves its read-ahead page in memory until the
+      slot is reused (no behaviour change).
+- [x] Build 551 installed in place: copied to SYS:WBStartup/DockAwesome.new;
+      the 550 file was "in use" (WBRun), so it is now
+      SYS:WBStartup/Disabled/DockAwesome-locked-delete2; .new renamed into
+      place, Version 0.551; started with WBRun, FindTask finds it, the
+      only dock (Status lists no CLI dock); with the user's ENVARC config
+      (14 pins) the Downloads menu shows Name and Show Stack checked.
+      ENVARC:DockAwesome.json kept its date (17:40:52 on the Amiga clock):
+      not written by the tests. RAM: clean (tools, configs, profiles,
+      ENV:dpid deleted); scratch files removed on the Mac.
+- [ ] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete (538) and
+      -locked-delete2 (550) after the next ApolloOS boot (both in use).
+- [ ] NOT RUN: Coffin, AmigaOS 3.2.3, 3.9, 3.1.4.1, AmiKit XE (Open Folder
+      as a DOpus lister is untested end to end on AmiKit; the launch path
+      is the one 4ed4e32 verified there for the old menu row), no-dot
+      check of an Open Folder stack (PiP only, ask the user), the box's
+      Open in Workbench tile (unchanged).
+
+### Coffin rerun with build 551 (2026-11-25)
+Coffin r65 (Kickstart 45.57, Workbench 45.5, core 12856, 24-bit 1280x720),
+agent input. Build 551 = HEAD 5cc7184 (no source newer than
+build/DockAwesome; not rebuilt, no code change in this follow-up). Baseline
+tag v1.0b5 built in a scratch worktree outside the repo; build 542
+(98bbf1a) built the same way as a control. Every test dock used
+--config RAM: copies; ENVARC:DockAwesome.json (migrated by 541, 18 paths,
+Downloads last) kept its date (10:03:46 on the Amiga clock) throughout.
+- [x] Old leftover SYS:WBStartup/Disabled/DockAwesome-locked-delete
+      (0.527) was not locked and is deleted.
+- [x] §4.4 checks for what changed since 541 (configs: the user's 17
+      paths + "folder" Downloads; t.json adds Archives:Games, System:Prefs
+      and Archives:, so three stacks and a volume after migration):
+
+      | check | result |
+      | --- | --- |
+      | --caps | 551, installed 541 and v1.0b5 identical (Diff) |
+      | migration | no "folder", Downloads last; a second start left the file unchanged (Diff, same date) |
+      | A5 | "folder": "RAM:DoesNotExist" -> no requester, dock running, file saved with paths [EditPad] only |
+      | no divider | --pip-dump, 18 icons at lefts 135 + 37k, the last (Downloads) at 764: last two 5 px apart |
+      | stack switch, quick click | Downloads -> Games and Games -> Downloads |
+      | stack switch, 1 s hold | Downloads -> Games and Games -> Downloads |
+      | program pin with a box open, quick click | EditPad started, box closed |
+      | volume pin (Archives:) | Workbench window; its menu shows Close, which closed it |
+      | Sort by | Date Modified saved "sorts": {"Personal:Downloads": "date"}; menu check moved; Games kept Name; after a restart Downloads still Date Modified |
+      | Click to, Open Folder | Downloads -> "clicks": {"Personal:Downloads": "folder"}; left click opened Workbench window "Downloads", no box window; menu with the window open has no Close row |
+      | box open + quick click on an Open Folder stack | Prefs box closed, window "Games" opened |
+      | no running dot | --pip-dump at exit with the Games and Downloads windows open (both stacks) and the Archives: window open: a dot under Archives: only |
+      | restart | Games menu checked Open Folder, Downloads Date Modified + Open Folder |
+      | Show Stack again | Downloads left "clicks"; left click opened the box (354x337) |
+      | reorder | Games dragged to slot 0: paths start with Archives:Games, "clicks" kept for Games, "sorts" kept for Downloads; a click at slot 0 opened window "Games"; Prefs (Show Stack) still opened its box |
+      | drag out | Downloads dragged out: gone from paths with its "sorts"; Games kept "folder" |
+      | Settings | Size, Scale, Position, Cancel/Save, no Folder Stack section; Save rewrote the file and kept "clicks" |
+
+      Test note: amiga_drag with relative:true and from == to is not a
+      hold (it homes the pointer, so the dock saw a drag of the pin; the
+      file was unchanged and nothing opened); the 1 s holds were sent as
+      absolute amiga_drag with settle 50 after a relative click had placed
+      the pointer. Coffin's Prefs icon is a flat bar: hit at y 680, not 692.
+- [x] §4.5 first open after 45 s idle, pointer off the dock, fresh dock
+      per run, ChangeTaskPri -30, config = the user's 17 paths + Archives:Games
+      + System:Prefs + "folder" Downloads (old: 19 pins + Folder Stack;
+      new: migrated, 3 stacks). n1, n2, n3 and o1, o2 sent the next agent
+      command at once after each click; n4, o3, o4 had seconds between
+      clicks:
+
+      | run | build | Downloads first paint / entrance ms | Games ms | frames (fields) |
+      | --- | --- | --- | --- | --- |
+      | o1 | v1.0b5 | 89.4 / 130.7 | - | 4 (0112) |
+      | n1 | 551 | 85.1 / 149.7 | 86.1 / 153.8 | 4 (0122) / 5 (01122) |
+      | o2 | v1.0b5 | 89.8 / 150.3 | - | 5 (01121) |
+      | n2 | 551 | 86.1 / 168.6 | 86.5 / 153.4 | 4 (0114) / 5 (01122) |
+      | c1 | 541 (control) | 87.7 / 132.3 | 88.4 / 131.3 | 4 (0112) |
+      | c2 | 542 (control) | 102.4 / 137.5 | 88.5 / 130.5 | 5 (01112) / 4 |
+      | n3 | 551 | 90.2 / 144.4 | 89.0 / 131.3 | 5 (01121) / 4 |
+      | o3 | v1.0b5 | 90.0 / 149.8 | - | 5 (01121) |
+      | n4 | 551 | 90.8 / 143.8 | 89.3 / 130.3 | 5 (01121) / 4 |
+      | o4 | v1.0b5 | 89.8 / 150.0 | - | 5 (01121) |
+
+      n1 Prefs (larger box, 468x433, exempt): 140.1 / 199.8. New prefetch
+      in every run: stacks=3 pending=0 reads=120 cache=120/512 evicted=0.
+      Old maximum 90.0 / 150.3. Against it:
+      - Entrance: n3 and n4 (Downloads 144.4 / 143.8, Games 131.3 / 130.3)
+        pass. n2 Downloads 168.6 FAILS: its last frame took 60.3 ms (25 ms
+        in every old run); n1 and n2 Games 153.8 / 153.4 are 3 ms over.
+      - First paint: n1 and n2 pass (85-86 ms); n3 and n4 are 0.2 and 0.8
+        ms over (90.2 / 90.8); the step is the "layer" prepare stage
+        (19.3 ms in n3/n4, 15.1 in n1/n2, 15.2-15.6 in the old runs).
+      Not fixed, open for the owner: no slow final frame or 3 ms Games
+      excess came back in n3/n4 or in the 541/542 controls, and the open
+      and entrance code is the same in 542 and 551 (84def22 changed the
+      menu rows, the check mask and the click routing only). The dock
+      runs at -30 here, below every task an agent command starts.
+- [x] §4.5 hover, agent sweep (relative moves to x 350, 500, 650, 800,
+      950 at y 692, then off, one per message, after 45 s idle), the same
+      20-pin row for both builds (pl.json: the user's 17 paths +
+      Archives:Games, System:Prefs, Personal:Downloads, no "folder";
+      canvas 992), ChangeTaskPri -30:
+
+      | run | build | render_us_avg | max us | stalled | redraws |
+      | --- | --- | --- | --- | --- | --- |
+      | ho1 | v1.0b5 | 13966 | 101512 | 11 | 102 |
+      | hn1 | 551 | 9284 | 18788 | 4 | 100 |
+      | ho2 | v1.0b5 | 10526 | 35374 | 6 | 102 |
+
+      Pass: new render_us_avg and stalled below both old runs. The old
+      runs show the pacing cascade at the x 950 rest (stalls of 35 ms with
+      a 29-32 ms present, the 3.2.3 finding); 551 has retire_waits=0
+      retire_defers=2 and no such stall (its 4 stalls are 12-13 ms frames
+      at the start of a motion). First check of the 542 pacing fix on
+      Coffin.
+- [x] No defect found that needs a code change; no commit to src/.
+- [x] End state: 551 copied to SYS:WBStartup/DockAwesome.new; the 541
+      file was "in use" (WBRun), so it is now
+      SYS:WBStartup/Disabled/DockAwesome-locked-delete; .new renamed into
+      place, Version 0.551; started with WBRun, FindTask finds it, Status
+      lists no CLI dock; its Downloads stack opened and closed with the
+      user's ENVARC config. RAM: and RAM:T clean (tools, configs,
+      profiles, dumps, binaries), ENV:dpid deleted; scratch worktrees
+      (v1.0b5, 542) removed on the Mac. ApolloExplorerSrv was already
+      running at boot.
+- [x] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete (541, in
+      use) on Coffin after its next boot (done in the 569 session; it was
+      no longer locked).
+- [ ] NOT RUN on Coffin this time: drawer/volume drops (pins came from the
+      config), the box's Open in Workbench tile (unchanged), --bench-sweep;
+      Open Folder as a DOpus lister (Workbench is Coffin's desktop).
+
+### AmigaOS 3.9 matrix and performance with build 551 (2026-11-25)
+Plain AmigaOS 3.9 on the Vampire (Kickstart 40.68 ROM, Workbench 45.5,
+exec 40.10, graphics 40.24, intuition 40.85, icon 51.4, workbench 45.132:
+the dock's V39/V44 requirements hold), core 12856, 24-bit 1280x720
+(cybergraphics 41.4), agent input (the warp lands where aimed;
+amiga_pointer 640,300 after a move to 640,300). amiagent did not start at
+boot (port 7846 refused for ~20 min); the user started it by hand from
+Personal:Applications/AmiMCP. ApolloExplorerSrv was not running; started
+with Run >NIL: C:ApolloExplorerSrv (stays until reboot). Installed before:
+release 1.0 beta 4 ("DockAwesome 1.0", 21-Nov) in SYS:WBStartup, running.
+Build 551 = HEAD 1fb8556 (`make amiga` had nothing to rebuild); baseline
+tag v1.0b5 built in a scratch worktree outside the repo. Every test dock
+used --config RAM: copies; ENVARC:DockAwesome.json (1.0b5 format, 12 paths,
+"folder": "Personal:Downloads") kept its date (Saturday 01:25:41) until
+the installed 551 started. --caps: shaped_windows no, rgb_rastport no,
+alpha_text no, aa_text no, pip yes, pixels ammx, ui_glass yes (the box and
+menus are real windows, so screenshots show them).
+- [x] Old leftover SYS:WBStartup/Disabled/DockAwesome-locked-delete
+      (build 509, 20-Nov) was not locked and is deleted.
+- [x] §4.4 (configs: mig = the user's file; t = its 12 paths +
+      Archives:Games, AOS39:Prefs, Archives: + "folder" Downloads, so
+      three stacks and a volume after migration):
+
+      | check | result |
+      | --- | --- |
+      | --caps | 551, v1.0b5 and the installed 1.0 beta 4 identical (diff on the Mac) |
+      | migration | no "folder", Personal:Downloads last; a second start left the file unchanged (same date) |
+      | A5 | "folder": "RAM:DoesNotExist" -> no requester, dock running, file saved with paths [AOS39:Tools/Editor] only |
+      | no divider | --pip-dump, 13 icons: centres 169.5 + 41k, last two (SD-Card, Downloads) 620 / 661.5: 5 px apart (36 px icons) |
+      | stack switch, quick click | Downloads -> Games and Games -> Downloads |
+      | stack switch, 1 s hold | Downloads -> Games and Games -> Downloads |
+      | program pin with a box open, quick click | Editor started, box closed |
+      | volume pin (Archives:) | Workbench window; its menu shows Close, which closed it |
+      | drawer drop | Personal:Audio dropped from the Personal window -> pinned at the drop slot as a stack; click opened its box, a click on its pin closed it |
+      | volume drop | Ram Disk: dropped -> appended last; click opened its window |
+      | Sort by | heading click kept the menu; Date Modified saved "sorts": {"Personal:Downloads": "date"}, check moved, box newest first (SAGA readme/lha first); Games kept Name |
+      | box tile | Open in Workbench in the box opened Workbench window "Downloads" |
+      | Click to, Open Folder | Downloads -> "clicks": {"Personal:Downloads": "folder"}; left click opened Workbench window "Downloads", no box; menu with the window open has no Close row |
+      | box open + quick click on an Open Folder stack | Prefs box closed, window "Games" opened |
+      | no running dot | --pip-dump at exit with the Games, Downloads (both stacks) and Archives: windows open: one dot, under Archives: only |
+      | restart | Downloads menu Date Modified + Open Folder, Games Name + Open Folder |
+      | Show Stack again | Downloads left "clicks"; left click opened the box (356x368) |
+      | reorder | Games dragged to slot 0: paths start with Archives:Games, "clicks" kept for Games, "sorts" kept for Downloads; a click at slot 0 opened window "Games"; Prefs (Show Stack) still opened its box |
+      | drag out | Downloads dragged out: gone from paths with its "sorts"; Games kept "folder" |
+      | Settings | Size, Scale, Position, Cancel/Save, no Folder Stack section; Save rewrote the file (new date) and kept "clicks" |
+
+- [x] §4.5 first open after 45 s idle, pointer off the dock, fresh dock per
+      run, ChangeTaskPri -30, config o = the user's 12 paths +
+      Archives:Games + AOS39:Prefs + "folder" Downloads (old: 14 pins +
+      Folder Stack; new: migrated, 3 stacks), clicks seconds apart:
+
+      | run | build | Downloads first paint / entrance ms | Games ms | Prefs ms (smaller box 356x315) |
+      | --- | --- | --- | --- | --- |
+      | o1 | v1.0b5 | 114.4 / 145.6 | - | - |
+      | n1 | 551 | 97.4 / 137.6 | 96.4 / 138.7 | 87.7 / 152.1 (1 frame, fields=0) |
+      | o2 | v1.0b5 | 110.4 / 144.7 | - | - |
+      | n2 | 551 | 97.8 / 137.2 | 96.9 / 138.1 | 88.2 / 131.5 |
+      | o3 | v1.0b5 | 100.6 / 134.5 | - | - |
+      | n3 | 551 | 97.7 / 137.3 | 96.4 / 138.8 | 87.6 / 130.9 |
+
+      New prefetch in every run: stacks=3 pending=0 reads=92 cache=92/512
+      evicted=0. Old maximum 114.4 / 145.6. Every new first paint and
+      every Downloads and Games entrance is under it. One exception, open
+      for the owner: n1's Prefs entrance drew a single frame (fields=0)
+      and ended at 152.1 ms, 6.5 ms over; n2 and n3 (131.5 / 130.9, 4
+      frames) did not repeat it. A one-frame entrance was seen once on
+      3.2.3 as well (Games, 134 ms, under the maximum there).
+- [x] §4.5 hover, agent sweep (relative moves to x 350, 500, 650, 800,
+      950 at y 692, then off, one per message, after 45 s idle), the same
+      15-pin row for both builds (pl: the user's 12 paths +
+      Archives:Games, AOS39:Prefs, Personal:Downloads, no "folder"; canvas
+      896), ChangeTaskPri -30:
+
+      | run | build | render_us_avg | max us | stalled | redraws |
+      | --- | --- | --- | --- | --- | --- |
+      | ho1 | v1.0b5 | 9460 | 18290 | 0 | 98 |
+      | hn1 | 551 | 9540 | 18218 | 0 | 99 |
+      | ho2 | v1.0b5 | 9561 | 18282 | 1 | 97 |
+
+      Pass: new render_us_avg and stalled within the old spread; 551
+      retire_waits=0 retire_defers=1.
+- [x] No defect found that needs a code change; no commit to src/.
+- [x] End state: 551 copied to SYS:WBStartup/DockAwesome.new; the 1.0
+      beta 4 file was "in use" (WBStartup), so it is now
+      SYS:WBStartup/Disabled/DockAwesome-locked-delete; .new renamed into
+      place, Version 0.551; started with WBRun, FindTask finds it, no CLI
+      dock in Status; it migrated ENVARC:DockAwesome.json (no "folder",
+      Personal:Downloads last) and its Downloads stack opened and closed.
+      RAM: clean (tools, scripts, configs, profiles, dumps, binaries,
+      Editor's RAM:T/JanoRecentFiles), ENV:dpid deleted; scratch worktree
+      removed on the Mac.
+- [x] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete (1.0 beta 4,
+      in use) on 3.9 after its next boot (done in the 569 session; it was
+      no longer locked).
+- [x] amiagent does not start at boot on this 3.9 install (the user
+      started it by hand). Solved outside the dock by the user's two
+      S:User-Startup lines; seen working at the 569 session's boot.
+- [ ] NOT RUN on 3.9: Open Folder as a DOpus lister (Workbench is the
+      desktop here). --bench-sweep ran in the 569 session.
+
+### AmigaOS 3.1.4.1 with builds 551 and 553 (2026-11-25)
+AmigaOS 3.1.4.1 on the Vampire (Kickstart 46.143, exec 46.45, Workbench
+45.194, graphics 45.27, intuition 40.87, layers 45.30, icon 51.4,
+workbench 45.194, cybergraphics 41.4, input.device 45.2: the dock's
+V39/V44 requirements hold, so it does not refuse), core 12856, 24-bit
+1280x720. Installed before: release 1.0 beta 4 ("DockAwesome 1.0",
+21-Nov), running from WBStartup. amiagent was up at boot;
+ApolloExplorerSrv was not (started with Run >NIL: C:ApolloExplorerSrv).
+Build 551 = HEAD 9bc7080 (not stale); baseline tag v1.0b5 built in a
+scratch worktree outside the repo, no warnings.
+- [x] Old leftover SYS:WBStartup/Disabled/DockAwesome-locked-delete
+      (21-Nov) was not locked and is deleted.
+- [x] --caps: 551, v1.0b5 and the installed 1.0 beta 4 identical (diff on
+      the Mac): shaped_windows no, pip yes, pixels ammx, ui_glass yes,
+      aa_text no, error none.
+- [x] DEFECT (also in v1.0b5): a Break during startup killed the dock
+      without cleanup and froze Intuition input. Migration test: the
+      installed dock stopped (BreakTask), 551 started on a copy of the
+      user's file (--config RAM:mig.json --profile), stop.s sent Break
+      within about a second. Its output file held only "***Break";
+      RAM:mig.json.new (582 bytes, migrated) was left and mig.json not
+      renamed, so it died inside save_config, after install_input. A
+      second start showed "PiP2 is already in use." and the agent's
+      pointer moves and clicks no longer moved the pointer. A window
+      walk (tool Wins) found a leaked 1x1 dock receiver window whose
+      owner task was gone; the "DockAwesome.PiP2" lease semaphore was
+      still listed with no process; an input.device spy saw only its own
+      two handlers in the chain and no events.
+      Cause: libnix's read() and write() call __chkabort, which raises
+      SIGINT when Ctrl-C is pending: it prints "***Break" and exits
+      without main's cleanup (input handler, PiP lease, windows,
+      AppWindow). The event loop clears Ctrl-C in its
+      Wait, so only a Break that lands before the loop (startup) or
+      while a file or stdout write runs hits it; --bench-sweep polls
+      Ctrl-C without clearing it, so a Break there also aborted at the
+      profile report.
+      Reproduced on v1.0b5 and 551 without a leak that matters: a tool
+      (CtrlCRun) runs the dock in its own process with Ctrl-C pending;
+      `--caps` printed only "***Break", rc 20, on both.
+      Fix: `void __chkabort(void) {}` in amiga_main.c, so libnix never
+      aborts and Ctrl-C is the event loop's alone (nm: the binary's
+      ___chkabort is an rts, _raise is no longer linked). Same CtrlCRun
+      test with 552: the full --caps output, rc 0.
+      Opus review of the delta: no blocking finding. Its non-blocking
+      point is done in build 553: the stock __chkabort also cleared
+      Ctrl-C, so --bench-sweep now reads and clears it
+      (SetSignal(0,SIGBREAKF_CTRL_C)) and main clears a Break the loop
+      never took before it returns, so it cannot stop the next command
+      of a script. CtrlCRun with 553: full --caps output, rc 0,
+      Ctrl-C not left pending. make host-test, make host-sanitize green;
+      make amiga (552 and 553) without warnings.
+- [x] Installed: 552 copied to SYS:WBStartup/DockAwesome.new; the 1.0
+      beta 4 file was "in use", so it is now
+      SYS:WBStartup/Disabled/DockAwesome-locked-delete; .new renamed
+      into place; then 553 replaced 552 the same way (552 was never
+      started, so it was deleted), Version 0.553. Not started: the leaked PiP2 lease and
+      the frozen input need a reboot first. ENVARC:DockAwesome.json
+      (1.0b5 format, "folder": "Personal:Downloads", 12 paths) kept its
+      date (Saturday 00:40:38); 553 migrates it on its first start.
+      The second test dock's "PiP2 is already in use." requester (the
+      one the user saw) could not be clicked with frozen input; a tool
+      (ReqOK) sent its window the OK gadget's GADGETUP, the dock exited
+      and Status lists no dock. RAM: clean (only amiagent's own file);
+      ENV:dpid deleted; scratch worktree removed on the Mac. The leaked
+      1x1 window, the PiP2 lease and the frozen input stay until the
+      reboot.
+- [x] Rebooted by the user. 553 started from WBStartup and migrated
+      ENVARC:DockAwesome.json at boot (no "folder", Personal:Downloads
+      last, 582 bytes; stamped 02-Aug-25 15:35:16 because the clock was
+      not yet set); the tests never wrote it. The 1.0 beta 4 file in
+      Disabled was no longer locked and is deleted. Agent input reaches
+      the dock here: warps land 1:1 (move to 640,300 -> pointer 640,300).
+      Before every start: Status (CLI docks), FindTask, tool Sems (PiP
+      leases); each test dock got 5 s or more before stop.s.
+- [x] Break checks with 553 (installed dock stopped first; Sems empty):
+
+      | test | result |
+      | --- | --- |
+      | Ctrl-C pending through a whole start (CtrlCRun, migration config) | migrated and saved (582 bytes), one frame drawn, normal exit with the full profile, rc 0, no Ctrl-C left, no lease, no leaked window |
+      | Break sent at once after a start (stop.s right after Run) | migrated file saved, full profile, no lease, pointer moves |
+      | Break 3 s after starting --bench-sweep 8 | ended at the sweep's start (redraws 0), full profile, no lease |
+      | Break 5 s after starting --bench-sweep 8 | ended mid-sweep (redraws 50 of 165), full profile, no lease, pointer moves |
+
+- [x] §4.4 with 553 (configs: m = the user's 1.0b5 file; t = its 12
+      paths + Archives:Games, AOS3141:Prefs, Archives: + "folder"
+      Downloads, so three stacks and a volume after migration):
+
+      | check | result |
+      | --- | --- |
+      | --caps | 551, v1.0b5 and 1.0 beta 4 identical (before the fix; 553 prints the same) |
+      | migration | no "folder", Personal:Downloads last; a second start left the file unchanged (same date) |
+      | A5 | "folder": "RAM:DoesNotExist" -> no requester, dock running, file saved with paths [AOS3141:Tools/Editor] only |
+      | no divider | --pip-dump, 16 icons, slots 140 + 41k on the 928 canvas, last two (Archives:, Downloads) at 714 and 755: 5 px apart |
+      | stack switch, quick click | Downloads -> Games and Games -> Downloads |
+      | stack switch, 1 s hold | Downloads -> Games and Games -> Downloads |
+      | program pin with a box open, quick click | Editor started, box closed |
+      | volume pin (Archives:) | Workbench window; its menu shows Close, which closed it |
+      | Sort by | heading click kept the menu; Date Modified saved "sorts": {"Personal:Downloads": "date"}, check moved, box newest first (SAGA readme/lha first); Games kept Name |
+      | Click to, Open Folder | "clicks" saved; left click opened Workbench window "Downloads", no box; menu with the window open has no Close row |
+      | box open + quick click on an Open Folder stack | Prefs box closed, window "Games" opened |
+      | no running dot | --pip-dump at exit, pointer off the dock, with the Games, Downloads (both stacks) and Archives: windows open: one dot, under Archives: only |
+      | restart | Downloads Date Modified + Open Folder, Games Name + Open Folder |
+      | Show Stack again | Downloads left "clicks"; left click opened the box (356x368) |
+      | box tile | Open in Workbench in the Downloads box opened its Workbench window |
+      | reorder | Games dragged to slot 0: paths start with Archives:Games, "clicks" kept; a click at slot 0 opened window "Games"; Prefs (Show Stack) still opened its box |
+      | drag out | Downloads dragged out: gone from paths with its "sorts" |
+      | drawer drop | Personal:Audio dropped from the Personal window -> pinned at the drop slot as a stack; its box opened and closed |
+      | volume drop | Ram Disk: dropped -> pinned at the drop slot; click opened its window |
+      | Settings | Size, Scale, Position, Cancel/Save, no Folder Stack section; Save rewrote the file (new time) and kept "clicks" |
+
+- [x] §4.5 first open after 45 s idle, pointer off the dock, fresh dock per
+      run, ChangeTaskPri -30, config o = the user's 12 paths +
+      Archives:Games + AOS3141:Prefs + "folder" Downloads (old: 14 pins +
+      Folder Stack; new: migrated, 3 stacks), clicks seconds apart:
+
+      | run | build | Downloads first paint / entrance ms | Games ms | Prefs ms (smaller box 299x315) |
+      | --- | --- | --- | --- | --- |
+      | o1 | v1.0b5 | 101.4 / 135.6 | - | - |
+      | n1 | 553 | 99.2 / 136.1 (1 frame) | 95.7 / 143.3 | 72.3 / 142.5 |
+      | o2 | v1.0b5 | 101.3 / 135.9 | - | - |
+      | n2 | 553 | 98.9 / 136.5 | 96.4 / 133.9 | 72.6 / 142.7 |
+      | o3 | v1.0b5 | 101.2 / 135.6 | - | - |
+      | n3 | 553 | 99.5 / 135.6 | 96.5 / 153.5 (fields 01113) | 72.5 / 146.4 |
+
+      New prefetch in every run: stacks=3 pending=0 reads=84 cache=84/512
+      evicted=0. Old maximum 101.4 / 135.9. Every new first paint is
+      under it. Entrance: NOT a clean pass, open for the owner like the
+      Coffin and 3.9 outliers: Downloads 135.6-136.5 (up to 0.6 ms over),
+      Games 133.9 once but 143.3 and 153.5 (a slow last frame), Prefs
+      142.5-146.4 (6.6-10.5 ms over) although its box is smaller. The
+      old runs are very steady (135.6-135.9, fields 01112).
+- [x] §4.5 hover, agent sweep (relative moves to x 350, 500, 650, 800,
+      950 at y 692, then off, one per message, after 45 s idle), the same
+      15-pin row for both builds (pl: the 12 paths + Archives:Games,
+      AOS3141:Prefs, Personal:Downloads, no "folder"; canvas 896),
+      ChangeTaskPri -30:
+
+      | run | build | render_us_avg | max us | stalled | redraws |
+      | --- | --- | --- | --- | --- | --- |
+      | ho1 | v1.0b5 | 9529 | 18392 | 1 | 98 |
+      | hn1 | 553 | 9610 | 18504 | 1 | 98 |
+      | ho2 | v1.0b5 | 10719 | 100610 | 0 | 98 |
+
+      Pass: render_us_avg and stalled within the old spread; 553
+      retire_waits=0 retire_defers=1.
+- [x] §4.5 --bench-sweep 8 (same row, ChangeTaskPri -30), v1.0b5 / 553 /
+      v1.0b5: render_us_avg 6753 / 6440 / 6736, stalled 41 / 41 / 43 of
+      165 redraws (553 retire_waits=0). Pass.
+- [x] No defect beyond the startup Break; no further code change.
+- [x] End state: 553 in SYS:WBStartup (Version 0.553), started with WBRun
+      after the tests, FindTask finds it, Status lists no CLI dock, one
+      "DockAwesome.PiP2" lease (its own); its Downloads stack opened and
+      closed with the user's ENVARC config. SYS:WBStartup/Disabled holds
+      only WBDock. RAM: clean (tools, scripts, configs, profiles, dumps,
+      binaries, Editor's RAM:T/JanoRecentFiles), ENV:dpid deleted;
+      scratch worktree removed on the Mac. ApolloExplorerSrv runs until
+      reboot.
+- [ ] NOT RUN on 3.1.4.1: Open Folder as a DOpus lister (Workbench is the
+      desktop here); Break during startup with the old build beyond the
+      in-process --caps proof.
+
+### AmigaOS 3.2.3 rerun with build 553 (2026-11-25)
+AmigaOS 3.2.3 on the Vampire (Kickstart 47.115, Workbench 47.5; exec 47.13,
+intuition 47.53, graphics 47.10), core 12856, 24-bit 1280x720, agent input
+(warps land 1:1). Installed before: build 542 (running from WBStartup).
+Build 553 = HEAD 24573c0, not stale (`make amiga`: nothing to rebuild; built
+without warnings); baseline tag v1.0b5 built in a scratch worktree outside
+the repo. No code change in this rerun. All destructive runs used
+--config RAM:<file>.json; ENVARC:DockAwesome.json kept its date (10:45:25,
+from 541's migration) through every test and the install. SYS:WBStartup/
+Disabled held only WBDock: no leftover to delete.
+- [x] Aiming on this boot: at rest the icon centres are 640 + 41*(k-(n-1)/2).
+      The last icon moves about 8 px right when the row zooms, so a press at
+      its rest centre lands in the gap (`downs=0`, `presses_unarmed=1`, an
+      input spy showed the press passed through): Downloads at x 955, not 931,
+      with 16 icons. Not a defect; the same in every build.
+- [x] Break checks with 553 (installed dock stopped first; Sems empty, no CLI
+      dock before each start):
+
+      | test | result |
+      | --- | --- |
+      | Ctrl-C pending through a whole start (CtrlCRun, migration config) | migrated and saved (568 bytes), one frame, full profile, rc 0, ctrl_c_left 0, no lease, no leaked window (Wins), pointer moves |
+      | Break sent at once after a start | migrated file saved, full profile, no lease |
+      | Break 3 s after starting --bench-sweep 8 | ended at the sweep's start (redraws 0), full profile, no lease |
+      | Break 6 s after starting --bench-sweep 8 | ended mid-sweep (redraws 91 of 165), full profile, no lease, pointer moves |
+
+- [x] §4.4 with 553 (configs: m = the user's paths without Downloads +
+      "folder" Downloads, 1.0b5 format; t = m + Archives:Games, AOS32:Prefs,
+      Archives:, so three stacks and a volume after migration):
+
+      | check | result |
+      | --- | --- |
+      | --caps | 553, v1.0b5 and the installed 542 identical (diff on the Mac); dopus no |
+      | migration | no "folder", Personal:Downloads last; a second start left the file unchanged (same date) |
+      | A5 | "folder": "RAM:DoesNotExist" -> no requester, dock running, file saved with paths [AOS32:Tools/TextEdit] only |
+      | no divider | --pip-dump, 13 icons on the 832 canvas: centres 169.5 + 41k, last two (SD-Card, Downloads) 620 / 661.5 |
+      | stack switch, quick click | Downloads -> Games and Games -> Downloads |
+      | stack switch, 1 s hold | Downloads -> Games and Games -> Downloads |
+      | program pin with a box open, quick click | TextEdit started, box closed |
+      | volume pin (Archives:) | Workbench window; its menu shows Close, which closed it |
+      | Sort by | heading click kept the menu; Date Modified saved "sorts": {"Personal:Downloads": "date"}, check moved, kept after a restart; Games kept Name (box order not looked at: PiP only) |
+      | Click to, Open Folder | "clicks" saved; left click opened Workbench window "Downloads", no box; the menu with the window open has the same 8 rows, no Close |
+      | box open + quick click on an Open Folder stack | Prefs box closed, window "Games" opened |
+      | no running dot | --pip-dump at exit, pointer off the dock, with the Prefs (stack), Downloads (Open Folder) and Archives: windows open: one dot, under Archives: only |
+      | restart | Downloads kept Date Modified + Open Folder; Show Stack removed "clicks" and brought the box back |
+      | box tile | Prefs box (299x315, 23 entries): Open in Workbench (last tile) opened Workbench window "Prefs" |
+      | reorder | Downloads dragged to slot 0: first in "paths", "sorts" kept; a click at slot 0 opened its box |
+      | drag out | Games (Open Folder) dragged past the row's left end: gone from "paths" with its "clicks" |
+      | drawer drop | Personal:Audio dropped from the Personal window -> pinned at the drop slot (7) as a stack; its box (185x156) opened and closed |
+      | volume drop | RAM Disk icon -> "RAM Disk:" pinned at the drop slot; a click opened its window |
+      | Settings | Size, Scale, Position, Cancel/Save, no Folder Stack section; Save rewrote the file (new time) and kept "sorts" |
+
+- [x] §4.5 first open after 45 s idle, pointer off the dock, fresh dock per
+      run, ChangeTaskPri -30, config o = the user's paths + Archives:Games +
+      AOS32:Prefs + "folder" Downloads (old: 14 pins + Folder Stack; new:
+      migrated, 3 stacks), Downloads opened and closed, v1.0b5 / 553
+      alternating, 8 runs each (fields = fields between frames; last = the
+      last motion frame's time):
+
+      | run | build | first paint ms | entrance ms | frames | fields | compose / present us avg | frame_us |
+      | --- | --- | --- | --- | --- | --- | --- | --- |
+      | o1 | v1.0b5 | 109.7 | 130.3 | 4 | 0112 | 13193 / 3281 | 7978 12857 18235 26748 |
+      | n1 | 553 | 93.1 | 146.8 | 4 | 0113 | 18003 / 2791 | 7795 13813 18396 43092 |
+      | o2 | v1.0b5 | 96.4 | 201.1 | 4 | 0111 | 9630 / 2685 | 4916 10586 14960 18719 |
+      | n2 | 553 | 93.0 | 146.8 | 4 | 0113 | 18064 / 2835 | 7968 13814 18561 43174 |
+      | o3 | v1.0b5 | 110.0 | 149.8 | 5 | 01121 | 11228 / 3602 | 7881 12792 18289 26479 8613 |
+      | n3 | 553 | 92.8 | 147.0 | 4 | 0113 | 18060 / 2888 | 8064 13807 18533 43312 |
+      | o4 | v1.0b5 | 112.3 | 147.4 | 5 | 01121 | 11854 / 3488 | 8049 14192 17346 28433 8589 |
+      | n4 | 553 | 95.4 | 144.4 | 5 | 01121 | 11867 / 2995 | 6949 12729 17375 28555 8596 |
+      | o5 | v1.0b5 | 109.8 | 130.0 | 4 | 0112 | 13081 / 3339 | 7877 12754 18430 26542 |
+      | n5 | 553 | 116.2 | 143.6 | 5 | 01121 | 11746 / 3019 | 6590 12915 17072 28568 8584 |
+      | o6 | v1.0b5 | 96.4 | 142.9 | 5 | 01121 | 10366 / 3397 | 6240 11653 16462 25766 8596 |
+      | n6 | 553 | 95.9 | 143.9 | 5 | 01121 | 11689 / 3129 | 7083 12781 16888 28649 8594 |
+      | o7 | v1.0b5 | 110.1 | 149.7 | 5 | 01121 | 11200 / 3612 | 7858 12533 18414 26552 8604 |
+      | n7 | 553 | 95.6 | 144.3 | 5 | 01121 | 11844 / 3038 | 7048 12730 17368 28565 8601 |
+      | o8 | v1.0b5 | 109.8 | 149.9 | 5 | 01121 | 11215 / 3636 | 7858 12764 18414 26497 8624 |
+      | n8 | 553 | 95.7 | 144.2 | 5 | 01121 | 11815 / 3066 | 7041 12581 17403 28698 8586 |
+
+      Entrance: v1.0b5 130.0-201.1 ms (median 148.6), 553 143.6-147.0 ms
+      (median 144.4). First paint: v1.0b5 96.4-112.3 (median 109.8), 553
+      92.8-95.9 except n5 116.2. New prefetch in every run: stacks=3
+      pending=0 reads=86 cache=86/512 evicted=0. In n1-n3 also Games (first
+      paint 93.0 / 92.9 / 102.9, entrance 142.2 / 142.2 / 136.7) and Prefs
+      (72.9 / 72.9 / 85.3, entrance 130.9 / 146.9 / 134.7).
+- [x] The entrance finding (a few ms slower than v1.0b5 on Coffin, 3.9,
+      3.1.4.1): NOISE, not a difference between the builds. Numbers:
+      - The entrance length is set by two things both builds share: whether
+        the box needs 4 or 5 motion frames (130 ms against 143-150 ms; both
+        builds do both) and how long the frame at scale ~235 with a 3/4 fade
+        takes (it mixes the box with the backdrop twice). Frames 1-3 are the
+        same in both builds.
+      - n1-n3 (the session's first new runs) had that frame at 43.1-46.8 ms
+        (Downloads and Games, identical to 0.2 ms) against 25.8-28.7 ms in
+        every other run of either build. The same 553 binary was at 19.7 ms
+        (entrance 139.1) with a 32 KB block allocated before the start
+        (tool Hold), and at 28.6 ms in n4-n8 later in the session with no
+        shift: the slow frame follows where memory lands, not the code.
+      - The entrance code (advance_folder_motion, compose_folder_scale) is
+        byte-identical in v1.0b5 and 553 (diff of both functions). What
+        changed around it (prefetch, 512-entry cache with an FNV-1a key,
+        per-slot prefetch, stack morphs) runs before the motion clock starts
+        or not at all during it (prefetch waits while a box is open).
+      - Diagnostic builds (scratch worktree, not committed) logged per frame
+        the elapsed time, scale, fade quarter, compose time and task
+        dispatches: 553 diag 25.3-27.5 ms, v1.0b5 diag 26.2 ms for that
+        frame (compose 21-23.5 ms, 2-6 dispatches, idle 0). A sweep of the
+        output buffer's address (16 openings, offset 0-30 KB) gave 25.2-28.3
+        ms with no slow case, so it is not aliasing of that buffer. Why the
+        frame took 43 ms in that memory state was not found.
+      - First paint: the "capture" stage (screen backdrop read) is bimodal in
+        both builds (v1.0b5 10.2 or 23.9-24.1 ms; 553 10.2 ms, once 30.7 ms
+        in n5), which explains n5's 116.2 ms; the other 553 runs are 13-17
+        ms faster than v1.0b5's slow-capture runs.
+      No code change.
+- [x] §4.5 hover, agent sweep (relative moves to x 350, 500, 650, 800, 950
+      at y 692, then off, one per message, after 45 s idle), the same 15-pin
+      row for both builds (pl: the user's paths + Archives:Games, AOS32:Prefs,
+      Personal:Downloads, no "folder"; canvas 896), ChangeTaskPri -30:
+      v1.0b5 / 553 / v1.0b5 render_us_avg 13374 / 10378 / 13868, max 37253 /
+      18847 / 127367, stalled 9 / 4 / 8 (553 retire_waits=0
+      retire_defers=5). Pass (the pacing cascade shows in v1.0b5 only).
+- [x] §4.5 --bench-sweep 8 (pl, ChangeTaskPri -30), 165 redraws each:
+
+      | build | render_us_avg | compose us | stalled |
+      | --- | --- | --- | --- |
+      | v1.0b5 | 7035 / 6495 / 6481 | 4753 / 4766 / 4746 | 42 / 41 / 41 |
+      | 553 | 8018 / 7998 / 7432 | 6251 / 5683 / 5664 | 41 / 40 / 41 |
+
+      Stalled equal; render_us_avg NOT within the old spread: compose is
+      ~0.9 ms (about 20%) higher in 553. Same damage (kpx) and zoom levels
+      frame for frame; 553 composes each frame 0.06-2.8 ms slower. The rest
+      frames are pixel-identical (--pip-dump). Not memory placement: with
+      Hold 32 KB / 300000 B, 553 7469 / 7478 (compose 5684 / 5710), v1.0b5
+      6526 / 6612 (4784 / 4791). Code placement: the compose code is
+      unchanged since v1.0b5 except the deleted divider, yet unrelated
+      edits move it: v1.0b5 + a 30-line diagnostic in amiga_ui.c 5154 us;
+      553 + diagnostic 6597; 553 + diagnostic + buffer pad 5104; 553 built
+      with -falign-functions=32 -falign-loops=32 -falign-jumps=16 4943 /
+      4947, but the padded variant with the same flags 5854 / 5868. So the
+      same compose code costs 4.75-6.6 ms depending on the binary's layout,
+      and alignment flags do not pin it. On 3.1.4.1 the same 553 binary was
+      faster than v1.0b5 (6440 against 6753 / 6736). Not fixed (no code
+      cause found); open for the owner: find the layout-sensitive part, for
+      example with the 68080's data-cache hit/miss counters (DCH/DCM, movec
+      $80E/$80F) around the compose.
+- [x] End state: 553 in SYS:WBStartup/DockAwesome (Version 0.553; 542 was
+      not locked and is deleted, copied as .new and renamed), started with
+      WBRun, FindTask finds it, Status lists no CLI dock, one
+      "DockAwesome.PiP2" lease (its own); its Downloads stack opened and
+      closed with the user's ENVARC config. ENVARC:DockAwesome.json not
+      written (10:45:25). SYS:WBStartup/Disabled holds only WBDock. RAM:
+      clean (Clipboards, ENV, empty T), ENV:dpid deleted; Hold, diagnostic
+      and aligned builds deleted; the three scratch worktrees removed on the
+      Mac. AmigaAMP, started once by a missed click on the Music pin, was
+      closed.
+- [ ] NOT RUN on 3.2.3: Open Folder as a DOpus lister (Workbench is the
+      desktop, --caps dopus no); the box order after Date Modified (PiP
+      only); Sort by Kind and Name removing "sorts" on this boot (run with
+      541).
+
+### AmiKit XE rerun with build 553 (2026-11-25)
+AmiKit XE 11.5 on the Vampire (KS 47.96 in the title bar, exec 47.7, graphics 47.4,
+intuition 47.51, workbench 47.33, dopus5.library 68.16, core 12856, 24-bit
+1280x720, Directory Opus 5 desktop; the clock says 02-Aug-25). Installed
+before: build 544, started from WBStartup (FindTask found it).
+ApolloExplorerSrv was not running and was started with Run. Build 553 = HEAD
+f47f5c5, not stale (`make -n amiga` compiles nothing; the binary is
+byte-identical to the 3.2.3 run's DockNew), built without warnings; baseline
+tag v1.0b5 built in a scratch worktree outside the repo (no warnings,
+identical to the earlier DockOld). Every destructive run used --config
+RAM:<file>.json; ENVARC:DockAwesome.json (424 bytes, 17:49:26, already
+migrated by 544) kept its size and date through every test. Agent input:
+warps land at screen = 2*w-4 (move to 322,152 -> pointer 640,300), so every
+click and drag was sent at ((X+4)/2, (Y+4)/2).
+- [x] Installed in place: 544 was not locked; 553 copied as .new, 544
+      deleted, renamed; Version 0.553 build 553. SYS:WBStartup/Disabled
+      holds no DockAwesome leftover.
+- [x] --caps: 553, v1.0b5 and the installed 544 identical (dopus yes,
+      workbench_port no, shaped_windows no, depth 24, error none).
+- [x] Break checks with 553 (installed dock stopped with BreakTask first;
+      FindTask, Status and Sems empty before every start):
+
+      | test | result |
+      | --- | --- |
+      | Ctrl-C pending through a whole start (CtrlCRun, migration config) | migrated and saved (424 bytes, no "folder", Downloads last), one frame, full profile, rc 0, ctrl_c_left 0, no lease, no leaked dock window (Wins) |
+      | Break sent at once after a start | migrated file saved, full profile, no lease |
+      | Break 3 s after starting --bench-sweep 8 | ended early in the sweep (redraws 10 of 113), full profile, no lease |
+      | Break 6 s after starting --bench-sweep 8 | ended near the sweep's end (redraws 111 of 113), full profile, no lease |
+      | pointer after the four tests | moves (322,152 -> 640,300) |
+
+- [x] §4.4 with 553 (configs: mig = the user's 9 pins + "folder"
+      Downloads, 1.0b5 format; t = the user's migrated 10 pins: 5 stacks
+      RiVA, AmigaAMP, Pictures, Demos, Downloads and the volumes AmiKit:,
+      Archives:):
+
+      | check | result |
+      | --- | --- |
+      | migration | no "folder", Personal:Downloads last; a second start left the file unchanged (same date) |
+      | A5 | "folder": "RAM:DoesNotExist" -> no requester (screenshot), dock running, file saved with [SYS:System/Shell, Personal:Pictures] and "sorts" kept |
+      | stack switch, quick click | Pictures -> Demos and Demos -> Pictures |
+      | stack switch, 1 s hold | Demos -> Pictures and Pictures -> Demos |
+      | program pin with a box open, quick click after the pointer rests on it | Shell started from an open Pictures box, Clock from an open Demos box (2 of 2), box closed |
+      | volume pin (Archives:) | DOpus lister "Archives" |
+      | Sort by | heading click keeps the menu; Date Modified saved "sorts" {Pictures: date} with the check moved, kept after a restart; Kind saved "kind"; Name removed "sorts" |
+      | Click to, Open Folder | "clicks" saved; a left click opens a DOpus lister "Personal:Downloads", no box, no DOS error; the menu with the lister open has the same 8 rows, no Close |
+      | Open Folder on Personal:Audio (the path of the old "dos device not mounted" report) | DOpus lister "Personal:Audio" with its 3 drawers and 4 files, no DOS error |
+      | box open + quick click on an Open Folder stack | Pictures box closed, Downloads lister opened |
+      | restart | Downloads still opens a lister; Pictures still Date Modified |
+      | Show Stack again | "clicks" entry removed; a left click opened the box (356x368) |
+      | box tile | Open in Workbench in the Demos box (slot 6 of 3x3) opened a DOpus lister "Personal:Demos" |
+      | no running dot | --pip-dump at exit, pointer off the dock, listers open for Downloads (Open Folder), Demos (box tile) and Archives: (volume): one dot, under Archives: only |
+      | drawer drop | Personal:Audio dragged from the Personal lister -> pinned at the drop slot as a stack, its box (185x156) opened |
+      | volume drop | Ram Disk dragged from the desktop -> "Ram Disk:" pinned, a click opened a DOpus lister "Ram Disk" |
+      | reorder | Audio (Open Folder) dragged to slot 0: first in "paths", "clicks" kept; a click there opened its lister |
+      | drag out | Audio dragged up off the dock: gone from "paths" with its "clicks" |
+      | Settings | Size, Scale, Position, Cancel/Save, no Folder Stack section; Save rewrote the file (new time) and kept "sorts" |
+
+- [x] Agent-input artifact, not a dock defect: a click warped straight from
+      a pin under a zoomed row to a pin far away (Pictures -> Shell, -> Clock)
+      pressed where the drawn row had no icon (`downs` not counted,
+      `presses_unarmed` +1): the press reaches the dock before the row has
+      zoomed around the new pointer position, and the far end icons are
+      shifted outward. The same clicks after a move to the pin (as a mouse
+      does) worked every time, and clicks from off the dock (row at rest)
+      always hit. Same geometry as the 3.2.3 lesson on the end icon. Not
+      rerun on v1.0b5.
+- [x] §4.5 first open after 45 s idle, pointer off the dock, fresh dock per
+      run, ChangeTaskPri -30, alternating oP / oD / n x 8. oP = the user's
+      paths without Pictures + "folder" Pictures; oD = the user's 1.0b5 file
+      ("folder" Downloads); n = the user's migrated file (5 stacks): Pictures
+      opened after 45 s, closed, then Downloads after another 45 s. First
+      paint / entrance ms:
+
+      | run | v1.0b5 Pictures (oP) | 553 Pictures (n) | v1.0b5 Downloads (oD) | 553 Downloads (n) |
+      | --- | --- | --- | --- | --- |
+      | 1 | 264.0 / 134.4 | 284.6 / 134.2 | 262.1 / 156.7 | 132.8 / 145.8 |
+      | 2 | 284.6 / 134.3 | 245.3 / 141.1 | 131.0 / 146.1 | 131.9 / 147.0 |
+      | 3 | 306.9 / 131.7 | 284.1 / 134.3 | 143.9 / 155.0 | 134.3 / 145.3 |
+      | 4 | 290.3 / 168.4 | 264.7 / 134.2 | 137.2 / 161.3 | 132.5 / 146.4 |
+      | 5 | 264.0 / 174.3 | 284.2 / 134.3 | 140.9 / 157.9 | 132.3 / 246.5 |
+      | 6 | 273.3 / 172.8 | 383.2 / 135.3 | 134.0 / 145.0 | 126.8 / 152.1 |
+      | 7 | 356.1 / 170.3 | 285.0 / 133.8 | 148.8 / 137.3 | 121.5 / 137.4 |
+      | 8 | 284.5 / 174.3 | 278.0 / 140.7 | 137.8 / 161.2 | 126.7 / 152.1 |
+
+      Medians: Pictures first paint old 284.6 / new 284.2, entrance old
+      169.4 / new 134.3 (old 4 of 8 runs have a 63-65 ms last frame, new
+      none: last frame 43 ms in every run); Downloads first paint old 139.4
+      / new 132.1, entrance old 155.9 / new 146.7. Box 584x527 and 356x368
+      in both builds. New prefetch in every run: stacks=5 pending=0
+      reads=153 cache=153/512 evicted=0. Every first open after idle
+      opened at the first click (24 of 24; the earlier 544 session lost 4
+      of 12).
+      Two single-run values above the old maximum, judged noise:
+      - n6 Pictures first paint 383.2 (old max 356.1): one stage, the glass
+        capture of the screen (prepare stage 3, 159 ms against 22-52 in
+        every other run of either build). The old build has single-stage
+        spikes of the same size elsewhere: oD1 OpenWindow 145 ms (first
+        paint 262 against 131-149), oP7 last stage 161 ms (356.1).
+      - n5 Downloads entrance 246.5 (old max 161.3): one present waited 7
+        fields (fields 0137, present_us_avg 33 ms); the motion code is
+        byte-identical to v1.0b5 (3.2.3 analysis). Not repeated in the
+        other 7 runs (137.4-152.1).
+      The earlier AmiKit entrance failure (544, Pictures 164.7 / 174.2
+      against an old maximum of 159.4) does not repeat: 553 133.8-141.1
+      against v1.0b5 131.7-174.3. No code change.
+- [x] §4.5 hover, agent sweep (relative moves to x 350, 500, 650, 800, 950
+      at y 690, then off, one per message, after 45 s idle), the same 10-pin
+      row for both builds (the user's migrated paths, no "folder"; v1.0b5
+      shows Downloads as a plain pin), ChangeTaskPri -30:
+
+      | run | build | render_us_avg | max us | stalled | redraws |
+      | --- | --- | --- | --- | --- | --- |
+      | ho1 | v1.0b5 | 12506 | 100510 | 2 | 41 |
+      | hn1 | 553 | 6960 | 14894 | 4 | 40 |
+      | ho2 | v1.0b5 | 10502 | 37030 | 3 | 40 |
+      | hn2 | 553 | 7005 | 14719 | 1 | 40 |
+      | ho3 | v1.0b5 | 7578 | 15114 | 3 | 41 |
+
+      render_us_avg: new below the old minimum. Stalled: new 4 and 1 against
+      old 2-3 (means 2.5 / 2.7, about 40 frames a run); within the noise.
+      553 retire_waits 0, retire_defers 0 / 1. Pass. (A first ho1 with the
+      five moves sent in one message, 9942 us, stalled 0, was discarded.)
+- [x] §4.5 --bench-sweep 8 (same row, ChangeTaskPri -30, one script,
+      113 redraws each): render_us_avg v1.0b5 / 553 / v1.0b5 / 553 /
+      v1.0b5 6221 / 5865 / 6214 / 5873 / 7039 (one 99 ms frame), compose
+      4576 / 4268 / 4559 / 4276 / 5393, stalled 40 / 40 / 40 / 38 / 40.
+      Pass. Compose is 0.3 ms faster in 553 here, slower on 3.2.3 and faster
+      on 3.1.4.1: it follows the binary's layout, as on 3.2.3.
+- [x] No defect found; no code change.
+- [x] Seen during the session, cause not found: the three Directory Opus
+      listers that were open at the start (Personal, Personal:Applications,
+      Personal:Applications/AmiMCP) were closed when the tests ended. They
+      were still open after the drag tests; no agent click was aimed at
+      their close gadgets. Reopened by ARexx at the same places and sizes
+      in icon mode.
+- [x] End state: 553 in SYS:WBStartup/DockAwesome (Version 0.553), started
+      with Run from a Stack 400000 script (WBRun does not work under DOpus),
+      the only dock (Status lists it once, no test dock); its Downloads stack
+      opened (356x368) and closed with the user's ENVARC config, which the
+      tests never wrote (424 bytes, 17:49:26). RAM: holds only Clipboards,
+      ENV, Logs and T (amiagent's own files); ENV:dpid deleted; the scratch
+      worktree is removed on the Mac. ApolloExplorerSrv runs until reboot.
+- [ ] NOT RUN on AmiKit: a v1.0b5 control for the warp-click artifact; the
+      box order after Date Modified (PiP only).
+
+### Open Folder tile in the Folder Stack box (AmiKit XE, 2026-11-25)
+Owner's request: the box's last tile looked too large next to the real
+icons. Implemented exactly as decided: a smaller ring, one line "Open
+Folder", the muted heading colour. The action is unchanged.
+- [x] `src/amiga_ui.c`: `folder_open_radius` (icon*36/100, rounded: 13 px
+      at 36, 17 at 48, 26 at 72, about 72%) at the same centre;
+      `folder_open_weight` keeps the ring weight of the old radius
+      (icon/2-2), in the AA path and the native fallback; the arrow scales
+      with the ring (a filled shape). Label `FOLDER_OPEN_LABEL` "Open
+      Folder" (shared with the menu's Click to row), in `FOLDER_MUTED`
+      like the ring; `centered_folder_text` takes the colour. `action_wrap`
+      and its extra row removed; `folder_grid` makes cells wide enough for
+      "Workbench 0" and "Open Folder" (the wider + 6), so the label always
+      fits `cell_width-6`. No DOpus-specific label.
+- [x] `--pip-dump` writes `prefix-folder.ppm` when a box page settles with
+      its icons (`dock_ui_folder_artwork`, keyed by a page counter so
+      drawers opened inside and page flips dump again; Opus review P2).
+- [x] Builds: before = HEAD + dump (554), after (555), final with the
+      review fix 556; `make amiga` without warnings, `make host-test` and
+      `make host-sanitize` pass (the layout is in amiga_ui.c and not
+      host-tested; no test asserted the wrap).
+- [x] Review (Opus, fresh): no P0/P1; P2 dump not repeated for a page
+      shown in place -> fixed with the page counter, checked on the
+      Amiga (Pictures box dumped, then its Wallpapers drawer dumped again
+      as a 185x200 box).
+- [x] Before/after on AmiKit (Demos, 6 entries; Pictures, 89 entries) at
+      the user's settings with only the size changed, test configs in RAM:
+
+      | case | before | after |
+      | --- | --- | --- |
+      | Demos, size 36 | 185x209, ring fills the cell, "Open in" / "Workbench" white | 185x200, smaller muted ring, "Open Folder" muted on one line |
+      | Demos, size 48 | 224x255 | 224x246 |
+      | Demos, size 72 | 334x342 (one line already) | 334x342 |
+      | Pictures, size 36 | 584x527 | 584x518 |
+
+      Box widths and cells unchanged; at 36 and 48 the box is one text line
+      (9 px) shorter. "Open Folder" draws whole (no "...") in every case.
+- [x] Tile click: build 555 test dock and the installed 556 each opened a
+      DOpus lister "Personal:Demos" from the Demos box tile, box closed.
+- [x] First open after 45 s idle, Pictures, pointer off the dock, fresh
+      dock per run, ChangeTaskPri -30, alternating (first paint / entrance
+      ms; prefetch pending=0 reads=153 in every run):
+
+      | run | 553 | 556 |
+      | --- | --- | --- |
+      | 1 | 282.4 / 134.3 | 273.0 / 165.7 |
+      | 2 | 360.0 / 178.9 | 306.0 / 132.9 |
+      | 3 | 264.3 / 134.5 | 284.4 / 134.5 |
+
+      Medians 282.4 / 134.5 (553) and 284.4 / 134.5 (556); the earlier
+      AmiKit figures for 553 were 284.2 / 134.3. Each build has one slow
+      entrance (553 178.9, 556 165.7, a frame waiting 4 fields): within
+      the same-binary spread. Pass.
+- [x] Hover sweep (5 moves at y 690, one per call, 45 s idle, same row):
+      553 render_us_avg 7359, max 14546, stalled 0; 556 7283, 14535,
+      stalled 2 (553 had 4 and 1 in the earlier runs). Pass. A first 556
+      sweep sent the moves in one message and was discarded.
+- [x] End state: 556 in SYS:WBStartup/DockAwesome (copied as .new, 553
+      deleted, renamed; Version 0.556), started with Run from a Stack
+      400000 script, the only dock (Status lists it once); Disabled holds no
+      DockAwesome; ENVARC:DockAwesome.json untouched (424 bytes, 17:49:26);
+      RAM: holds only Clipboards, ENV, Logs and T; ENV:dpid deleted.
+      Images on the Mac in the session scratchpad `design/`.
+- [x] Seen: the box's "Demos" entry in Personal:Demos is an iGame project;
+      a test click on it opened iGame's "can't open ... library"
+      requester (iGame's own, closed with OK). Not a dock issue.
+- [ ] NOT RUN: the tile on ApolloOS, Coffin, 3.2.3, 3.9, 3.1.4.1 (same
+      code path on every system; not booted); the native (no AA) fallback
+      of the ring, which no booted system uses; a paged box (no drawer here
+      has more than one page at 36 px). docs/images/folder-stack.png still
+      shows the old tile (and the old divider).
+
+### Open Folder tile on AmigaOS 3.2.3 with build 556 (2026-11-25)
+AmigaOS 3.2.3 on the Vampire (Workbench desktop), agent input (warps 1:1).
+Build 556 = HEAD 3ea4b09, not stale (`make amiga`: nothing to rebuild; no
+warnings). Installed before: 553 from WBStartup, stopped with BreakTask
+(FindTask and the PiP2 lease gone after 5 s). Test docks from RAM: with
+`--config RAM:` copies (pl = the user's 12 pins + Archives:Games +
+AOS32:Prefs + Personal:Downloads, three stacks); exactly one dock at a time.
+- [x] `--pip-dump` of the Downloads box (356x359, 30 entries, size 36): the
+      tile shows the smaller muted ring and "Open Folder" on one line, like
+      AmiKit. Images: scratchpad `design/323-556-downloads.png` (and -2x,
+      `323-556-cell-4x.png`).
+- [x] Tile click: Workbench window "Downloads" opened, box closed.
+- [x] Quick switch Games -> Downloads and Downloads -> Games (quick clicks,
+      a move to the pin first); with the Games box open a quick click on
+      TextEdit started TextEdit and closed the box.
+- [x] First open after 45 s idle, pointer off the dock, fresh dock per run,
+      ChangeTaskPri -30, pl copies, Downloads opened and closed:
+
+      | run | first paint ms | entrance ms | frames | note |
+      | --- | --- | --- | --- | --- |
+      | 1 | 90.2 | 149.6 | 5 | |
+      | 2 | 103.5 | 136.0 | 5 | capture stage 23.4 ms (bimodal, known) |
+      | 3 | 90.1 | 145.0 | 5 | |
+      | 4 | 181.9 | 138.2 | 5 | backdrop-copy stage 94.5 ms (3.0 elsewhere) |
+      | 5 | 103.6 | 136.2 | 5 | capture stage 23.6 ms |
+
+      553 (same boot, earlier): first paint 92.8-95.9 (once 116.2), entrance
+      143.6-147.0. Entrance within the spread; the fast-capture first paints
+      (90.1/90.2) are under 553's. Run 4 is a single-stage spike in a stage
+      the tile change does not touch (the text stage is 6.0-6.4 ms in every
+      run); judged noise. Prefetch pending=0 reads=86 every run.
+- [x] Hover sweep (relative moves to x 350, 500, 650, 800, 950 at y 692,
+      one per call, 45 s idle, pl, -30): render_us_avg 9626, max 18342,
+      stalled 2 (553: 10378 / 18847 / 4). Pass.
+- [x] Owner's report: the Downloads window (1034,599 169x96) opened "behind
+      the dock". Findings:
+
+      | question | answer |
+      | --- | --- |
+      | where the position comes from | the drawer icon's snapshot: Personal:Downloads.info is a PNG icon; its icOn chunk holds drawer x 1034, y 599, w 169, h 96 (file dated 18-May-26). The dock calls `OpenWorkbenchObjectA(path,NULL)` and sets no position |
+      | v1.0b5 | same call; its plain drawer pin for Personal:Downloads opened the window at 1034,599 169x96 |
+      | dock pixels over the window? | `--pip-dump` (composed vs source), 15 pins: at rest x 327-952, y 665-716; zoomed on Downloads x 270-965, y 610-716 (with the label). Window x 1034-1202: 0 covered pixels, 69 px clear. The user's 13-pin row ends further left |
+      | what can cover it | the open Downloads box (746-1101 x 279-637 with 15 pins, 706-1061 with 13) covers the window's top-left corner while the box is open or closing (popover over everything, by design) |
+
+      Not a regression and no overlap with the row measured; no code change.
+      Options for the owner if wanted: none for the row; for the box, open
+      the window only after the dismissal motion ends (it already closes
+      first). Moving a window away from its snapshot would override the
+      user's own placement, so not proposed.
+- [x] Seen once: with the 556 test dock running, a click on the window's
+      close gadget right after it opened did nothing; repeated 3 times
+      later (twice with the installed 556 right after the tile click, once
+      with no dock) it closed every time. Not reproduced.
+- [x] End state: 556 in SYS:WBStartup/DockAwesome (copied as .new, 553
+      deleted (not locked), renamed; Version 0.556), started with WBRun;
+      FindTask finds it, one DockAwesome.PiP2 lease, no CLI dock in Status;
+      its Downloads box opened and closed, its tile opened the window.
+      ENVARC:DockAwesome.json untouched (568 bytes, 17:36:48). Disabled
+      holds only WBDock. RAM: holds only Clipboards, ENV, T (empty); ENV:dpid
+      deleted. Scratch upload/download folders removed on the Mac.
+- [ ] NOT RUN on 3.2.3: DOpus lister (Workbench is the desktop); the tile on
+      a paged box.
+
+### Folder Stack box buttons: centred glyphs, smaller disc, parent-drawer arrow (AmigaOS 3.2.3, 2026-11-26)
+Owner's report: the back button's "<" was not centred in its circle; the
+page buttons "<" ">" share the code. Follow-up requests in the same task:
+draw the buttons smaller; make the parent-drawer button look different
+from the page-back button (an up chevron, then a "Back"/"BACK" pill, both
+rejected; the owner now chooses from candidates A-E, the build carries A).
+- [x] Measured before the fix (build 556, `--pip-dump` box images of a
+      RAM: test drawer with a Sub drawer of 360 files, page 2 of 4-8, icon
+      sizes 36, 41, 48, 72; the control is 19 px at every size, Helvetica 9
+      + 10). The chevron's pixel bounding box sat 0.50 px toward its open
+      side in every button (back and page-back right, page-forward left),
+      the ink centroid 0.70-0.73 px; vertical 0.00 (footer readings
+      within +-0.1 of the glass gradient). Host model: the end points were
+      shifted radius/16 (0.56 px at 19 px, 0.50 at 18 px).
+- [x] Fix (`dock_button_glyph`/`dock_button_coverage`/`dock_button_pixels`
+      in dock_geometry.c, host-tested): the glyph is up to three
+      round-capped segments whose ink box is centred on the disc; disc and
+      glyph drawn at 5/6 of the control (12 px floor), stroke half width
+      11/16 px (was 13/16, scaled with the glyph); hit rectangles, layout
+      and actions unchanged. The header button shows a stemmed up arrow
+      (`DOCK_BUTTON_PARENT`, candidate A). Native fallback: same disc
+      inset, chevrons two pixels wide, the arrow's stem one pixel; centred
+      exactly along the pointing direction, half a pixel across at even
+      controls.
+- [x] After (build 563 dumps, sizes 36/48/72; 41 with 559, same page-button
+      code): page buttons bbox offset 0.00 px both axes (footer y +0.00 to
+      +0.08 = glass-gradient noise of the measurement), ink centroid
+      0.16-0.17 px toward the open side; disc 15.9 px (was 19.0). Parent
+      arrow bbox 0.00/0.00, ink centroid 0.54 px up (the head carries more
+      ink; the bounding box is centred). The 72 px page-forward button lies
+      over the bright backdrop logo in the glass and does not measure
+      (before and after alike). Host: exact for every control 8-24 px,
+      both pixel phases; within half a pixel above 24 px.
+- [x] Clicks with 559/560/563 test docks: the header button opens the
+      parent drawer, ">" and "<" turn pages.
+- [x] Host tests: `test_button_glyph` (centring, mirror symmetry, size
+      5/6, native polylines) in test_geometry; `make host-test`,
+      `make host-sanitize` pass; `make amiga` without warnings.
+- [x] Reviews (Opus, fresh): first diff no P0/P1, four P2 fixed (native
+      arm clamp before the parity step, native size guard, one direction
+      rule, test comment); second review (arrow diff): no P0/P1, page
+      chevrons byte-identical to the first fix for sizes 6-60; three P2
+      fixed (native arrow direction asserted, head comment, control capped
+      at 96 px for the 32-bit distance math).
+- [x] First open (3 runs, 45 s idle, pl copies, -30, build 559, the paint
+      code of the page buttons is the same): first paint 90.3 / 103.8 /
+      90.1 ms, entrance 149.4 / 136.1 / 149.8 ms (556: 90.1-103.6 /
+      136.0-149.6). Hover sweep: render_us_avg 9857, max 18667, stalled 1
+      (556: 9626 / 18342 / 2). Pass.
+- [x] Images: scratchpad `design/btn-compare-{36,48,72}.png` (10x, before
+      556 / after 563, cross-hair on the control centre),
+      `design/btn-{before,after}-36-nested-p2-2x.png`, candidates
+      `design/parent-candidates-sheet.png` (A-E at 4x and real size beside
+      the page buttons, sizes 36/48/72) and `design/parent-*-1x.png`.
+- [x] Installed: build 564 (HEAD = the arrow commit) in
+      SYS:WBStartup/DockAwesome (copied as .new, 560 deleted, renamed),
+      started with WBRun; FindTask finds it, one DockAwesome.PiP2 lease, no
+      CLI dock. The same file run from the CLI with a RAM: test config and
+      --pip-dump gave a box image byte-identical to 563's (arrow bbox
+      0.00/0.00, page buttons 0.00); its arrow opened the parent drawer.
+      ENVARC:DockAwesome.json untouched (568 bytes, 17:36:48). RAM: holds
+      only Clipboards, ENV, T; ENV:dpid deleted.
+- [x] Owner chose C (return arrow, up then left) from the contact sheet.
+      Build 566/567: 8 round-capped segments on a grid of one pixel at the
+      19 px control (stem x 3 from y 5 to 1, quarter turn of radius 2, bar
+      at y -1 to x -3, head arms from (-1,-3) and (-1,1)), stroke half
+      9/16 px (the sheet's 11 with a smaller head was muddy at 1x; one
+      pixel lines keep the head crisp). Box-centred it read high (ink
+      centroid 0.85 px up), so it sits one pixel low: box offset +1.00 px
+      down, ink centroid 0.15 px down and 0.29 px right (options in
+      `design/parent-C-centring-options.png`). Dumps at 36/48/72: exactly
+      that in all three; page buttons unchanged (0.00). The arrow opens the
+      parent drawer. Coverage now skips the segment tests outside the
+      glyph's ink box (reviewer: byte-identical without the early-out).
+      Native: three one pixel polylines, half a pixel off both ways at even
+      controls.
+- [x] Review (Opus, fresh, delta): no P0/P1; seven P2 (comments, an ink
+      assertion, an unused mirror glyph in the test) fixed.
+- [x] Installed: 567 in SYS:WBStartup/DockAwesome (in place, WBRun), the
+      only dock; the installed file run from the CLI with --pip-dump gave
+      a box image byte-identical to 566's. ENVARC untouched (568 bytes,
+      17:36:48); RAM: holds only Clipboards, ENV, T; ENV:dpid deleted.
+      Images also in ~/Downloads/DockAwesome-design/.
+- [ ] NOT RUN: the native (no AA) path on hardware (no booted system uses
+      it; host-tested only); an 18 px control (topaz 8 fallback; host
+      only); other OSes.
+- [x] Owner's correction 2026-11-26: "Alltid exakt!" and one shared,
+      slightly more faded tone for the controls. Build 569:
+      - Return arrow centred by its box again (0.00 / 0.00 in the dumps at
+        36/48/72; ink centroid 0.24 px right, 0.71 px up, not compensated).
+      - Open Folder ring: was centred on a pixel centre, half a pixel right
+        and down of an even icon's box (ring box centre 662.50, 522.50 for
+        the icon box 662, 522 at size 36); now 662.00, 522.00. Coverage in
+        `dock_open_glyph`/`dock_open_glyph_row` (host-tested); the arrow
+        outlines are centred on the ring by their box (tables shifted
+        (-1, +3)/64) and their vertices lie on multiples of 4/16 px so no
+        sample falls on one; ring and arrow alone are pixel-exact for every
+        icon size 16-192 (host test). Native ring still half a pixel off
+        for even icons (DrawEllipse; documented).
+      - Tones measured in the 556/566 dumps: page/parent strokes, title and
+        page count #f2f4f8; Open Folder ring and label #aeb8c7; file names
+        #f2f4f8. Now all controls #dee2e9 (`FOLDER_GLYPH`, the menu text
+        30% toward the muted tone); file names #f2f4f8; disc tint
+        unchanged. WCAG contrast of #dee2e9: 13.26 on the darkest glass
+        (black backdrop, #181b22), 8.76 on the lightest (white backdrop,
+        #373a41, measured over a Workbench window), 7.52 / 5.08 on the disc
+        over those; #f2f4f8 had 15.65 / 10.34 / 8.87 / 6.00 (-15%), #aeb8c7
+        8.60 / 5.68 / 4.87 / 3.30.
+      - Review (Opus, fresh): no P0/P1; four P2 fixed (arrow-only pixel
+        test and the vertex rule, a pen-collision guard for FOLDER_GLYPH,
+        the native ring comment, a stale test comment).
+      - Installed 569 in place (WBRun), the only dock; the installed file
+        run from the CLI gave a dump byte-identical to the test run.
+        ENVARC:DockAwesome.json was changed by the owner at 01:03 (added
+        Personal:Audio, 590 bytes), not by the tests (they use RAM:
+        copies). A Workbench window "Personal" was open during the runs
+        (not opened by the tests' clicks as far as seen; left open).
+      - Images: scratchpad `design/btn-compare-{36,48,72}.png`,
+        `design/tone-compare-36.png`, `design/btn-{before,after}-36-nested-p2-2x.png`,
+        also in ~/Downloads/DockAwesome-design/.
+
+### AmigaOS 3.1.4.1 with build 569 (2026-11-26)
+AmigaOS 3.1.4.1 on the Vampire (Kickstart 46.143, Workbench 45.194),
+24-bit 1280x720, agent warps 1:1. Build 569 = HEAD d175ad7 (the last
+commit touched only docs; `make amiga`: nothing to rebuild, no warnings).
+Installed before: 553 from WBStartup. ApolloExplorerSrv started with
+Run >NIL:. Test docks from RAM: with `--config RAM:` copies, exactly one
+dock at a time (Status, FindTask and Sems checked before each start, 5 s
+or more before each stop).
+- [x] Installed 569 in place: 553 stopped (BreakTask, gone after 5 s),
+      569 copied to SYS:WBStartup/DockAwesome.new, the old file was "in
+      use" so it became SYS:WBStartup/Disabled/DockAwesome-locked-delete,
+      .new renamed into place (Version 0.569); WBRun started it, FindTask
+      finds it, one DockAwesome.PiP2 lease.
+- [x] Box dumps (`--pip-dump`, RAM:BtnTest = Sub (360 files) + t10-t15;
+      pins Shell, RAM:BtnTest, Editor), nested Sub page 2, sizes 36/48/72:
+      the same box sizes as on 3.2.3 (698x598, 836x541, 1252x465).
+
+      | control | 3.1.4.1 bbox offset (x / y) | 3.2.3 (569) |
+      | --- | --- | --- |
+      | parent arrow, 36 / 48 / 72 | 0.00 / 0.00 each | 0.00 / 0.00 |
+      | page back "<", 36 / 48 / 72 | 0.00 / -0.01, 0.00 / +0.02, 0.00 / 0.00 | 0.00 / +0.06, 0.00 / +0.02, 0.00 / 0.00 |
+      | page forward ">", 36 / 72 | 0.00 / -0.03, -0.01 / 0.00 | 0.00 / +0.03, - (over the backdrop logo) |
+      | page forward ">", 48 | over the backdrop's bright "OS3" logo: does not measure; its full-tone pixel at the same place as on 3.2.3 | 0.00 / +0.08 |
+      | Open Folder ring box, 36 | 648..676 x 508..536, centre 662.00 / 522.00 = icon box centre | the same |
+
+      Footer y readings within +-0.03 are the glass gradient. Ink centroids
+      equal 3.2.3's (arrow 0.24 right / 0.71 up; chevrons 0.12-0.13 toward
+      the open side). The tile's full-tone pixels (ring, arrow, label) lie
+      at exactly the 3.2.3 positions at all three sizes (198 / 354 / 767
+      pixels). The fixed `ring.py` threshold read the 3.1.4.1 backdrop
+      texture under the glass; `ring2.py` (mean > 70) measures both dumps
+      the same.
+- [x] Tone (36, brightest pixel of each element): title, parent arrow,
+      "<", ">", page count, Open Folder ring and label all #dee2e9; file
+      names #f2f4f8; contrast on the glass 12.67-13.26 (3.2.3: 13.00-13.26).
+- [x] Downloads box at the dock's own size (36, a RAM: copy of the user's
+      ENVARC file): 356x359, 30 entries, the tile last with the small ring
+      and "Open Folder" on one line, both #dee2e9; title #dee2e9, names
+      #f2f4f8.
+- [x] Behaviour (569 test docks):
+
+      | check | result |
+      | --- | --- |
+      | Open Folder tile (BtnTest; Downloads) | Workbench window "BtnTest" / "Downloads" (1034,599 169x96) opened, box closed |
+      | parent arrow in Sub | back to the BtnTest box (185x200) |
+      | page buttons | ">" to 2/4 (36), 2/5 (48), 2/8 (72); "<" back to page 1 (no "<" shown there) |
+      | quick switch (pl copy, 15 pins) | Downloads -> Games (box anchor 744 -> 667) -> Downloads (746) |
+      | program pin with a box open | Editor started, box closed |
+      | Sort by | Date Modified saved "sorts": {"Personal:Downloads": "date"}, check moved |
+      | Click to | Open Folder saved "clicks", left click opened the window, no box; Show Stack removed "clicks", left click opened the box |
+
+      A dump copied right after a page click still showed the previous
+      page: the dump is written when the new page has settled with its
+      icons. Wait 2 s before copying.
+- [x] First open after 50 s idle, pointer off the dock, fresh dock per
+      run, ChangeTaskPri -30, o.json (1.0b5 format, migrated each run):
+
+      | run | first paint ms | entrance ms | fields |
+      | --- | --- | --- | --- |
+      | 1 | 94.1 | 140.7 | 01112 |
+      | 2 | 94.3 | 139.5 | 01112 |
+      | 3 | 94.0 | 140.8 | 01112 |
+      | 4 | 94.2 | 139.1 | 01112 |
+
+      553 on 3.1.4.1: 98.9-99.5 / 135.6-136.5. First paint 5 ms faster;
+      entrance 3-4 ms longer with the same five frames and field pattern
+      (no extra field; a phase within the last field, the known
+      memory-placement spread; 3.2.3 showed 136-150 for one binary).
+      Prefetch pending=0 reads=84 every run. Pass.
+- [x] Hover sweep (relative moves to x 350, 500, 650, 800, 950 at y 692,
+      one per call, 50 s idle, pl copy, -30): render_us_avg 10680, max
+      101715 (the first frame after idle), stalled 2. 553: 9610 / 18504 /
+      1; v1.0b5: 9529 and 10719 (max 100610) / stalled 1 and 0. Within the
+      old builds' spread. Pass.
+- [x] Seen: RAM:BtnTest stayed "in use" after its contents were deleted
+      (empty drawer, held until reboot). Not reproduced in five control
+      runs on RAM:LockA (box, Sub, page 2, parent, tile window, close;
+      quit with the box open on page 2; Break right after a page click;
+      the same with --pip-dump) nor with acp downloads of an assign or of
+      RAM: (killed mid-way and complete): every drawer deleted. The holder
+      is unknown; no dock defect shown, no code change.
+- [x] My diagnostic tool CDirs (NameFromLock on every process's current
+      and home directory) blocked inside a DOS call, twice, and ignores
+      Break; two "RAM:CDirs" processes and the empty RAM:cd.txt stay until
+      reboot. Do not call NameFromLock on other processes' locks.
+- [x] End state: 569 in SYS:WBStartup/DockAwesome, started with WBRun,
+      FindTask finds it, one DockAwesome.PiP2 lease, no CLI dock; its
+      Downloads box opened and closed. ENVARC:DockAwesome.json untouched
+      (582 bytes, 02-Aug-25 15:35:16, the migration date at the reboot
+      after 553). RAM: holds Clipboards, ENV, T and, until reboot, the
+      empty BtnTest drawer and cd.txt; ENV:dpid deleted; DL: assign removed.
+      SYS:WBStartup/Disabled holds WBDock and, until reboot (locked by
+      WBRun), DockAwesome-locked-delete (553). Images: scratchpad
+      `design/3141-569-*.png`, also in ~/Downloads/DockAwesome-design/.
+- [ ] NOT RUN on 3.1.4.1: the native (no AA) path (not used here); DOpus
+      lister (Workbench is the desktop).
+
+### AmiKit XE with build 569 (2026-11-26)
+AmiKit XE 11.5 (KS 47.96, Directory Opus 5 desktop), 24-bit 1280x720,
+agent input at ((X+4)/2, (Y+4)/2). Build 569 = 08de37b (HEAD 5fead28; the
+commits since touched only docs; `make amiga`: nothing to rebuild, no
+warnings; the binary is byte-identical to the 3.1.4.1 upload). Installed
+before: 556 from WBStartup (FindTask found it, one PiP2 lease), stopped
+with BreakTask. ApolloExplorerSrv started with Run. Test docks from RAM:
+with `--config RAM:` copies, exactly one dock at a time (Status, FindTask
+and Sems before each start).
+- [x] Installed 569 in place: copied as DockAwesome.new, 556 deleted (not
+      locked), renamed; Version 0.569 build 569. Disabled holds no
+      DockAwesome.
+- [x] Box dumps (`--pip-dump`, RAM:BtnTest = Sub (360 files) + t10-t15;
+      pins Shell, RAM:BtnTest, MultiView), nested Sub page 2 (2/4, 2/5,
+      2/8), sizes 36/48/72: 698x598, 836x541, 1252x465 as on 3.2.3. A CON
+      window with no text (`Run >NIL: Wait 1500 >CON:0/23/1280/640/Plain`)
+      lay behind the box so the glass was even: on the bare desktop the BOOT
+      icon lay under the 36 px parent arrow and read +1.65 px.
+
+      | control | AmiKit bbox offset (x / y), 36 / 48 / 72 | 3.2.3 (569) |
+      | --- | --- | --- |
+      | parent arrow | 0.00 / -0.05, 0.00 / 0.00, 0.00 / 0.00 | 0.00 / 0.00 each |
+      | page back "<" | 0.00 / 0.00 each | 0.00 / +0.06, 0.00 / +0.02, 0.00 / 0.00 |
+      | page forward ">" | 0.00 / 0.00 each | 0.00 / +0.03, -0.01 / +0.08, - (backdrop logo) |
+      | Open Folder ring (full-tone box, 36) | 649..675 x 509..535, centre 662.00 / 522.00 = icon box centre | the same |
+
+      The -0.05 is the CON window's title bar under the glass (gradient
+      noise, as the +-0.08 on 3.2.3). Ink centroids equal 3.2.3's (arrow
+      0.24 right / 0.63-0.71 up; chevrons 0.13 toward the open side). Every
+      full-tone #dee2e9 pixel (buttons, ring, arrow, label, title, page
+      count) lies at exactly the 3.2.3 positions: 274 / 431 / 845 pixels at
+      36 / 48 / 72, 0 differ. Tone (36, brightest pixel per element): title,
+      parent arrow, "<", ">", page count, ring and label #dee2e9; file names
+      #f2f4f8.
+- [x] Images: scratchpad `design/ak-569-btn-compare-{36,48,72}.png` (10x,
+      3.2.3 above AmiKit, cross-hair on the control centre),
+      `design/ak-569-nested-p2-36-2x.png`, `-48.png`, `-72.png`,
+      `design/ak-569-open-folder-36-6x.png`; also in
+      ~/Downloads/DockAwesome-design/.
+- [x] Behaviour (569 test docks, agent clicks):
+
+      | check | result |
+      | --- | --- |
+      | Open Folder cell, BtnTest box | DOpus lister "Ram Disk:BtnTest" (Sub, t10-t15), no DOS error, box closed |
+      | Open Folder cell, Personal:Audio box (185x147) | DOpus lister "Personal:Audio" (MOD, MP3, Streams, Apollo.mp3), no DOS error |
+      | parent arrow in Sub (page 1) | back to the BtnTest box (185x200) |
+      | page buttons | ">" to 2/4 (36), 2/5 (48), 2/8 (72); "<" back to 1/4 (dump) |
+      | quick switch | Downloads (356x359) -> Demos (185x200) -> Downloads |
+      | program pin with a box open | Downloads box open, pointer moved to Clock, click: Clock started, box closed |
+      | Click to | Open Folder saved "clicks" {Downloads: folder}; left click opened a DOpus lister "Personal:Downloads", no box; Show Stack removed "clicks"; left click opened the box |
+
+      The three test listers and Clock were closed again.
+- [x] First open after 45 s idle, pointer off the dock (parked at 640,300
+      on the DOpus desktop), fresh dock per run, ChangeTaskPri -30, a copy
+      of the user's ENVARC file per run; Pictures opened and closed, then
+      Downloads after another 45 s; 556 control runs alternated (first
+      paint / entrance ms):
+
+      | run | Pictures | Downloads |
+      | --- | --- | --- |
+      | 569 f1 | 284.5 / 214.4 (fields 0118) | 128.2 / 130.9 |
+      | 556 g1 | 283.7 / 134.6 | 121.4 / 137.8 |
+      | 569 f2 | 271.9 / 165.6 | 123.8 / 153.8 |
+      | 556 g2 | 284.6 / 174.4 | 121.3 / 137.6 |
+      | 569 f3 | 287.7 / 170.8 | 124.8 / 154.0 |
+      | 569 f4 | 284.3 / 135.1 | 129.5 / 188.2 (fields 0113) |
+
+      Medians 569: Pictures 284.4 / 168.2, Downloads 126.5 / 153.9. Earlier
+      AmiKit figures: 556 Pictures 273.0-306.0 / 132.9-165.7 (medians 284.4
+      / 134.5); 553 Downloads 121.5-134.3 / 137.4-246.5 (medians 132.1 /
+      146.7). Pictures first paint equal; Downloads first paint inside 553's
+      range, 4-8 ms over the two 556 runs. Entrances: same frame counts;
+      the spread is in the fields a present waits (f1 one 8-field wait,
+      f2/f3 Downloads 01213 against 556's 01122), the pattern of the known
+      single-run outliers (553 246.5, v1.0b5 174.3). Per stage the 569
+      "layer" step (finish_folder_layer) took 47.8-48.7 ms (Pictures) and
+      30.7-31.3 ms (Downloads) against 556's 40.5 and 21.5, and the "read
+      back" step was shorter; finish_folder_layer and its callees are
+      unchanged since 556, so that shift follows the binary's layout or
+      memory, not code (3.2.3 lesson). Not shown to be a regression; no
+      rebuild with an unrelated change was run. Prefetch pending=0
+      reads=153 in every run.
+- [x] FINDING, pre-existing (544 finding; also 556 here): the first agent
+      click after idle was lost in 5 of 8 first opens with 569 (Pictures 4
+      of 4, Downloads 1 of 4) and 3 of 4 with 556 (Pictures 2 of 2,
+      Downloads 1 of 2); a second click opened the box each time and the
+      figures above are from that click. Profile: `PiP receiver: arms=1
+      disarms=0 presses_armed=1..2`: with the pointer parked on the DOpus
+      desktop the receiver rests on the plate (dopus_desktop, by design for
+      DOpus drops), and the warp press lands on it before any hover. The
+      553 session opened 24 of 24 at the first click; why is not known (its
+      parking spot was not recorded). Same in both builds, so not a 569
+      defect; physical-mouse effect not measured; left open for the owner
+      as before.
+- [x] Hover sweep (relative moves to x 350, 500, 650, 800, 950 at y 690,
+      one per message, 45 s idle, user's file copy, -30): render_us_avg
+      6957, max 14374, stalled 2 (556: 7283 / 14535 / 2; 553: 7359 / 14546
+      / 0). Pass. A first sweep sent the five moves in one message and was
+      discarded.
+- [x] Seen: the Amiga clock jumped from 15:47 to 17:29 mid-session
+      (AmiKit's time sync); the measuring CON window's `Wait 1200` ended at
+      that moment and the open box closed with it. The box then reopened
+      normally.
+- [x] End state: 569 in SYS:WBStartup/DockAwesome, started from a script
+      `Run >NIL: Stack 400000 +` / `SYS:WBStartup/DockAwesome` (the script
+      ends at once and was deleted; a script that runs the dock itself
+      stays "in use"); Status shows it once with stk 400000, one
+      DockAwesome.PiP2 lease, no test dock; its Downloads box opened
+      (356x359) and closed with the user's config. ENVARC:DockAwesome.json
+      untouched (424 bytes, 17:49:26, as since the 553 session). RAM: holds
+      only Clipboards, ENV, Logs and T (amiagent's files); ENV:dpid
+      deleted; DL: assign removed. No DOpus listers were open at the start
+      (the machine had been rebooted; `lister list` empty, desktop
+      screenshot), so none were left open. ApolloExplorerSrv runs until
+      reboot.
+- [ ] NOT RUN on AmiKit: a rebuild with an unrelated change to settle the
+      layer-stage shift; the native (no AA) path (not used here).
+
+### ApolloOS with build 569 (2026-11-26)
+ApolloOS R9.5 on the Vampire (Kickstart 51.3, 16-bit 1280x720), agent
+input with relative moves. Build 569 = 08de37b (HEAD 866c55d changed only
+docs; `make amiga`: nothing to rebuild, no warnings). Installed before:
+551. Test docks from RAM: with `--config RAM:` copies, exactly one dock at
+a time (Tasks/FindTask/Sems before each start, 5 s or more before each
+stop).
+- [x] "Not in Status": the dock was running. Status lists only CLI
+      processes; the exec task list showed "DockAwesome" (pri 1) and its
+      "DockAwesome Workbench status" task, and the DockAwesome.PiP2
+      semaphore existed. It had started from SYS:WBStartup at boot (551).
+      No WBRun needed.
+- [x] Installed 569 in place: 551 copied to RAM:DockOld for controls,
+      stopped (BreakTask, gone after 5 s); the old leftovers
+      Disabled/DockAwesome-locked-delete (538) and -locked-delete2 (550)
+      were not locked after the reboot and are deleted; 569 copied as
+      DockAwesome.new, the 551 file was "in use" (started from WBStartup),
+      so it is now SYS:WBStartup/Disabled/DockAwesome-locked-delete
+      (delete after the next ApolloOS boot); .new renamed into place,
+      Version 0.569 build 569.
+- [x] Box dumps (`--pip-dump`, RAM:BtnTest = Sub (360 files) + t10-t15;
+      pins CLI, RAM:BtnTest, Editor), nested Sub page 2 (2/4), sizes
+      36/48/72: 698x598, 836x541, 1252x465 as on 3.2.3.
+
+      | control | ApolloOS bbox offset (x / y), 36 / 48 / 72 | 3.2.3 (569) |
+      | --- | --- | --- |
+      | parent arrow | 0.00 / 0.00, +0.01 / -0.01, 0.00 / 0.00 (*) | 0.00 / 0.00 each |
+      | page back "<" | -0.01 / -0.01, -0.01 / 0.00, 0.00 / 0.00 | 0.00 / +0.06, 0.00 / +0.02, 0.00 / 0.00 |
+      | page forward ">" | 0.00 / 0.00, 0.00 / +0.01, -0.01 / +0.01 | 0.00 / +0.03, -0.01 / +0.08, - |
+      | Open Folder ring (36) | 648..676 x 508..536, centre 662.00 / 522.00 = icon box centre | the same |
+
+      (*) At 72 the coverage measure read -0.04 / -0.87: the backdrop's
+      red nebula lies under the glass there. The neutral stroke pixels
+      (min channel > 110 and > 140) give the box 20..27 x 12..21, 0.00 /
+      0.00, the same as 3.2.3's dump. Every full-tone #dee2e9 pixel lies
+      at exactly the 3.2.3 positions: 274 / 431 / 845 pixels at 36 / 48 /
+      72, 0 differ. Ink centroids equal 3.2.3's (arrow 0.24 right / 0.70
+      up; chevrons 0.11-0.15 toward the open side). Tone (36, brightest
+      pixel per element): title, parent arrow, "<", ">", page count, ring
+      and label #dee2e9; file names #f2f4f8; contrast 11.97-13.13 on the
+      glass.
+- [x] Behaviour (569 test docks):
+
+      | check | result |
+      | --- | --- |
+      | Open Folder cell, BtnTest box | Workbench window "BtnTest" opened, box closed |
+      | parent arrow in Sub | back to the BtnTest box (185x200 / 224x246 / 334x342 at 36 / 48 / 72) |
+      | page buttons | ">" to 2/4 at every size; "<" back to page 1 (36) |
+      | quick switch (o.json, 14 pins) | Downloads (anchor 906) -> Games (824) -> Downloads (906) |
+      | program pin with a box open | Downloads box open, pointer moved to Editor, click: Editor started, box closed |
+      | Click to | Open Folder saved "clicks" {Personal:Downloads: folder}; left click opened Workbench window "Downloads", no box; Show Stack removed "clicks"; left click opened the box (356x359) |
+
+      Profile: Input downs=6 ups=6, prefetch stacks=3 pending=0.
+- [x] First open of Downloads after 50 s idle, pointer off the dock,
+      fresh dock per run, ChangeTaskPri -30, o.json (the 550/551 runs'
+      config, migrated each run), 551 controls (the installed binary from
+      RAM:) alternated:
+
+      | run | build | first paint ms | entrance ms | fields |
+      | --- | --- | --- | --- | --- |
+      | n1 | 569 | 100.7 | 138.0 | 01112 |
+      | o1 | 551 | 102.6 | 136.0 | 0121 |
+      | n2 | 569 | 100.2 | 139.5 | 01112 |
+      | o2 | 551 | 102.6 | 136.9 | 01121 |
+      | n3 | 569 | 100.7 | 137.7 | 01112 |
+      | n4 | 569 | 100.9 | 139.0 | 01112 |
+
+      551 recorded earlier: 107.2-114.7 / 137.6-150.3. 569 first paint
+      2 ms under today's 551 runs; entrance 1-3 ms over, the same five
+      frames (the box is 9 px lower with the one-line tile: 356x359
+      against 356x368). Prefetch pending=0 reads=81 every run. Pass.
+- [x] Hover sweep (t.json, 15 pins, relative moves to x 350, 500, 650,
+      800, 950 at y 688, one per call, 45 s idle, -30): render_us_avg
+      9516, max 18313, stalled 0 (551 earlier 9733 / 9677, stalled 2 / 0;
+      old spread 9077-10211). Pass.
+- [x] Seen again (as on 3.1.4.1): RAM:BtnTest stayed "in use" after its
+      contents were deleted (empty drawer, held until reboot). Two control
+      runs on RAM:LockA (box, Sub, ">", "<", parent, Open Folder window,
+      close it, quit) and RAM:LockB (box, Sub, ">", parent, quit with the
+      box open) deleted cleanly, and a drawer opened and closed by WBRun
+      did too. Holder unknown; no dock defect shown, no code change.
+- [x] End state: 569 in SYS:WBStartup/DockAwesome, started with WBRun,
+      FindTask finds it, one DockAwesome.PiP2 semaphore, Status lists no
+      CLI dock; its Downloads box opened (356x359) and closed with the
+      user's config. ENVARC:DockAwesome.json untouched by the tests (588
+      bytes, 18:10:59 on the Amiga clock, already so at the start; the 551
+      session recorded 17:40:52, so it changed between the sessions, not
+      by the tests; 14 pins with Personal:Audio and Personal:). RAM: holds Clipboards, ENV,
+      T and, until reboot, the empty BtnTest drawer; ENV:dpid deleted;
+      DL: assign removed. SYS:WBStartup/Disabled holds WBDock and, until
+      reboot, DockAwesome-locked-delete (551). C:ApolloExplorerSrv
+      (started this session) runs until reboot. Images: scratchpad
+      `design/ao-569-btn-compare-{36,48,72}.png` (10x, 3.2.3 above
+      ApolloOS), `design/ao-569-nested-p2-36-2x.png`, `-48.png`, `-72.png`;
+      also in ~/Downloads/DockAwesome-design/.
+- [ ] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete (551) after
+      the next ApolloOS boot.
+- [ ] NOT RUN on ApolloOS: the native (no AA) path (not used here); Sort
+      by on this build (unchanged since 551, run there).
+
+### Coffin with build 569 (2026-11-26)
+Coffin r65 on the Vampire (Kickstart 45.20, AmigaOS 3.9 Workbench is the
+desktop; Directory Opus 4 is only a pinned program), 24-bit 1280x720,
+agent input with relative moves (absolute warps miss the dock here).
+Build 569 = 08de37b (HEAD c3d1cb2 changed only docs; `make amiga`:
+nothing to rebuild, no warnings; byte-identical to the ApolloOS upload).
+Installed before: 551, started from SYS:WBStartup at boot. Test docks
+from RAM: with `--config RAM:` copies, exactly one dock at a time
+(Status COM=, FindTask and Sems before each start, 5 s or more before
+each stop).
+- [x] At this boot amiagent and ApolloExplorerSrv started by themselves
+      from the last two lines of S:User-Startup (`run > NIL:
+      Personal:Applications/AmiMCP/amiagent TOKEN=amiga` and `run > NIL:
+      Personal:Applications/ApolloExplorer-Amiga/ApolloExplorerSrv`), not
+      from WBStartup; Status showed both before any command of mine.
+- [x] Installed 569 in place: 551 copied to RAM:DockOld for controls;
+      the old Disabled/DockAwesome-locked-delete (541) was no longer
+      locked and is deleted; 551 stopped (BreakTask, gone after 5 s, no
+      PiP2 semaphore), 569 copied as DockAwesome.new, the 551 file was "in
+      use" (WBStartup), so it is now
+      SYS:WBStartup/Disabled/DockAwesome-locked-delete (delete after the
+      next Coffin boot); .new renamed into place, Version 0.569 build 569.
+- [x] Box dumps (`--pip-dump`, RAM:BtnTest = Sub (360 files) + t10-t15;
+      pins Shell, RAM:BtnTest, EditPad), nested Sub page 2 (2/4, 2/5,
+      2/8), sizes 36/48/72: 698x598, 836x541, 1252x465 as on 3.2.3. A CON
+      window with no text (`Run >NIL: Wait 1800 >CON:0/20/1280/650/Plain`,
+      black on Coffin) lay behind the box, so the glass was even.
+
+      | control | Coffin bbox offset (x / y), 36 / 48 / 72 | 3.2.3 (569) |
+      | --- | --- | --- |
+      | parent arrow | 0.00 / 0.00 each | 0.00 / 0.00 each |
+      | page back "<" | 0.00 / 0.00 each | 0.00 / +0.06, 0.00 / +0.02, 0.00 / 0.00 |
+      | page forward ">" | 0.00 / 0.00 each | 0.00 / +0.03, -0.01 / +0.08, - (backdrop logo) |
+      | Open Folder ring (36) | 648..676 x 508..536, centre 662.00 / 522.00 = icon box centre | the same |
+
+      Ink centroids equal 3.2.3's (arrow 0.24 right / 0.71 up; chevrons
+      0.13 toward the open side). Every full-tone #dee2e9 pixel (buttons,
+      ring, arrow, label, title, page count) lies at exactly the 3.2.3
+      positions: 274 / 431 / 845 pixels at 36 / 48 / 72, 0 differ. The 72 px
+      ">" measures here (on 3.2.3 it lies over the backdrop logo). Tone
+      (36, brightest pixel per element): title, parent arrow, "<", ">",
+      page count, ring and label #dee2e9 (contrast 13.26 on the glass);
+      file names #f2f4f8 (15.65).
+- [x] Images: scratchpad `design/co-569-btn-compare-{36,48,72}.png` (10x,
+      3.2.3 above Coffin, cross-hair on the control centre),
+      `design/co-569-nested-p2-36-2x.png`, `-48.png`, `-72.png`,
+      `design/co-569-open-folder-36-6x.png`,
+      `design/co-569-btntest-top-36-2x.png`, `design/co-569-downloads-2x.png`;
+      also in ~/Downloads/DockAwesome-design/.
+- [x] Behaviour (569 test docks, agent clicks):
+
+      | check | result |
+      | --- | --- |
+      | Open Folder cell, BtnTest box (185x200) | Workbench window "BtnTest" opened, box closed |
+      | Open Folder cell, Downloads box (354x328, size 32) | Workbench window "Downloads" (1034,599 169x96) opened, box closed |
+      | parent arrow in Sub | back to the BtnTest box (185x200 at 36 from page 1, 224x246 at 48 from page 2) |
+      | page buttons | ">" to 2/4 (36), 2/5 (48), 2/8 (72); "<" back to page 1 (36) |
+      | quick switch (o.json copy, migrated, 3 stacks) | Downloads (anchor 988) -> Games (916; 354x328, its own entries) -> Downloads (988) |
+      | program pin with a box open | Downloads box open, click on EditPad: EditPad started, box closed |
+      | Sort by | Date Modified saved "sorts": {"Personal:Downloads": "date"}; the check moved in the reopened menu |
+      | Click to | Open Folder saved "clicks" {Personal:Downloads: folder}; left click opened Workbench window "Downloads", no box; the menu showed the check on Open Folder; Show Stack removed "clicks"; left click opened the box |
+
+      Profile: Input downs=6 ups=6 right_seen=3. The Downloads box is 354x328
+      (551: 354x337; the one-line tile, as on the other systems).
+      Drawer icons on Coffin are a flat bar: aim at the bar from a box
+      dump (36: dock pin at y 682; 48: 672; 72: 650).
+- [x] First open of Downloads after 50 s idle, pointer off the dock
+      (640,300), fresh dock per run, ChangeTaskPri -30, o.json (the 551
+      runs' config, migrated each run), 551 controls (the installed binary
+      from RAM:) alternated:
+
+      | run | build | first paint ms | entrance ms | fields |
+      | --- | --- | --- | --- | --- |
+      | n1 | 569 | 88.3 | 146.1 | 01121 |
+      | o1 | 551 | 90.2 | 144.6 | 01121 |
+      | n2 | 569 | 88.1 | 131.9 | 0112 |
+      | o2 | 551 | 89.9 | 144.9 | 01121 |
+      | n3 | 569 | 88.6 | 146.3 | 01121 |
+      | n4 | 569 | 88.2 | 146.4 | 01121 |
+
+      551 recorded earlier on Coffin: 85.1-90.8 / 143.8-168.6 (v1.0b5
+      89.4-90.0 / 130.7-150.3). 569 first paint 1.6-2.1 ms under today's
+      551 runs; entrance 1.2-1.8 ms over them with the same five frames
+      and field pattern (n2 one frame fewer). Prefetch stacks=3 pending=0
+      reads=120 every run. Pass.
+- [x] Hover sweep (pl.json copy, 20 pins, relative moves to x 350, 500,
+      650, 800, 950 at y 692, one per call, 50 s idle, -30): render_us_avg
+      9128, max 18538, stalled 3, redraws 100, retire_waits=0
+      retire_defers=3 (551 earlier 9284 / 18788 / 4; v1.0b5 10526-13966).
+      Pass.
+- [x] RAM:BtnTest stayed "in use" after its contents were deleted (as on
+      3.1.4.1 and ApolloOS); stopping the installed dock did not free it.
+      Three control drawers (L48: box, Sub, ">", parent, quit with the box
+      open; L72: box, Sub, ">", quit on page 2; L36: box, Open Folder
+      window, ARexx close, quit) deleted cleanly. The holder is
+      Workbench: after ARexx `WINDOW "RAM:BtnTest" OPEN` and `CLOSE` the
+      empty drawer deleted at once. Not a dock defect; no code change.
+- [x] No defect found; no change to src/.
+- [x] End state: 569 in SYS:WBStartup/DockAwesome, started with WBRun,
+      FindTask finds it, one DockAwesome.PiP2 semaphore, Status lists no
+      CLI dock; its Downloads box opened (354x328) and closed with the
+      user's config. ENVARC:DockAwesome.json untouched (751 bytes,
+      Yesterday 10:03:46 on the Amiga clock, as since the 551 session).
+      RAM: holds only Clipboards and T; ENV:dpid deleted; DL: assign
+      removed; the measuring CON window closed (Break). SYS:WBStartup/
+      Disabled holds the user's WBDock, Matrix and others and, until
+      reboot (locked by WBStartup), DockAwesome-locked-delete (551).
+      amiagent and ApolloExplorerSrv keep running.
+- [ ] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete (551) after
+      the next Coffin boot.
+- [ ] NOT RUN on Coffin: the native (no AA) path (not used here); a DOpus
+      lister for Open Folder (Workbench is the desktop).
+
+### AmigaOS 3.9 with build 569 (2026-11-26)
+Plain AmigaOS 3.9 on the Vampire (the agent reports kickstart 40.10,
+graphics 40; volume AOS39), 24-bit 1280x720, agent input with relative moves. Build
+569 = 08de37b (HEAD 2b57cc9 changed only docs; `make amiga`: nothing to
+rebuild, no warnings; byte-identical to the Coffin upload). Installed
+before: 551, started from SYS:WBStartup at boot. Test docks from RAM:
+with `--config RAM:` copies, exactly one dock at a time (Status COM=,
+FindTask and Sems before each start, 5 s or more before each stop).
+- [x] At this boot amiagent and ApolloExplorerSrv started by themselves
+      from the two lines the user added at the end of AOS39:S/User-Startup
+      (`run > NIL: Personal:Applications/AmiMCP/amiagent TOKEN=amiga` and
+      `run > NIL: Personal:Applications/ApolloExplorer-Amiga/ApolloExplorerSrv`);
+      Status showed both before any command of mine. On the 551 session's
+      boot amiagent had not started. The user added the same lines on
+      3.1.4.1 (as reported to me); 3.1.4.1 has not been booted with them
+      yet, so that is not verified.
+- [x] Installed 569 in place: 551 copied to RAM:DockOld for controls,
+      stopped (BreakTask, gone after 5 s, no PiP2 semaphore); the old
+      Disabled/DockAwesome-locked-delete (1.0 beta 4) was no longer locked
+      and is deleted; 569 copied as DockAwesome.new, the 551 file was "in
+      use" (WBStartup), so it is now
+      SYS:WBStartup/Disabled/DockAwesome-locked-delete (delete after the
+      next 3.9 boot); .new renamed into place, Version 0.569 build 569.
+- [x] Box dumps (`--pip-dump`, RAM:BtnTest = Sub (360 files) + t10-t15;
+      pins Shell, RAM:BtnTest, Editor), nested Sub page 2 (2/4, 2/5,
+      2/8), sizes 36/48/72: 698x598, 836x541, 1252x465 as on 3.2.3. An
+      empty CON window (`Run >NIL: Wait 1800 >CON:0/20/1280/650/Plain`,
+      grey on 3.9) lay behind the box, so the glass was even.
+
+      | control | 3.9 bbox offset (x / y), 36 / 48 / 72 | 3.2.3 (569) |
+      | --- | --- | --- |
+      | parent arrow | 0.00 / 0.00 each | 0.00 / 0.00 each |
+      | page back "<" | 0.00 / 0.00 each | 0.00 / +0.06, 0.00 / +0.02, 0.00 / 0.00 |
+      | page forward ">" | 0.00 / 0.00 each | 0.00 / +0.03, -0.01 / +0.08, - (backdrop logo) |
+      | Open Folder ring (36) | 648..676 x 508..536, centre 662.00 / 522.00 = icon box centre | the same |
+
+      Ink centroids equal 3.2.3's (arrow 0.24 right / 0.69 up; chevrons
+      0.13 toward the open side). Every full-tone #dee2e9 pixel (buttons,
+      ring, arrow, label, title, page count) lies at exactly the 3.2.3
+      positions: 274 / 431 / 845 pixels at 36 / 48 / 72, 0 differ. Tone
+      (36, brightest pixel per element): title, parent arrow, "<", ">",
+      page count, ring and label #dee2e9 (contrast 11.51 on this grey
+      glass, #24272e); file names #f2f4f8 (13.58).
+- [x] Images: scratchpad `design/39-569-btn-compare-{36,48,72}.png` (10x,
+      3.2.3 above 3.9, cross-hair on the control centre),
+      `design/39-569-nested-p2-36-2x.png`, `-48.png`, `-72.png`,
+      `design/39-569-open-folder-36-6x.png`,
+      `design/39-569-btntest-top-36-2x.png`; also in
+      ~/Downloads/DockAwesome-design/.
+- [x] Behaviour (569 test docks, agent clicks):
+
+      | check | result |
+      | --- | --- |
+      | Open Folder cell, BtnTest box (185x200) | Workbench window "BtnTest" opened, box closed |
+      | Open Folder cell, Downloads box (356x359) | Workbench window "Downloads" (1034,599 169x96) opened, box closed |
+      | parent arrow in Sub | back to the BtnTest box (185x200 at 36 from page 1, 224x246 at 48 from page 2) |
+      | page buttons | ">" to 2/4 (36), 2/5 (48), 2/8 (72); "<" back to page 1 (36) |
+      | quick switch (t.json copy, migrated, 16 pins) | Downloads (box x 766) -> Games (645; its own entries) -> Downloads (766) |
+      | program pin with a box open | Downloads box open, pointer moved to Editor, click: Editor started, box closed |
+      | volume pin (Archives:) | Workbench window "Archives" opened |
+      | Sort by | Date Modified saved "sorts": {"Personal:Downloads": "date"}; the check moved in the reopened menu; box newest first (SAGA readme first) |
+      | Click to | Open Folder saved "clicks" {Personal:Downloads: folder}; left click opened Workbench window "Downloads", no box; the menu showed the check on Open Folder; Show Stack removed "clicks"; left click opened the box |
+
+      Profile: Input downs=8 ups=8 right_seen=3; prefetch stacks=3
+      pending=0. The Downloads box is 356x359 (551: 356x368; the one-line
+      tile, as on the other systems).
+- [x] First open of Downloads after 45 s idle, pointer off the dock
+      (640,300), fresh dock per run, ChangeTaskPri -30, o.json (the 551
+      runs' config, migrated each run), 551 controls (the installed binary
+      from RAM:) alternated:
+
+      | run | build | first paint ms | entrance ms | frame ms | fields |
+      | --- | --- | --- | --- | --- | --- |
+      | n1 | 569 | 92.7 | 142.2 | 6.0 11.7 16.0 23.5 9.0 | 01121 |
+      | o1 | 551 | 95.5 | 139.7 | 5.7 11.8 16.3 20.4 9.1 | 01121 |
+      | n2 | 569 | 92.6 | 146.9 | 7.5 12.8 17.1 26.7 8.9 | 01121 |
+      | o2 | 551 | 95.4 | 139.5 | 5.9 11.3 16.5 20.2 9.2 | 01121 |
+      | n3 | 569 | 93.0 | 141.7 | 6.1 11.3 15.8 21.5 9.0 | 01121 |
+      | n4 | 569 | 92.2 | 147.0 | 7.5 13.0 17.5 26.5 8.9 | 01121 |
+
+      551 recorded earlier on 3.9: 97.4-97.8 / 137.2-137.6 (v1.0b5
+      100.6-114.4 / 134.5-145.6). 569 first paint 2.4-3.2 ms under
+      today's 551 runs. Entrance 2.0-7.5 ms over them with the same five
+      frames and field pattern: no extra field. The fourth frame (the one
+      that spans two fields) takes 21.5-26.7 ms in 569 against 20.2-20.4
+      in 551, and n2/n4 are slower in every frame (memory placement, as
+      in the earlier per-binary lesson); the other systems showed the same
+      direction (Coffin +1.2-1.8, ApolloOS +1-3, 3.1.4.1 +3-4). n2 and n4
+      end 1.3-1.4 ms over the old v1.0b5 maximum 145.6. Open for the
+      owner as a cost note, not a defect: nothing is drawn later (same
+      fields). Prefetch stacks=3 pending=0 reads=92 every run.
+- [x] Hover sweep (pl.json copy, 15 pins, relative moves to x 350, 500,
+      650, 800, 950 at y 692, then off, one per call, 45 s idle, -30):
+
+      | run | build | render_us_avg | max us | stalled | redraws |
+      | --- | --- | --- | --- | --- | --- |
+      | hn1 | 569 | 9835 | 18297 | 1 | 98 |
+      | ho1 | 551 | 9950 | 18015 | 2 | 99 |
+
+      551 earlier 9540 / stalled 0, v1.0b5 9460 / 9561. 569 under today's
+      551 control. Pass; retire_waits=0 retire_defers=3.
+- [x] --bench-sweep 8 (pl.json copy, one script, ChangeTaskPri -30,
+      v1.0b5 from tag v1.0b5 built in a scratch worktree outside the repo),
+      165 redraws each:
+
+      | build | render_us_avg | max us | compose us | stalled |
+      | --- | --- | --- | --- | --- |
+      | v1.0b5 | 7169 | 97527 (first frame) | 4796 | 40 |
+      | 569 | 6804 | 11715 | 5020 | 43 |
+      | v1.0b5 | 6622 | 10949 | 4800 | 40 |
+
+      Same damage (compose 24%, conversion 29% of the pixels). Pass:
+      render_us_avg within the old spread; compose 0.22 ms (4.6%) over
+      v1.0b5 (3.2.3 had shown 0.9 ms with 553), stalled 3 more of 165.
+- [x] RAM:BtnTest stayed "in use" after the tests (as on 3.1.4.1,
+      ApolloOS and Coffin; the tests had opened and closed a Workbench
+      window on it). With RexxMast started for it, ARexx `WINDOW
+      "RAM:BtnTest" OPEN` and `CLOSE` released it and it deleted at once;
+      RexxMast stopped again with RXC. Workbench was the holder, as on
+      Coffin. Not a dock defect.
+- [x] No defect found; no change to src/.
+- [x] End state: 569 in SYS:WBStartup/DockAwesome, started with WBRun,
+      FindTask finds it, one DockAwesome.PiP2 semaphore, Status lists no
+      CLI dock; its Downloads box opened (356x359) and closed with the
+      user's config. ENVARC:DockAwesome.json untouched (566 bytes,
+      Yesterday 16:37:26 on the Amiga clock: the migration by the
+      installed 551 in the 551 session; 13 pins, Downloads last). RAM:
+      holds only Clipboards, ENV, T and amiagent's own file; ENV:dpid,
+      Editor's RAM:T/JanoRecentFiles and an Execute temp file deleted; DL:
+      assign removed; the measuring CON window closed (Break). SYS:WBStartup/
+      Disabled holds the user's WBDock and, until reboot (locked by
+      WBStartup), DockAwesome-locked-delete (551). Scratch worktree
+      removed on the Mac. amiagent and ApolloExplorerSrv keep running.
+- [ ] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete (551) after
+      the next 3.9 boot.
+- [ ] Verify at the next 3.1.4.1 boot that the same two User-Startup lines
+      start amiagent and ApolloExplorerSrv there.
+- [ ] NOT RUN on 3.9: the native (no AA) path (not used here); a DOpus
+      lister for Open Folder (Workbench is the desktop).

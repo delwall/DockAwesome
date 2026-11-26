@@ -862,7 +862,9 @@ void program_poll_schedule(App *app)
     if (now < app->program_poll_at && now < app->document_poll_at &&
         (!app->status_recheck || now < app->status_event_at) &&
         (!app->discovery_at || now < app->discovery_at) && !app->shell_probe_wanted) return;
-    for (i = 0; i < app->count; ++i) kinds |= app->items[i].kind;
+    /* A Folder Stack has no running state (no dot, no Close): it asks for
+       nothing and goes to the worker without a kind. */
+    for (i = 0; i < app->count; ++i) if (!app->items[i].stack) kinds |= app->items[i].kind;
     if (app->shell_probe_wanted) query |= kinds & PIN_SHELL;
     if (now >= app->program_poll_at || (app->status_recheck && now >= app->status_event_at)) {
         query |= kinds;
@@ -891,9 +893,9 @@ void program_poll_schedule(App *app)
         strcpy(poll->pins[i].path,app->items[i].path);
         strcpy(poll->pins[i].title_path,app->items[i].title_path);
         poll->pins[i].pin_id = app->items[i].pin_id;
-        poll->pins[i].running = app->items[i].kind == PIN_PROGRAM ?
+        poll->pins[i].running = app->items[i].kind == PIN_PROGRAM && !app->items[i].stack ?
             app->items[i].running & RUNNING_WORKBENCH : 0;
-        poll->pins[i].kind = app->items[i].kind;
+        poll->pins[i].kind = app->items[i].stack ? 0 : app->items[i].kind;
         poll->pins[i].temporary = app->items[i].temporary;
         poll->pins[i].attributed = 0;
         poll->pins[i].owner = NULL;
