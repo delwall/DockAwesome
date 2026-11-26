@@ -677,3 +677,31 @@ One push of folder-stacks; PR opened as a draft and left a draft with a
   this one).
 - Installed now: 569 on AmigaOS 3.2.3, 3.1.4.1, AmiKit XE and ApolloOS;
   551 on Coffin and 3.9.
+
+## Follow-up: Coffin with build 569 (2026-11-26)
+
+- At this boot amiagent and ApolloExplorerSrv started by themselves from
+  the last two lines of S:User-Startup (not WBStartup). The dock (551)
+  had started from SYS:WBStartup.
+- Build 569 (08de37b; HEAD c3d1cb2 changed only docs; not stale, no
+  warnings) installed in place (551 was locked by WBStartup and waits in
+  SYS:WBStartup/Disabled/DockAwesome-locked-delete until reboot; the 541
+  leftover is deleted), started with WBRun, the only dock, owns PiP2.
+- Box dumps at 36/48/72 (nested drawer, page 2, over an empty CON
+  window): parent arrow and both page buttons 0.00 / 0.00 px by their box
+  at every size (the 72 px ">" measures here, unlike on 3.2.3), the Open
+  Folder ring on its icon box (662.00, 522.00 at 36); every #dee2e9 pixel
+  at exactly the 3.2.3 positions (0 differ); file names #f2f4f8.
+- Workbench is Coffin's desktop: the Open Folder cell opens a Workbench
+  window. Parent arrow, page buttons, quick switch, a program pin with a
+  box open, Click to and Sort by work.
+- First open (4 runs, 551 controls alternated): 88.1-88.6 / 131.9-146.4
+  ms (551 today 89.9-90.2 / 144.6-144.9), same five frames. Hover sweep
+  9128 us, stalled 3 (551 9284 / 4). No regression; no defect; no code
+  change.
+- RAM:BtnTest stayed locked again; the holder is Workbench (ARexx
+  `WINDOW "RAM:BtnTest" OPEN` + `CLOSE` released it at once); three
+  control drawers deleted cleanly. ENVARC:DockAwesome.json untouched
+  (751 bytes, 10:03:46 yesterday, as since the 551 session).
+- Installed now: 569 on AmigaOS 3.2.3, 3.1.4.1, AmiKit XE, ApolloOS and
+  Coffin; 551 on AmigaOS 3.9.

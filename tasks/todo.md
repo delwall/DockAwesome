@@ -2603,8 +2603,9 @@ Downloads last) kept its date (10:03:46 on the Amiga clock) throughout.
       profiles, dumps, binaries), ENV:dpid deleted; scratch worktrees
       (v1.0b5, 542) removed on the Mac. ApolloExplorerSrv was already
       running at boot.
-- [ ] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete (541, in
-      use) on Coffin after its next boot.
+- [x] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete (541, in
+      use) on Coffin after its next boot (done in the 569 session; it was
+      no longer locked).
 - [ ] NOT RUN on Coffin this time: drawer/volume drops (pins came from the
       config), the box's Open in Workbench tile (unchanged), --bench-sweep;
       Open Folder as a DOpus lister (Workbench is Coffin's desktop).
@@ -3742,3 +3743,116 @@ stop).
       the next ApolloOS boot.
 - [ ] NOT RUN on ApolloOS: the native (no AA) path (not used here); Sort
       by on this build (unchanged since 551, run there).
+
+### Coffin with build 569 (2026-11-26)
+Coffin r65 on the Vampire (Kickstart 45.20, AmigaOS 3.9 Workbench is the
+desktop; Directory Opus 4 is only a pinned program), 24-bit 1280x720,
+agent input with relative moves (absolute warps miss the dock here).
+Build 569 = 08de37b (HEAD c3d1cb2 changed only docs; `make amiga`:
+nothing to rebuild, no warnings; byte-identical to the ApolloOS upload).
+Installed before: 551, started from SYS:WBStartup at boot. Test docks
+from RAM: with `--config RAM:` copies, exactly one dock at a time
+(Status COM=, FindTask and Sems before each start, 5 s or more before
+each stop).
+- [x] At this boot amiagent and ApolloExplorerSrv started by themselves
+      from the last two lines of S:User-Startup (`run > NIL:
+      Personal:Applications/AmiMCP/amiagent TOKEN=amiga` and `run > NIL:
+      Personal:Applications/ApolloExplorer-Amiga/ApolloExplorerSrv`), not
+      from WBStartup; Status showed both before any command of mine.
+- [x] Installed 569 in place: 551 copied to RAM:DockOld for controls;
+      the old Disabled/DockAwesome-locked-delete (541) was no longer
+      locked and is deleted; 551 stopped (BreakTask, gone after 5 s, no
+      PiP2 semaphore), 569 copied as DockAwesome.new, the 551 file was "in
+      use" (WBStartup), so it is now
+      SYS:WBStartup/Disabled/DockAwesome-locked-delete (delete after the
+      next Coffin boot); .new renamed into place, Version 0.569 build 569.
+- [x] Box dumps (`--pip-dump`, RAM:BtnTest = Sub (360 files) + t10-t15;
+      pins Shell, RAM:BtnTest, EditPad), nested Sub page 2 (2/4, 2/5,
+      2/8), sizes 36/48/72: 698x598, 836x541, 1252x465 as on 3.2.3. A CON
+      window with no text (`Run >NIL: Wait 1800 >CON:0/20/1280/650/Plain`,
+      black on Coffin) lay behind the box, so the glass was even.
+
+      | control | Coffin bbox offset (x / y), 36 / 48 / 72 | 3.2.3 (569) |
+      | --- | --- | --- |
+      | parent arrow | 0.00 / 0.00 each | 0.00 / 0.00 each |
+      | page back "<" | 0.00 / 0.00 each | 0.00 / +0.06, 0.00 / +0.02, 0.00 / 0.00 |
+      | page forward ">" | 0.00 / 0.00 each | 0.00 / +0.03, -0.01 / +0.08, - (backdrop logo) |
+      | Open Folder ring (36) | 648..676 x 508..536, centre 662.00 / 522.00 = icon box centre | the same |
+
+      Ink centroids equal 3.2.3's (arrow 0.24 right / 0.71 up; chevrons
+      0.13 toward the open side). Every full-tone #dee2e9 pixel (buttons,
+      ring, arrow, label, title, page count) lies at exactly the 3.2.3
+      positions: 274 / 431 / 845 pixels at 36 / 48 / 72, 0 differ. The 72 px
+      ">" measures here (on 3.2.3 it lies over the backdrop logo). Tone
+      (36, brightest pixel per element): title, parent arrow, "<", ">",
+      page count, ring and label #dee2e9 (contrast 13.26 on the glass);
+      file names #f2f4f8 (15.65).
+- [x] Images: scratchpad `design/co-569-btn-compare-{36,48,72}.png` (10x,
+      3.2.3 above Coffin, cross-hair on the control centre),
+      `design/co-569-nested-p2-36-2x.png`, `-48.png`, `-72.png`,
+      `design/co-569-open-folder-36-6x.png`,
+      `design/co-569-btntest-top-36-2x.png`, `design/co-569-downloads-2x.png`;
+      also in ~/Downloads/DockAwesome-design/.
+- [x] Behaviour (569 test docks, agent clicks):
+
+      | check | result |
+      | --- | --- |
+      | Open Folder cell, BtnTest box (185x200) | Workbench window "BtnTest" opened, box closed |
+      | Open Folder cell, Downloads box (354x328, size 32) | Workbench window "Downloads" (1034,599 169x96) opened, box closed |
+      | parent arrow in Sub | back to the BtnTest box (185x200 at 36 from page 1, 224x246 at 48 from page 2) |
+      | page buttons | ">" to 2/4 (36), 2/5 (48), 2/8 (72); "<" back to page 1 (36) |
+      | quick switch (o.json copy, migrated, 3 stacks) | Downloads (anchor 988) -> Games (916; 354x328, its own entries) -> Downloads (988) |
+      | program pin with a box open | Downloads box open, click on EditPad: EditPad started, box closed |
+      | Sort by | Date Modified saved "sorts": {"Personal:Downloads": "date"}; the check moved in the reopened menu |
+      | Click to | Open Folder saved "clicks" {Personal:Downloads: folder}; left click opened Workbench window "Downloads", no box; the menu showed the check on Open Folder; Show Stack removed "clicks"; left click opened the box |
+
+      Profile: Input downs=6 ups=6 right_seen=3. The Downloads box is 354x328
+      (551: 354x337; the one-line tile, as on the other systems).
+      Drawer icons on Coffin are a flat bar: aim at the bar from a box
+      dump (36: dock pin at y 682; 48: 672; 72: 650).
+- [x] First open of Downloads after 50 s idle, pointer off the dock
+      (640,300), fresh dock per run, ChangeTaskPri -30, o.json (the 551
+      runs' config, migrated each run), 551 controls (the installed binary
+      from RAM:) alternated:
+
+      | run | build | first paint ms | entrance ms | fields |
+      | --- | --- | --- | --- | --- |
+      | n1 | 569 | 88.3 | 146.1 | 01121 |
+      | o1 | 551 | 90.2 | 144.6 | 01121 |
+      | n2 | 569 | 88.1 | 131.9 | 0112 |
+      | o2 | 551 | 89.9 | 144.9 | 01121 |
+      | n3 | 569 | 88.6 | 146.3 | 01121 |
+      | n4 | 569 | 88.2 | 146.4 | 01121 |
+
+      551 recorded earlier on Coffin: 85.1-90.8 / 143.8-168.6 (v1.0b5
+      89.4-90.0 / 130.7-150.3). 569 first paint 1.6-2.1 ms under today's
+      551 runs; entrance 1.2-1.8 ms over them with the same five frames
+      and field pattern (n2 one frame fewer). Prefetch stacks=3 pending=0
+      reads=120 every run. Pass.
+- [x] Hover sweep (pl.json copy, 20 pins, relative moves to x 350, 500,
+      650, 800, 950 at y 692, one per call, 50 s idle, -30): render_us_avg
+      9128, max 18538, stalled 3, redraws 100, retire_waits=0
+      retire_defers=3 (551 earlier 9284 / 18788 / 4; v1.0b5 10526-13966).
+      Pass.
+- [x] RAM:BtnTest stayed "in use" after its contents were deleted (as on
+      3.1.4.1 and ApolloOS); stopping the installed dock did not free it.
+      Three control drawers (L48: box, Sub, ">", parent, quit with the box
+      open; L72: box, Sub, ">", quit on page 2; L36: box, Open Folder
+      window, ARexx close, quit) deleted cleanly. The holder is
+      Workbench: after ARexx `WINDOW "RAM:BtnTest" OPEN` and `CLOSE` the
+      empty drawer deleted at once. Not a dock defect; no code change.
+- [x] No defect found; no change to src/.
+- [x] End state: 569 in SYS:WBStartup/DockAwesome, started with WBRun,
+      FindTask finds it, one DockAwesome.PiP2 semaphore, Status lists no
+      CLI dock; its Downloads box opened (354x328) and closed with the
+      user's config. ENVARC:DockAwesome.json untouched (751 bytes,
+      Yesterday 10:03:46 on the Amiga clock, as since the 551 session).
+      RAM: holds only Clipboards and T; ENV:dpid deleted; DL: assign
+      removed; the measuring CON window closed (Break). SYS:WBStartup/
+      Disabled holds the user's WBDock, Matrix and others and, until
+      reboot (locked by WBStartup), DockAwesome-locked-delete (551).
+      amiagent and ApolloExplorerSrv keep running.
+- [ ] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete (551) after
+      the next Coffin boot.
+- [ ] NOT RUN on Coffin: the native (no AA) path (not used here); a DOpus
+      lister for Open Folder (Workbench is the desktop).

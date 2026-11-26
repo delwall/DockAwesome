@@ -759,3 +759,13 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
   suspecting the code.
 - On ApolloOS, List shows a soft link on an SFS volume as "Dir"; check
   that it resolves with Version (or Search) on the link path.
+
+## An empty drawer "in use" can be Workbench's (Coffin, 2026-11-26)
+- RAM:BtnTest stayed "in use" after its contents were deleted, on
+  3.1.4.1, ApolloOS and Coffin, while control drawers through the same
+  dock gestures deleted cleanly. Stopping the dock did not free it;
+  ARexx `address WORKBENCH; 'WINDOW "RAM:BtnTest" OPEN'` then `CLOSE`
+  did, at once: Workbench held it.
+- Rule: before calling a held drawer a dock leak, open and close it as a
+  Workbench window by ARexx and try Delete again; only a lock that
+  survives that is worth a bisect.
