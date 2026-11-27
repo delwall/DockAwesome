@@ -827,3 +827,21 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
   patch.
 - A review's "a busy lock is not proof" was right: check the lock's owner,
   not only that it is busy.
+
+## Read the menu tool's own settings before testing menus (AmiKit, 2026-11-27)
+- AmiKit XE runs MagicMenu 2 (ENV:MagicMenu.prefs is text): MenuType 2 =
+  pull-down when pressed in the screen's title bar, pop-up elsewhere;
+  NonBlocking=Yes draws every box as a borderless window without a port
+  and takes no layer lock; PUMode 2 ("select") keeps a pop-up open after
+  a quick release until the next click. Directory Opus adds its own
+  pop-ups (desktop, lister files, lister title): windows with a port,
+  opened about 240 ms after the press. The MagicMenu source is on GitHub
+  (AmiKit/MagicMenu); `MenWin->Flags |= WFLG_MENUSTATE` marks the menu.
+- What that found: every rule so far ended at the button's release, but a
+  select-mode pop-up opened just above the dock stayed open for seconds
+  with PiP back over its lower half (569 and 583 alike).
+- Rule: before a menu test, read the menu tool's prefs (mode, blocking,
+  sticky/select) and test a menu that stays open after the release, not
+  only a held button. Drive pop-ups with Rmb down / screenshot / move off
+  the boxes / Rmb up, and close a select-mode pop-up with a second right
+  press, never a left click over its items.

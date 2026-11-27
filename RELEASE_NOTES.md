@@ -13,16 +13,17 @@ Draft, not released.
   works as before (running dot, **Close** while its window is open, now
   below the menu's groups) and is never read while the dock idles. A disk
   that is taken out shows "Cannot read drawer" in its box, without an
-  "insert volume" requester (checked on ApolloOS, Coffin, AmigaOS 3.2.3
-  and AmigaOS 3.9; not yet on the other systems). Before, a right-click on a disk without an open window did
-  nothing.
+  "insert volume" requester (checked on ApolloOS, Coffin, AmigaOS 3.2.3,
+  AmigaOS 3.9 and AmiKit XE, where Open Folder opens a Directory Opus
+  lister and Close closes it; not yet on AmigaOS 3.1.4.1). Before, a
+  right-click on a disk without an open window did nothing.
 
 **Fixes**
 - A right-click menu that lies over the dock's icons now shows them, and
   the plate, through its glass; before, the glass there showed only the
   desktop, as if the dock were not behind it (checked on ApolloOS with
-  the dock at the bottom, left and right, and on Coffin, AmigaOS 3.2.3 and
-  AmigaOS 3.9 at the bottom).
+  the dock at the bottom, left and right, and on Coffin, AmigaOS 3.2.3,
+  AmigaOS 3.9 and AmiKit XE at the bottom).
 - On ApolloOS a right-click on the desktop or in a window no longer hides
   the dock for a moment when the pointer is in the lower part of the
   screen. The dock now steps aside only when a menu actually opens over
@@ -32,9 +33,19 @@ Draft, not released.
   hides the dock when the pointer is in the lower part of the screen.
   The system's own menus drop from the title bar, and the dock now steps
   aside only if the active window's menus can drop as far as the dock (a
-  dock on the left edge still steps aside). Pop-up menus at the pointer,
-  such as MagicMenu's, keep the earlier rule (checked on AmigaOS 3.2.3
-  and AmigaOS 3.9 with the dock at the bottom and on the left).
+  dock on the left edge still steps aside). Pop-up menus at the pointer
+  that are not drawn as windows keep the earlier rule (checked on
+  AmigaOS 3.2.3 and AmigaOS 3.9 with the dock at the bottom and on the
+  left).
+- With MagicMenu (AmiKit XE), a pop-up menu opened just above the dock no
+  longer disappears under the dock when the button is released: such a
+  menu stays open until the next click, and the dock now stays out of its
+  way until it closes. The dock watches MagicMenu's menu boxes and steps
+  aside only while one lies over it, so a right-click near the dock whose
+  menu opens away from it no longer hides the dock (the first menu after
+  the dock starts still hides it while the button is held). Directory
+  Opus's own pop-up menus keep the earlier rule (checked on AmiKit XE
+  with the dock at the bottom and on the left).
 
 ## 1.0 beta 6
 

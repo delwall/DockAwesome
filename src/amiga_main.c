@@ -1024,12 +1024,14 @@ static void live_schedule(App *app)
        second to find PiP hidden. */
     held = IntuitionBase->FirstScreen == app->screen &&
         buttons_engaged(app,ANY_BUTTON) && !native_menu_held(app);
-    /* While a native menu that does not cover the dock is held on
-       ApolloOS, its windows are watched each field: one can open over
-       the dock later (a pop-up menu, a long menu, a submenu). */
+    /* While a native menu that does not cover the dock is up, its
+       windows are watched each field: one can open over the dock later
+       (a pop-up menu, a long menu, a submenu; on AmigaOS 3.x also
+       MagicMenu's boxes after the button is released). */
     fast = animation_needed(app) || (held && !app->input_context.local_motion) ||
-        (app->caps.menu_windows && native_menu_held(app) && !app->menu_hides &&
-            app->pip_visible && IntuitionBase->FirstScreen == app->screen);
+        ((app->caps.menu_windows ? native_menu_held(app) : app->menu_decided) &&
+            app->menu.hides != 1 && (app->pip_visible || app->menu.hides == 2) &&
+            IntuitionBase->FirstScreen == app->screen);
     /* On Magellan, give a held button the fast capture rate once the
        backdrop moves or there is dock artwork following the gesture. */
     if (!fast && held && app->input_context.local_motion) {
@@ -2738,11 +2740,15 @@ static __attribute__((noinline)) void event_loop(App *app)
             reset_watch_done(app);
             break;
         }
-        if (native_menu_held(app)) {
+        if (native_menu_held(app) || (native_menu_up(app) && app->menu.hides)) {
             /* MagicMenu holds IntuitionBase's lock while its menu is up:
                the status polls and the drop catcher would wait on it (the
                dock froze, deaf to Ctrl-C). Only decide whether PiP steps
-               aside for the menu, then wait for it to close. */
+               aside for the menu, then wait for it to close, also while a
+               sticky or select pop-up that hid the dock stays open after
+               the release. One that leaves the dock shown runs the normal
+               pass, as before (AmiKit: no lock held), which draws PiP again
+               after the pointer rule's guess was undone. */
             pip_menu_check(app);
             interaction_cancel(app);
             /* Wait() cleared what woke this pass: keep it for the pass
@@ -2764,7 +2770,7 @@ static __attribute__((noinline)) void event_loop(App *app)
         }
         if (app->status_notify && (signals & (1UL<<app->status_notify_bit)))
             status_observe_windows(app);
-        if (IntuitionBase->FirstScreen != app->screen || native_menu_held(app))
+        if (IntuitionBase->FirstScreen != app->screen || native_menu_up(app))
             interaction_cancel(app);
         Disable();
         dismiss_popup = app->input_context.popup_dismiss;

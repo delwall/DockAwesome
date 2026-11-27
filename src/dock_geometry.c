@@ -526,6 +526,29 @@ DockRect dock_pulldown_reach(int screen_width, int bar_height, int items_bottom)
     return (DockRect){0,0,screen_width,bar_height+1+items_bottom+DOCK_PULLDOWN_MARGIN};
 }
 
+int dock_menu_step(DockMenuWatch *watch, int first, int windows, int reach, int pointer, int expired)
+{
+    if (first) { watch->hides = 0; watch->waiting = 0; }
+    if (watch->hides == 1) return 1;
+    /* The menu's own windows show where it is (as on ApolloOS); they also
+       undo a guess the pointer made before they opened. */
+    if (windows >= 0) {
+        watch->windows_seen = 1; watch->waiting = 0;
+        watch->hides = windows ? 1 : 0;
+        return watch->hides;
+    }
+    if (watch->hides) return 1;
+    if (!first && !watch->waiting) return 0;
+    if (reach >= 0) { watch->waiting = 0; watch->hides = reach ? 1 : 0; return watch->hides; }
+    /* Nothing is drawn yet: a menu like the last one opens its windows in
+       a few fields, so the dock stays until they show (no blink). */
+    if (first && watch->windows_seen) { watch->waiting = 1; return 0; }
+    if (watch->waiting && !expired) return 0;
+    watch->waiting = 0;
+    watch->hides = pointer ? 2 : 0;
+    return watch->hides != 0;
+}
+
 int dock_menu_covers(DockRect dock, int pointer_x, int pointer_y, const DockRect *menus, int count)
 {
     int i, dx, dy;

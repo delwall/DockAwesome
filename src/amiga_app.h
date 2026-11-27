@@ -461,7 +461,13 @@ typedef struct App {
     int drag_bob_gx, drag_bob_gy; /* the pointer at the drawn pin's last frame */
     /* Ctrl-Amiga-Amiga was answered: PiP stays off and the loop ends. */
     int resetting;
-    int menu_decided, menu_hides; /* the native menu held now: whether PiP steps aside */
+    /* A native menu is up and PiP's choice for it is made (MENU_DECIDED,
+       MENU_OLD_WINDOWS); that choice (AmigaOS 3.x: dock_menu_step). Bytes,
+       with the EClock's low word for the wait, so App keeps its size and
+       layout (lessons.md: a field added to App moved hover by 12%). */
+    unsigned char menu_decided;
+    DockMenuWatch menu;
+    ULONG menu_wait_until; /* low EClock word: when the wait for its windows ends */
     ULONG menu_press; /* input_context.right_seen when that menu was decided */
     ResetWatch reset; /* amiga_reset.c */
     int drop_preview_slot, displayed_drop_slot, snap_wait_motion, snap_x, snap_y;
@@ -591,6 +597,24 @@ static inline int native_menu_held(const App *app)
 {
     return (PeekQualifier() & IEQUALIFIER_RBUTTON) && !app->input_context.right_held;
 }
+
+/* A native menu is up: its button is held, or (AmigaOS 3.x) the active
+   window on the dock's screen is marked MENUSTATE, as Intuition and
+   MagicMenu mark it until the menu closes; MagicMenu's sticky and select
+   pop-ups stay open after the release (AmiKit). Only read: no lock. */
+static inline int native_menu_up(const App *app)
+{
+    struct Window *window;
+    if (native_menu_held(app)) return 1;
+    if (app->caps.menu_windows) return 0;
+    window = IntuitionBase->ActiveWindow;
+    return window && window->WScreen == app->screen && (window->Flags & WFLG_MENUSTATE);
+}
+
+/* app->menu_decided bits. MENU_OLD_WINDOWS: borderless windows without a
+   port were in front of the dock at the press, before any menu box could
+   open, so this menu's windows prove nothing (AmigaOS 3.x). */
+enum { MENU_DECIDED = 1, MENU_OLD_WINDOWS = 2 };
 
 #define ANY_BUTTON (IEQUALIFIER_LEFTBUTTON|IEQUALIFIER_RBUTTON|IEQUALIFIER_MIDBUTTON)
 #define DOCK_DRAG_SAMPLE_RADIUS 128

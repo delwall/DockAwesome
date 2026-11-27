@@ -659,6 +659,53 @@ static void test_menu_covers(void)
     assert(!dock_menu_covers((DockRect){10,10,10,20},10,15,NULL,-1));
 }
 
+/* AmigaOS 3.x: one native menu, pass by pass (AmiKit: MagicMenu's
+   non-blocking pop-ups are windows and stay open after the release). */
+static void test_menu_step(void)
+{
+    DockMenuWatch w = {0,0,0};
+    /* Intuition's pull-down decides at once by its reach. */
+    assert(!dock_menu_step(&w,1,-1,0,1,0) && !w.hides && !w.waiting);
+    assert(!dock_menu_step(&w,0,-1,-1,1,0));
+    assert(dock_menu_step(&w,1,-1,1,0,0) && w.hides == 1);
+    assert(dock_menu_step(&w,0,-1,-1,0,0));
+    /* No windows, no Intuition lock (a blocking MagicMenu): the pointer
+       rule, once per menu. */
+    assert(dock_menu_step(&w,1,-1,-1,1,0) && w.hides == 2);
+    assert(dock_menu_step(&w,0,-1,-1,0,0));
+    assert(!dock_menu_step(&w,1,-1,-1,0,0) && !w.hides);
+    assert(!dock_menu_step(&w,0,-1,-1,1,0));
+    /* The first windowed menu: the pointer hid the dock before the box
+       opened; the box shows it does not reach the dock, so the dock
+       comes back, and steps aside for good once a box overlaps it. */
+    assert(dock_menu_step(&w,1,-1,-1,1,0) && w.hides == 2);
+    assert(dock_menu_step(&w,0,-1,-1,1,0));
+    assert(!dock_menu_step(&w,0,0,-1,1,0) && w.windows_seen && !w.hides);
+    assert(!dock_menu_step(&w,0,-1,-1,1,0));
+    assert(dock_menu_step(&w,0,1,-1,1,0) && w.hides == 1);
+    assert(dock_menu_step(&w,0,0,-1,1,0));
+    /* Later menus wait for the windows instead of guessing: no blink. */
+    assert(!dock_menu_step(&w,1,-1,-1,1,0) && w.waiting);
+    assert(!dock_menu_step(&w,0,-1,-1,1,0));
+    assert(!dock_menu_step(&w,0,0,-1,1,0) && !w.waiting && !w.hides);
+    assert(!dock_menu_step(&w,1,-1,-1,1,0) && w.waiting);
+    assert(dock_menu_step(&w,0,1,-1,1,0) && w.hides == 1);
+    /* ... Intuition's menu (a window without a strip) ends the wait by
+       its reach and keeps the learned windows ... */
+    assert(!dock_menu_step(&w,1,-1,-1,1,0) && w.waiting);
+    assert(!dock_menu_step(&w,0,-1,0,1,0) && !w.waiting && w.windows_seen);
+    /* ... and a menu that shows no watched window in time (a Directory
+       Opus pop-up) gets the pointer rule, the next one waits again. */
+    assert(!dock_menu_step(&w,1,-1,-1,1,0) && w.waiting);
+    assert(!dock_menu_step(&w,0,-1,-1,1,0) && w.waiting);
+    assert(dock_menu_step(&w,0,-1,-1,1,1) && w.hides == 2 && w.windows_seen && !w.waiting);
+    assert(dock_menu_step(&w,0,-1,-1,0,1));
+    assert(!dock_menu_step(&w,1,-1,-1,1,0) && w.waiting);
+    /* Far from the dock after the wait: shown. */
+    assert(!dock_menu_step(&w,0,-1,-1,0,1) && !w.hides && !w.waiting);
+    assert(!dock_menu_step(&w,0,-1,-1,1,1));
+}
+
 int main(void)
 {
     test_layout_and_baseline();
@@ -674,6 +721,7 @@ int main(void)
     test_button_glyph();
     test_open_glyph();
     test_menu_covers();
-    puts("geometry: native menu reach, bottom/left/right layout, upright hit/slot/outside, half-open panel bounds, animation equivalence and centred box buttons (page chevrons, return arrow) and Open Folder glyph PASS");
+    test_menu_step();
+    puts("geometry: native menu reach and per-menu steps, bottom/left/right layout, upright hit/slot/outside, half-open panel bounds, animation equivalence and centred box buttons (page chevrons, return arrow) and Open Folder glyph PASS");
     return 0;
 }
