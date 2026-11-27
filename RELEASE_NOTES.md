@@ -14,8 +14,8 @@ Draft, not released.
   below the menu's groups) and is never read while the dock idles. A disk
   that is taken out shows "Cannot read drawer" in its box, without an
   "insert volume" requester (checked on ApolloOS, Coffin, AmigaOS 3.2.3,
-  AmigaOS 3.9 and AmiKit XE, where Open Folder opens a Directory Opus
-  lister and Close closes it; not yet on AmigaOS 3.1.4.1). Before, a
+  AmigaOS 3.9, AmigaOS 3.1.4.1 and AmiKit XE, where Open Folder opens a
+  Directory Opus lister and Close closes it). Before, a
   right-click on a disk without an open window did nothing.
 
 **Fixes**
@@ -23,7 +23,7 @@ Draft, not released.
   the plate, through its glass; before, the glass there showed only the
   desktop, as if the dock were not behind it (checked on ApolloOS with
   the dock at the bottom, left and right, and on Coffin, AmigaOS 3.2.3,
-  AmigaOS 3.9 and AmiKit XE at the bottom).
+  AmigaOS 3.9, AmigaOS 3.1.4.1 and AmiKit XE at the bottom).
 - On ApolloOS a right-click on the desktop or in a window no longer hides
   the dock for a moment when the pointer is in the lower part of the
   screen. The dock now steps aside only when a menu actually opens over
@@ -35,8 +35,8 @@ Draft, not released.
   aside only if the active window's menus can drop as far as the dock (a
   dock on the left edge still steps aside). Pop-up menus at the pointer
   that are not drawn as windows keep the earlier rule (checked on
-  AmigaOS 3.2.3 and AmigaOS 3.9 with the dock at the bottom and on the
-  left).
+  AmigaOS 3.2.3, AmigaOS 3.9 and AmigaOS 3.1.4.1 with the dock at the
+  bottom and on the left).
 - With MagicMenu (AmiKit XE, Coffin), a pop-up menu opened just above the
   dock no longer disappears under the dock when the button is released:
   such a menu stays open until the next click, and the dock now stays out

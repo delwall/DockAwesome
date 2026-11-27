@@ -806,6 +806,7 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
   with IND_WRITEEVENT and patch PeekQualifier (SetFunction, restore at once
   and check the vector is still ours) to report RBUTTON between them.
   Check the DoIO result of every injected event before reading a log.
+  AmigaOS 3.1.4.1 (input.device 45.2) needs the same patch (2026-11-27).
 - An agent right-click that misses the dock opens MagicMenu's pop-up at
   the pointer in sticky mode, with Power > Reboot now under it. Close it by
   moving the pointer away (absolute warp) and Esc, never a click; aim
