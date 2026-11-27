@@ -850,3 +850,12 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
   the pointer. Test it with `RmbHold <ticks> <x> <y>` (the pointer is
   written off the boxes just before the release), a screenshot, then Esc;
   never a second right press over a menu (2026-11-27).
+
+## Agent menus and dock starts on ApolloOS (2026-11-27)
+- With the right button held (RmbQ down), an absolute amiga_move_mouse to
+  the title bar shows the bar but drops no menu; amiga_move_mouse with
+  relative:true does. Release with the pointer warped off every box.
+- The AmiKit start form (`Run >NIL: Stack 400000 +` with the dock on the
+  next line, from Execute) started nothing on ApolloOS: no process, no
+  output file. Start CLI test docks there with `Run >NIL: Execute
+  <script>` and stop them with stop.s.

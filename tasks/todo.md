@@ -5084,3 +5084,94 @@ screenshot before each Esc); no click inside a menu. Dock box
       the next Coffin boot (still "in use" at the end).
 - [ ] NOT RUN on Coffin with 589: the physical mouse and the monitor (PiP
       is not in screenshots; register state and dumps only); a side dock.
+
+### ApolloOS, build 589 recheck (2026-11-27)
+ApolloOS R9.5 on the Vampire (Kickstart 51.3), 16-bit 1280x720, fresh
+boot with 579 in SYS:WBStartup. Build 589 = aa39aed (`make amiga`:
+nothing to rebuild, no warnings; md5 35f778... as on AmiKit/Coffin).
+C:ApolloExplorerSrv was not running; started with Run >NIL:. Tools
+(scratch `ao589/`, the 579 run's binaries): PipWatch (read-only, 2 ms
+polls, one EClock), RmbQ (IND_ADDEVENT press/release with
+IEQUALIFIER_RBUTTON; PeekQualifier "held" in every log), BreakTask,
+FindTask, Sems. Dock box 208,612-1071,719 (the user's 14 pins).
+- [x] Install: the locked copies of 573 and 577 in
+      SYS:WBStartup/Disabled were free after the reboot and are deleted.
+      579 stopped (BreakTask, gone after 5 s, no PiP2 semaphore), 589
+      copied as DockAwesome.new, the 579 file was "in use", so it is now
+      SYS:WBStartup/Disabled/DockAwesome-locked-delete; .new renamed into
+      place (Version 0.589); WBRun: FindTask finds it, one
+      DockAwesome.PiP2 semaphore, Status lists no CLI dock.
+- [x] (1) Right-click with the held qualifier, installed dock, user's
+      config. 579 baseline in the same session: 400,500 held 0.5 s, PiP2
+      ON throughout.
+
+      | right button (pointer) | 577 (579 table) | 579 (table / today) | 589 |
+      | --- | --- | --- | --- |
+      | 0.5 s at 400,500 / 300,362 / 300,600 / 1270,450 | OFF 2.3 ms after down, ON 41 ms after up | ON | ON throughout |
+      | 0.5 s at 400,200 / 300,350 | ON | ON | ON |
+      | 3 s at 400,500 / 300,600 / 1270,450 / 400,200 | - | - | ON |
+      | Workbench menu [1,12-164,92] then Window menu [73,12-218,154] dropped, held 15 s, released at 640,300 | ON | ON | ON |
+      | on a pin (Personal:, 620,700), agent click and RmbQ | dock's menu, ON | dock's menu, ON | dock's menu 115x146 (Sort by, Click to, Open Folder checked, no Close), ON |
+      | on the plate gap (640,700) | - | - | plate menu (Settings/About/Quit), ON |
+
+      native_menu_hides=0 in every bottom-dock profile; PiP2 never
+      changed state (only front-buffer flips while the dock drew).
+      Left dock (RAM:dl.json, test dock from RAM:, box 3,13-194,719):
+      right-clicks at 600,400 and 400,600 stay ON; the Window and
+      Workbench menus dropped over the dock: PiP2 OFF in the same 2 ms
+      poll as the first menu window appeared, ON 39 ms after the release
+      (579: OFF 5 ms after, ON 82 ms after); native_menu_hides=1 (579: 1).
+      No regression, no change to src/.
+- [x] Menus with the agent: an absolute warp (amiga_move_mouse) to the
+      title bar while the button is held does NOT drop an Intuition menu
+      on ApolloOS; a relative move (relative:true) does. Released each
+      menu at 640,300, off every box; dock menus closed with the pointer
+      off them and Esc while the menu was the active window.
+- [x] (2) First open of Downloads after 45 s idle (o.json, migrated each
+      run, 14 pins, pointer at 640,300, fresh test dock per run,
+      ChangeTaskPri -30, relative click at 906,700), alternated:
+
+      | run | build | first paint ms | entrance ms | fields |
+      | --- | --- | --- | --- | --- |
+      | n1 | 589 | 100.1 | 138.4 | 01112 |
+      | o1 | 579 | 99.7 | 138.4 | 01112 |
+      | n2 | 589 | 100.1 | 138.3 | 01112 |
+      | o2 | 579 | 99.3 | 138.8 | 01112 |
+      | n3 | 589 | 99.1 | 139.1 | 01112 |
+      | n4 | 589 | 99.8 | 138.7 | 01112 |
+
+      Box 356x359 every run; prefetch stacks=3 pending=0 reads=81. Earlier
+      figures 100-105 / 137-141. Pass.
+      Hover sweep (t.json, 15 pins, relative moves x 350, 500, 650, 800,
+      950 at y 688, one per call, 45 s idle, -30):
+
+      | run | build | render_us_avg | compose_us_avg | max us | stalled | redraws |
+      | --- | --- | --- | --- | --- | --- | --- |
+      | hn1 | 589 | 9715 | 7080 | 18998 | 2 | 107 |
+      | ho1 | 579 | 9793 | 7147 | 18979 | 0 | 93 |
+
+      Equal (earlier 9.4-10.4 ms). Pass.
+      Menu glass (user's config copy, right-click on Audio, zoomed,
+      `--pip-dump`): menu 520,550 115x146, dock 208,612 864x108, 4832
+      dock pixels; tint [20,23,29] (100% share); 3964 covered inner
+      pixels, glass vs tint(desktop+dock) max 0 (100% within 1), vs
+      desktop only max 54 mean 23.3; canvas change at exit 1462 (inside
+      the menu). Pass.
+      Disk stack (test dock, RAM:dc.json = copy of the user's file):
+      right-click Personal: shows Sort by (Name checked) and Click to
+      (Open Folder checked), no Close; Show Stack saved "clicks":
+      {"Personal:": "stack"} in RAM:dc.json; a click on Personal: opened
+      its box (299x253, 16 entries + Open Folder). Pass.
+- [x] End state: 589 in SYS:WBStartup/DockAwesome, started with WBRun,
+      FindTask finds it, one DockAwesome.PiP2 semaphore, Status lists no
+      CLI dock; re-measured: right-clicks at 400,500 / 300,650 / 400,200
+      keep PiP2 ON. ENVARC:DockAwesome.json untouched (588 bytes,
+      17:16:08 on the Amiga clock). RAM: holds only Clipboards, ENV and T
+      (dhclient.pid and a boot temp file); tools, configs, logs and dumps
+      deleted; DL: assign removed, ENV:dpid deleted. amiagent and
+      ApolloExplorerSrv keep running. No scratch worktrees.
+- [ ] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete (579) after
+      the next ApolloOS boot (still "in use" at the end).
+- [ ] NOT RUN on ApolloOS with 589: the physical mouse and the monitor
+      (PiP is not in screenshots: register state and dumps only); IControl
+      pop-up menus (ICF_POPUPMENUS is off here); a right dock.
