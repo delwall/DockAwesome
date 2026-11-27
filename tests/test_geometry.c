@@ -604,6 +604,108 @@ static void test_open_glyph(void)
     }
 }
 
+/* PiP steps aside only for a native menu that can reach it (IMG_2662:
+   ApolloOS hid a bottom dock for every right-click in the lower half). */
+static void test_menu_covers(void)
+{
+    const DockRect bottom = {208,612,1056,720}, left = {0,100,96,620};
+    const DockRect bar = {0,0,1280,12}, items = {0,12,180,300}, long_items = {300,12,520,640};
+    const DockRect popup = {380,520,560,700}, left_items = {40,12,220,300};
+    DockRect menus[2];
+    /* Menus are windows (ApolloOS): only their overlap counts, never the pointer. */
+    assert(!dock_menu_covers(bottom,400,650,NULL,0));
+    menus[0] = bar;
+    assert(!dock_menu_covers(bottom,400,650,menus,1));
+    assert(!dock_menu_covers(bottom,450,200,menus,1));
+    menus[1] = items;
+    assert(!dock_menu_covers(bottom,100,600,menus,2));
+    menus[1] = long_items;
+    assert(dock_menu_covers(bottom,400,30,menus,2));
+    menus[0] = popup;
+    assert(dock_menu_covers(bottom,400,520,menus,1));
+    menus[0] = bar; menus[1] = left_items;
+    assert(dock_menu_covers(left,600,5,menus,2));
+    menus[1] = (DockRect){120,12,300,300};
+    assert(!dock_menu_covers(left,600,5,menus,2));
+    /* Touching edges do not overlap (half-open bounds). */
+    menus[0] = (DockRect){0,0,1280,612};
+    assert(!dock_menu_covers(bottom,0,0,menus,1));
+    menus[0].bottom = 613;
+    assert(dock_menu_covers(bottom,0,0,menus,1));
+    /* No menu windows (MagicMenu): the pointer within 256 px, or a dock
+       that starts within 256 px of the top. */
+    assert(dock_menu_covers(bottom,400,650,NULL,-1));
+    assert(dock_menu_covers(bottom,300,612-255,NULL,-1));
+    assert(!dock_menu_covers(bottom,300,612-256,NULL,-1));
+    assert(!dock_menu_covers(bottom,1056+255,700,NULL,-1));
+    assert(dock_menu_covers(bottom,1056+254,700,NULL,-1));
+    assert(dock_menu_covers(left,1200,700,NULL,-1));
+    /* AmigaOS 3.x Intuition's own menus drop from the bar (12 rows, BarHeight
+       11) as deep as the active window's strip reaches: a bottom dock stays
+       for a Workbench-sized strip, a left dock does not, and a strip long
+       enough to reach the dock's top hides it. */
+    menus[0] = dock_pulldown_reach(1280,11,160);
+    assert(menus[0].left == 0 && menus[0].top == 0 && menus[0].right == 1280 &&
+        menus[0].bottom == 12+160+DOCK_PULLDOWN_MARGIN);
+    assert(!dock_menu_covers(bottom,0,0,menus,1));
+    assert(dock_menu_covers(left,0,0,menus,1));
+    menus[0] = dock_pulldown_reach(1280,11,612-12-DOCK_PULLDOWN_MARGIN);
+    assert(!dock_menu_covers(bottom,0,0,menus,1));
+    menus[0] = dock_pulldown_reach(1280,11,612-12-DOCK_PULLDOWN_MARGIN+1);
+    assert(dock_menu_covers(bottom,0,0,menus,1));
+    menus[0] = dock_pulldown_reach(1280,11,-40);
+    assert(menus[0].bottom == 12+DOCK_PULLDOWN_MARGIN);
+    /* An empty dock box is never covered. */
+    assert(!dock_menu_covers((DockRect){10,10,10,20},10,15,NULL,-1));
+}
+
+/* AmigaOS 3.x: one native menu, pass by pass (AmiKit: MagicMenu's
+   non-blocking pop-ups are windows and stay open after the release). */
+static void test_menu_step(void)
+{
+    DockMenuWatch w = {0,0,0};
+    /* Intuition's pull-down decides at once by its reach. */
+    assert(!dock_menu_step(&w,1,-1,0,1,0) && !w.hides && !w.waiting);
+    assert(!dock_menu_step(&w,0,-1,-1,1,0));
+    assert(dock_menu_step(&w,1,-1,1,0,0) && w.hides == 1);
+    assert(dock_menu_step(&w,0,-1,-1,0,0));
+    /* No windows, no Intuition lock (a blocking MagicMenu): the pointer
+       rule, once per menu. */
+    assert(dock_menu_step(&w,1,-1,-1,1,0) && w.hides == 2);
+    assert(dock_menu_step(&w,0,-1,-1,0,0));
+    assert(!dock_menu_step(&w,1,-1,-1,0,0) && !w.hides);
+    assert(!dock_menu_step(&w,0,-1,-1,1,0));
+    /* The first windowed menu: the pointer hid the dock before the box
+       opened; the box shows it does not reach the dock, so the dock
+       comes back, and steps aside for good once a box overlaps it. */
+    assert(dock_menu_step(&w,1,-1,-1,1,0) && w.hides == 2);
+    assert(dock_menu_step(&w,0,-1,-1,1,0));
+    assert(!dock_menu_step(&w,0,0,-1,1,0) && w.windows_seen && !w.hides);
+    assert(!dock_menu_step(&w,0,-1,-1,1,0));
+    assert(dock_menu_step(&w,0,1,-1,1,0) && w.hides == 1);
+    assert(dock_menu_step(&w,0,0,-1,1,0));
+    /* Later menus wait for the windows instead of guessing: no blink. */
+    assert(!dock_menu_step(&w,1,-1,-1,1,0) && w.waiting);
+    assert(!dock_menu_step(&w,0,-1,-1,1,0));
+    assert(!dock_menu_step(&w,0,0,-1,1,0) && !w.waiting && !w.hides);
+    assert(!dock_menu_step(&w,1,-1,-1,1,0) && w.waiting);
+    assert(dock_menu_step(&w,0,1,-1,1,0) && w.hides == 1);
+    /* ... Intuition's menu (a window without a strip) ends the wait by
+       its reach and keeps the learned windows ... */
+    assert(!dock_menu_step(&w,1,-1,-1,1,0) && w.waiting);
+    assert(!dock_menu_step(&w,0,-1,0,1,0) && !w.waiting && w.windows_seen);
+    /* ... and a menu that shows no watched window in time (a Directory
+       Opus pop-up) gets the pointer rule, the next one waits again. */
+    assert(!dock_menu_step(&w,1,-1,-1,1,0) && w.waiting);
+    assert(!dock_menu_step(&w,0,-1,-1,1,0) && w.waiting);
+    assert(dock_menu_step(&w,0,-1,-1,1,1) && w.hides == 2 && w.windows_seen && !w.waiting);
+    assert(dock_menu_step(&w,0,-1,-1,0,1));
+    assert(!dock_menu_step(&w,1,-1,-1,1,0) && w.waiting);
+    /* Far from the dock after the wait: shown. */
+    assert(!dock_menu_step(&w,0,-1,-1,0,1) && !w.hides && !w.waiting);
+    assert(!dock_menu_step(&w,0,-1,-1,1,1));
+}
+
 int main(void)
 {
     test_layout_and_baseline();
@@ -618,6 +720,8 @@ int main(void)
     test_outside_shown();
     test_button_glyph();
     test_open_glyph();
-    puts("geometry: bottom/left/right layout, upright hit/slot/outside, half-open panel bounds, animation equivalence and centred box buttons (page chevrons, return arrow) and Open Folder glyph PASS");
+    test_menu_covers();
+    test_menu_step();
+    puts("geometry: native menu reach and per-menu steps, bottom/left/right layout, upright hit/slot/outside, half-open panel bounds, animation equivalence and centred box buttons (page chevrons, return arrow) and Open Folder glyph PASS");
     return 0;
 }

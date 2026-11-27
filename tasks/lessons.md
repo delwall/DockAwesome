@@ -769,3 +769,94 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
 - Rule: before calling a held drawer a dock leak, open and close it as a
   Workbench window by ARexx and try Delete again; only a lock that
   survives that is worth a bisect.
+
+## A field added to a struct inside App moved hover by 12% (ApolloOS, 2026-11-26)
+- Build 575 added `int volume` to `Item` (32 of them inside `App`): the
+  hover sweep composed 8.76 ms a frame against 7.34 ms for 573 in the
+  same session (render 11.3 / 10.1 ms, stalls 5 / 0), with the same
+  damage and no change to the compose code. Deriving the flag from the
+  path instead (build 576, `Item` and `App` back to 573's size) gave
+  10.2 ms against 10.1-10.2 ms.
+- Rule: keep `Item` and `App` sizes unchanged unless a field is needed;
+  derive cheap facts (a path ending in ':') instead. After any change to
+  their layout, run the matched hover sweep against the installed build
+  before judging the feature.
+
+## Agent right-clicks do not set the button qualifier (ApolloOS, 2026-11-27)
+- The dock hid PiP for every desktop right-click in the lower half (IMG_2662),
+  but agent right-clicks (amiga_click, amiga_button) never did: their events
+  carry no IEQUALIFIER_RBUTTON, so PeekQualifier stayed free and
+  `native_menu_held()` never fired. A test that depends on a held button
+  must send it through IND_ADDEVENT with the qualifier (input.device then
+  sets PeekQualifier, as for the gameport); check PeekQualifier in the log.
+- PiP2 registers are write-only: observe what the dock wrote by reading its
+  `AmigaPip` through the DockAwesome.PiP2 lease semaphore, on one EClock with
+  an input.device spy. That showed OFF 2 ms after the press, ON 40 ms after
+  the release.
+- A rule built for one menu system (MagicMenu pop-ups at the pointer) was
+  applied to every OS. Check how menus open on each target first (ApolloOS:
+  pull-down windows from the title bar, IControl ICF_POPUPMENUS off) and
+  decide from what is there (the menu's windows) where the OS shows it.
+
+## A held right button on AmigaOS 3.x needs more than an event (Coffin, 2026-11-27)
+- input.device on Coffin (Kickstart 45) has no IND_ADDEVENT (DoIO -3), and
+  IND_WRITEEVENT passes the event to the handlers but leaves
+  PeekQualifier() free, so the ApolloOS tool (RmbQ) did nothing here and
+  the dock never saw a held button. What worked: write the press/release
+  with IND_WRITEEVENT and patch PeekQualifier (SetFunction, restore at once
+  and check the vector is still ours) to report RBUTTON between them.
+  Check the DoIO result of every injected event before reading a log.
+  AmigaOS 3.1.4.1 (input.device 45.2) needs the same patch (2026-11-27).
+- An agent right-click that misses the dock opens MagicMenu's pop-up at
+  the pointer in sticky mode, with Power > Reboot now under it. Close it by
+  moving the pointer away (absolute warp) and Esc, never a click; aim
+  right-clicks at a pin from the row arithmetic (centre 640 + pitch *
+  (k - (n-1)/2), pitch 37 at size 32) and test held-button rules with a
+  menuless CON window active.
+- Esc on the dock's own window quits the dock (any build): send Esc only
+  while one of its menus or boxes is the active window.
+
+## Find how each OS shows its menus before picking a rule (3.2.3, 2026-11-27)
+- The 256 px pointer rule (MagicMenu pop-ups, Coffin) also hid a bottom dock
+  on AmigaOS 3.2.3, whose stock menus drop from the title bar. A read-only
+  probe's layer_busy count matched the held-menu time exactly: Intuition
+  3.x holds the screen's LayerInfo lock (owner: the input.device task) for
+  its whole menu; MagicMenu left it free. That owner, not a version check,
+  now tells the dock which kind of menu is up.
+- input.device on 3.2.3 has IND_ADDEVENT (DoIO 0): the ApolloOS-style Rmb
+  tool sets the held qualifier there; Coffin (3.9) needs the PeekQualifier
+  patch.
+- A review's "a busy lock is not proof" was right: check the lock's owner,
+  not only that it is busy.
+
+## Read the menu tool's own settings before testing menus (AmiKit, 2026-11-27)
+- AmiKit XE runs MagicMenu 2 (ENV:MagicMenu.prefs is text): MenuType 2 =
+  pull-down when pressed in the screen's title bar, pop-up elsewhere;
+  NonBlocking=Yes draws every box as a borderless window without a port
+  and takes no layer lock; PUMode 2 ("select") keeps a pop-up open after
+  a quick release until the next click. Directory Opus adds its own
+  pop-ups (desktop, lister files, lister title): windows with a port,
+  opened about 240 ms after the press. The MagicMenu source is on GitHub
+  (AmiKit/MagicMenu); `MenWin->Flags |= WFLG_MENUSTATE` marks the menu.
+- What that found: every rule so far ended at the button's release, but a
+  select-mode pop-up opened just above the dock stayed open for seconds
+  with PiP back over its lower half (569 and 583 alike).
+- Rule: before a menu test, read the menu tool's prefs (mode, blocking,
+  sticky/select) and test a menu that stays open after the release, not
+  only a held button. Drive pop-ups with Rmb down / screenshot / move off
+  the boxes / Rmb up, and close a select-mode pop-up with a second right
+  press, never a left click over its items.
+- Coffin's MagicMenu is also non-blocking, but PUMode/PDMode 1 = sticky:
+  the release does nothing, the next right press selects the item under
+  the pointer. Test it with `RmbHold <ticks> <x> <y>` (the pointer is
+  written off the boxes just before the release), a screenshot, then Esc;
+  never a second right press over a menu (2026-11-27).
+
+## Agent menus and dock starts on ApolloOS (2026-11-27)
+- With the right button held (RmbQ down), an absolute amiga_move_mouse to
+  the title bar shows the bar but drops no menu; amiga_move_mouse with
+  relative:true does. Release with the pointer warped off every box.
+- The AmiKit start form (`Run >NIL: Stack 400000 +` with the dock on the
+  next line, from Execute) started nothing on ApolloOS: no process, no
+  output file. Start CLI test docks there with `Run >NIL: Execute
+  <script>` and stop them with stop.s.

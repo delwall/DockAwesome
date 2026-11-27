@@ -149,36 +149,132 @@ static int update_drag_mask(App *app, int sample)
     return 1;
 }
 
-/* A native menu opened within this many pixels of the dock may cover it. */
-enum { MENU_REACH = 256 };
-
-/* Whether a native menu opened now can reach the dock: MagicMenu's pop-up
-   opens at the pointer, Intuition's drops from the title bar, so a dock
-   near the top (a side dock) always steps aside. Decided once per menu. */
-static int menu_near_dock(const App *app)
+/* The windows of a native menu that lie in front of the dock, up to max:
+   the count, -1 while the layer list is busy (Intuition's menu task takes
+   it briefly as the menu opens). ApolloOS opens the menu bar, items and
+   subitems as borderless windows without a UserPort (seen on R9.5: Flags
+   $00040800); a program's window in front of the dock has its IDCMP port
+   and is not a menu. Only AttemptSemaphore: never wait on a lock while a
+   menu is held. */
+static int menu_windows(App *app, DockRect *out, int max)
 {
-    int x = app->screen->MouseX, y = app->screen->MouseY;
-    int right = app->left+pip_visible_width(app), bottom = app->top+app->height;
-    int dx = x < app->left ? app->left-x : x >= right ? x-right+1 : 0;
-    int dy = y < app->top ? app->top-y : y >= bottom ? y-bottom+1 : 0;
-    return app->top < MENU_REACH || (dx < MENU_REACH && dy < MENU_REACH);
+    struct Layer *layer;
+    int count = 0;
+    if (!AttemptSemaphore(&app->screen->LayerInfo.Lock)) return -1;
+    for (layer = app->window->WLayer->front; layer && count < max; layer = layer->front) {
+        struct Window *window = layer->Window;
+        if (window && !window->UserPort && (window->Flags & WFLG_BORDERLESS) &&
+            !owns_window(app,window))
+            out[count++] = (DockRect){layer->bounds.MinX,layer->bounds.MinY,
+                layer->bounds.MaxX+1,layer->bounds.MaxY+1};
+    }
+    ReleaseSemaphore(&app->screen->LayerInfo.Lock);
+    return count;
 }
 
-/* PiP2 lies over menus, so the dock steps aside for a native menu that can
-   reach it; one opened further away leaves the dock in place (hiding it
-   for every desktop right-click on Coffin was jarring). The screen is not
-   read while a menu is up: under P96 MagicMenu holds the screen's bitmap
-   lock until it closes. */
+/* AmigaOS 3.x Intuition draws its own menus in layers that drop from the
+   screen's bar and holds the screen's layer lock for the whole menu (seen
+   on 3.2.3: busy from press to release); MagicMenu's pop-ups at the
+   pointer leave that lock free (Coffin), and AmigaOS 3.2 has no pop-up
+   menus of its own (IControl has no such option). So the lock held by
+   input.device's task, where Intuition runs its menus, while the right
+   button is down is Intuition's pull-down menu; any other owner (a
+   program moving a window, a menu patch) keeps the pointer rule. The
+   active window's menu strip bounds how deep the menu can drop: out gets
+   that area. Only AttemptSemaphore, and the strip is only read:
+   ClearMenuStrip waits for a menu in use, so it stays put while
+   Intuition holds the menu. */
+static int pulldown_reach(App *app, DockRect *out)
+{
+    struct Window *window;
+    struct Menu *menu;
+    int bottom = 0, menus = 0;
+    if (AttemptSemaphore(&app->screen->LayerInfo.Lock)) {
+        ReleaseSemaphore(&app->screen->LayerInfo.Lock);
+        return 0;
+    }
+    Forbid();
+    if (!app->screen->LayerInfo.Lock.ss_Owner ||
+        app->screen->LayerInfo.Lock.ss_Owner != FindTask((STRPTR)"input.device")) {
+        Permit();
+        return 0;
+    }
+    window = IntuitionBase->ActiveWindow;
+    if (window && window->WScreen == app->screen)
+        for (menu = window->MenuStrip; menu && menus < 64; menu = menu->NextMenu, ++menus) {
+            struct MenuItem *item;
+            int items = 0;
+            for (item = menu->FirstItem; item && items < 256; item = item->NextItem, ++items) {
+                struct MenuItem *sub;
+                int subs = 0, low = item->TopEdge+item->Height;
+                for (sub = item->SubItem; sub && subs < 256; sub = sub->NextItem, ++subs)
+                    if (item->TopEdge+sub->TopEdge+sub->Height > low)
+                        low = item->TopEdge+sub->TopEdge+sub->Height;
+                if (low > bottom) bottom = low;
+            }
+        }
+    Permit();
+    *out = dock_pulldown_reach(app->screen->Width,app->screen->BarHeight,bottom);
+    return 1;
+}
+
+/* PiP2 lies over menus, so the dock steps aside for a native menu that
+   reaches it and stays for one that does not (hiding it for every desktop
+   right-click was jarring). ApolloOS draws menus in windows: the dock
+   watches them for the whole menu and steps aside once one overlaps it;
+   its menus drop from the title bar, so a right-click anywhere leaves a
+   bottom dock in place (IMG_2662: it hid for every click within 256 px).
+   AmigaOS 3.x (dock_menu_step), for the whole menu, also after the button
+   is up while MagicMenu keeps it open: MagicMenu's non-blocking boxes are
+   borderless windows, watched as on ApolloOS (AmiKit: a pop-up opened just
+   above the dock stayed open under the dock after the release, and every
+   right-click within 256 px hid the dock); Intuition's own menus drop from
+   the bar as far as the active window's strip reaches (pulldown_reach);
+   a menu drawn without windows or Intuition's lock (a blocking MagicMenu)
+   keeps the pointer rule. The screen is not read while a menu is held:
+   under P96 a blocking MagicMenu holds the screen's bitmap lock until it
+   closes. */
 static int pip_blocked_by_screen(App *app)
 {
-    int menu = native_menu_held(app);
+    int menu = native_menu_up(app);
     if (!menu) app->menu_decided = 0;
-    else if (!app->menu_decided) {
-        app->menu_decided = 1;
-        app->menu_hides = menu_near_dock(app);
-        if (app->menu_hides) ++app->stats.menu_suspends;
+    else {
+        DockRect dock = {app->left,app->top,app->left+pip_visible_width(app),app->top+app->height};
+        DockRect windows[8];
+        /* A new press is a new menu, also when the loop missed the
+           release between them. */
+        ULONG press = app->input_context.right_seen;
+        int first = !app->menu_decided || press != app->menu_press, covers = 0, count, was = app->menu.hides;
+        if (first) { app->menu_decided = MENU_DECIDED; app->menu.hides = 0; app->menu_press = press; }
+        if (app->menu.hides == 1) {}
+        else if (app->caps.menu_windows) {
+            if (!app->resetting && IntuitionBase->FirstScreen == app->screen) {
+                count = menu_windows(app,windows,8);
+                covers = count > 0 && dock_menu_covers(dock,0,0,windows,count);
+            }
+            if (covers) app->menu.hides = 1;
+        } else {
+            DockRect drop;
+            int waiting = !first && app->menu.waiting, shown = -1, reach = -1;
+            count = !app->resetting && IntuitionBase->FirstScreen == app->screen &&
+                !(app->menu_decided & MENU_OLD_WINDOWS) ? menu_windows(app,windows,8) : -1;
+            /* The first pass comes at the press, before MagicMenu opens a box
+               (17-93 ms later): windows already there are something else. */
+            if (first && count > 0) { app->menu_decided |= MENU_OLD_WINDOWS; count = -1; }
+            if (count > 0) shown = dock_menu_covers(dock,0,0,windows,count);
+            else if ((first || waiting) && pulldown_reach(app,&drop)) reach = dock_menu_covers(dock,0,0,&drop,1);
+            dock_menu_step(&app->menu,first,shown,reach,
+                dock_menu_covers(dock,app->screen->MouseX,app->screen->MouseY,NULL,-1),
+                waiting && (LONG)((ULONG)profile_clock()-app->menu_wait_until) >= 0);
+            /* 150 ms: on AmiKit MagicMenu opened its first box 68-93 ms
+               after the press (its bar 17 ms); Directory Opus opened its
+               own pop-ups (windows with a port, so not watched) after
+               244 ms, so the pointer rule hides the dock before they show. */
+            if (app->menu.waiting && !waiting) app->menu_wait_until = (ULONG)profile_clock()+app->clock_hz*3/20;
+        }
+        if (app->menu.hides && (first || !was)) ++app->stats.menu_suspends;
     }
-    if (!app->resetting && IntuitionBase->FirstScreen == app->screen && !(menu && app->menu_hides)) return 0;
+    if (!app->resetting && IntuitionBase->FirstScreen == app->screen && !(menu && app->menu.hides)) return 0;
     interaction_cancel(app);
     amiga_pip_suspend(app->pip); app->pip_visible = 0; input_publish(app);
     return 1;

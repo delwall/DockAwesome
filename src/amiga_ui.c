@@ -80,15 +80,18 @@ static const MenuItem menu_items[] = {
 static const MenuItem close_item = {"Close", DOCK_UI_CLOSE_ITEM};
 /* A Folder Stack's menu, after the macOS Dock's: its order and what a
    left click does (Display as Stack / Folder there), each under a muted
-   heading with the active one checked, between them a separator. A NULL
-   label is the separator; DOCK_UI_NONE rows do not react. */
+   heading with the active one checked, between them a separator. A disk
+   whose window is open adds Close below another separator, last as the
+   Mac's Quit. A NULL label is the separator; DOCK_UI_NONE rows do not
+   react. */
 static const MenuItem drawer_items[] = {
     {"Sort by", DOCK_UI_NONE}, {"Name", DOCK_UI_SORT_NAME},
     {"Date Modified", DOCK_UI_SORT_DATE}, {"Kind", DOCK_UI_SORT_KIND}, {NULL, DOCK_UI_NONE},
     {"Click to", DOCK_UI_NONE}, {"Show Stack", DOCK_UI_CLICK_STACK},
-    {FOLDER_OPEN_LABEL, DOCK_UI_CLICK_FOLDER}
+    {FOLDER_OPEN_LABEL, DOCK_UI_CLICK_FOLDER}, {NULL, DOCK_UI_NONE}, {"Close", DOCK_UI_CLOSE_ITEM}
 };
 enum { POPUP_MAX_ROWS = sizeof(drawer_items)/sizeof(*drawer_items),
+    DRAWER_ROWS = POPUP_MAX_ROWS-2, /* without the Close row and its separator */
     POPUP_SEPARATOR = 7, /* the separator row's height; its line is in the middle */
     POPUP_INERT = -2 };  /* popup_hit: a heading or separator */
 static const MenuItem quit_item = {"Quit", DOCK_UI_QUIT_ITEM};
@@ -1309,8 +1312,19 @@ static void paint_folder_content(DockUI *ui, struct RastPort *rp, int parts, Doc
     int visible = folder_visible_files(f), icon = f->anchor.icon_size;
     size_t first = f->page*folder_page_size(f);
     const char *title = (const char *)FilePart((STRPTR)f->path);
+    char volume[DOCK_PREFS_PATH_CAP];
     int labels = parts&FOLDER_PAINT_LABELS, glyphs = parts&FOLDER_PAINT_GLYPHS;
-    if (!title[0]) title = f->path;
+    /* A disk's root: its name without the colon, as its pin's label and
+       its Workbench window say. */
+    if (!title[0]) {
+        size_t length = strlen(f->path);
+        title = f->path;
+        if (length > 1 && f->path[length-1] == ':') {
+            memcpy(volume,f->path,length-1);
+            volume[length-1] = '\0';
+            title = volume;
+        }
+    }
 
     if (!target) SetDrMd(rp,JAM1);
     SetFont(rp,folder_font(ui));
@@ -2644,7 +2658,7 @@ int dock_ui_open_popup(DockUI *ui, DockEdge edge, int anchor_x, int anchor_y,
     ui->popup_text_left = 10;
     if (drawer) {
         ui->popup_items = drawer_items;
-        ui->popup_rows = POPUP_MAX_ROWS;
+        ui->popup_rows = item_action == DOCK_UI_CLOSE_ITEM ? POPUP_MAX_ROWS : DRAWER_ROWS;
         for (i = 0; i < ui->popup_rows; ++i)
             if (drawer_items[i].action == DOCK_UI_SORT_NAME+sort ||
                 drawer_items[i].action == DOCK_UI_CLICK_STACK+click) ui->popup_checked |= 1U<<i;

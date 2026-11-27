@@ -928,7 +928,8 @@ int program_poll_result(App *app, int *recreate)
         int pin, running;
         if (!(poll->valid & poll->pins[i].kind) && !poll->pins[i].attributed) continue;
         pin = pin_index(app,poll->pins[i].pin_id);
-        if (pin < 0) continue;
+        /* A disk that became a stack while this poll ran has no dot. */
+        if (pin < 0 || app->items[pin].stack) continue;
         /* Keep the sources apart: the next poll carries RUNNING_WORKBENCH
            over while the Workbench list cannot be read (no Workbench, as
            under Directory Opus), so a window's dot must not turn into it. */

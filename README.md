@@ -8,6 +8,7 @@ A macOS-style dock for the Vampire V4, with live transparency through SAGA PiP.
 - Drop Workbench icons on the dock to pin them. Drag a pin off to remove it.
 - Running programs get a dot under their pin, or a temporary icon.
 - Every pinned drawer opens as a **Folder Stack** that browses it straight from the dock.
+  A pinned disk opens its window, or, chosen in its menu, works as a stack too.
 
 ![A large magnified icon under the pointer](docs/images/dock-zoom.png)
 
@@ -37,6 +38,7 @@ double-click `DockAwesome`. If you use WBDock, move it to
 | Right-click the dock | **Settings**, **About** or **Quit** |
 | Right-click a running program | **Quit**, **Close** or **Keep in Dock** |
 | Right-click a Folder Stack | **Sort by** Name, Date Modified or Kind; **Click to** **Show Stack** or **Open Folder** |
+| Right-click a disk | The same as a Folder Stack (**Open Folder** by default), and **Close** while its window is open |
 
 **Settings** sets the icon size, the zoom and the screen edge. Pins and
 settings are saved in `ENVARC:DockAwesome.json`.

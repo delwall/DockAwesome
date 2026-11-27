@@ -29,6 +29,12 @@ static const char *const click_keys[DOCK_CLICK_COUNT] = {"stack", "folder"};
 
 static const char *const edge_names[] = {"bottom", "left", "right"};
 
+DockClick dock_click_default(const char *path)
+{
+    size_t length = strlen(path);
+    return length && path[length-1] == ':' ? DOCK_CLICK_FOLDER : DOCK_CLICK_STACK;
+}
+
 void dock_prefs_defaults(DockPrefs *prefs)
 {
     DockSettings defaults = dock_settings_default();
@@ -230,7 +236,7 @@ static int parse_click(const char *key, int *value)
 
 /* An object of path: key ("sorts", "clicks"). Keys this build does not
    know, values that are not strings, and entries past DOCK_MAX_ITEMS are
-   skipped: they read as the default. Not an object at all: a newer
+   skipped: they read as the path's default. Not an object at all: a newer
    build's format, skipped too. */
 static int read_map(FILE *file, PendingMap *pending, ParseKey parse)
 {
@@ -340,7 +346,8 @@ int dock_prefs_read(FILE *file, DockPrefs *prefs)
     if (ok) {
         for (i = 0; i < parsed->count; ++i) {
             parsed->sorts[i] = (DockSort)map_value(&pending->sorts,parsed->paths[i],DOCK_SORT_NAME);
-            parsed->clicks[i] = (DockClick)map_value(&pending->clicks,parsed->paths[i],DOCK_CLICK_STACK);
+            parsed->clicks[i] = (DockClick)map_value(&pending->clicks,parsed->paths[i],
+                dock_click_default(parsed->paths[i]));
         }
         *prefs = *parsed;
     }
@@ -390,7 +397,7 @@ static const char *sort_key_at(const DockPrefs *prefs, int i)
 
 static const char *click_key_at(const DockPrefs *prefs, int i)
 {
-    return prefs->clicks[i] == DOCK_CLICK_STACK ? NULL : click_keys[prefs->clicks[i]];
+    return prefs->clicks[i] == dock_click_default(prefs->paths[i]) ? NULL : click_keys[prefs->clicks[i]];
 }
 
 int dock_prefs_write(FILE *file, const DockPrefs *prefs)
@@ -432,7 +439,9 @@ int dock_prefs_migrate(DockPrefs *prefs)
     int i;
     if (!prefs || !prefs->folder[0]) return 0;
     for (i = 0; i < prefs->count; ++i) if (same_path(prefs->paths[i],prefs->folder)) break;
-    if (i == prefs->count && prefs->count < DOCK_MAX_ITEMS) {
+    /* Already a pin: it keeps its sort and shows its box (a disk too). */
+    if (i < prefs->count) prefs->clicks[i] = DOCK_CLICK_STACK;
+    else if (prefs->count < DOCK_MAX_ITEMS) {
         memcpy(prefs->paths[prefs->count],prefs->folder,sizeof(prefs->folder));
         prefs->sorts[prefs->count] = DOCK_SORT_NAME;
         prefs->clicks[prefs->count++] = DOCK_CLICK_STACK;

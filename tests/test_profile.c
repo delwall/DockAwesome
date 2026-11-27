@@ -6,7 +6,7 @@
 /* Probed capabilities of the machines DockAwesome meets. Fields in
    DockCaps order: cpu_080, ammx, saga_core, saga_pip2, shaped_windows,
    rgb_rastport, alpha_text, window_action, status_notify, apollo_console,
-   screen_notify, screen_depth, workbench_port, scalos, dopus. */
+   screen_notify, screen_depth, workbench_port, scalos, dopus, menu_windows. */
 typedef struct {
     const char *name;
     DockCaps caps;
@@ -17,47 +17,47 @@ typedef struct {
 
 static const Machine machines[] = {
     {"ApolloOS R9.5, Vampire V4, 16-bit SAGA",
-        {1,1,12515,1,1,1,1,1,1,1,1,16,1,0,0},
+        {1,1,12515,1,1,1,1,1,1,1,1,16,1,0,0,1},
         DOCK_PROFILE_OK, DOCK_PIXELS_AMMX, 1, 1, 1},
     {"ApolloOS R9.5, Vampire V4, 24-bit screen",
-        {1,1,12515,1,1,1,1,1,1,1,1,24,1,0,0},
+        {1,1,12515,1,1,1,1,1,1,1,1,24,1,0,0,1},
         DOCK_PROFILE_OK, DOCK_PIXELS_AMMX, 1, 1, 1},
     {"ApolloOS R9.5, Vampire V4, 32-bit screen",
-        {1,1,12515,1,1,1,1,1,1,1,1,32,1,0,0},
+        {1,1,12515,1,1,1,1,1,1,1,1,32,1,0,0,1},
         DOCK_PROFILE_OK, DOCK_PIXELS_AMMX, 1, 1, 1},
     {"ApolloOS R9.5, Vampire V4, 8-bit screen",
-        {1,1,12515,1,1,1,1,1,1,1,1,8,1,0,0},
+        {1,1,12515,1,1,1,1,1,1,1,1,8,1,0,0,1},
         DOCK_PROFILE_PIP_SCREEN, DOCK_PIXELS_AMMX, 1, 0, 0},
     {"ApolloOS, Vampire with a core older than 11900",
-        {1,1,11000,0,1,1,1,1,1,1,1,16,1,0,0},
+        {1,1,11000,0,1,1,1,1,1,1,1,16,1,0,0,1},
         DOCK_PROFILE_PIP_NO_CORE, DOCK_PIXELS_AMMX, 1, 1, 1},
     /* AmigaOS 3.2 has no V50 Intuition or Layers and no AROS RGB tags.
        PiP runs without window shapes there (no ApolloOS pointer events). */
     {"AmigaOS 3.2, Vampire V4, 16-bit SAGA",
-        {1,1,12515,1,0,0,0,0,0,0,0,16,1,0,0},
+        {1,1,12515,1,0,0,0,0,0,0,0,16,1,0,0,0},
         DOCK_PROFILE_OK, DOCK_PIXELS_AMMX, 0, 1, 0},
     {"AmigaOS 3.2, Vampire V4, screennotify installed",
-        {1,1,12515,1,0,0,0,0,0,0,1,16,1,0,0},
+        {1,1,12515,1,0,0,0,0,0,0,1,16,1,0,0,0},
         DOCK_PROFILE_OK, DOCK_PIXELS_AMMX, 0, 1, 0},
     /* AmiKit ships screennotify.library and runs Directory Opus instead of
        Workbench. The glass is RGBA images on any RTG screen; AA text needs
        BltTemplateAlpha. */
     {"AmigaOS 3.9/AmiKit, Vampire V4, P96 16-bit",
-        {1,1,12515,1,0,0,0,0,0,0,1,16,0,0,1},
+        {1,1,12515,1,0,0,0,0,0,0,1,16,0,0,1,0},
         DOCK_PROFILE_OK, DOCK_PIXELS_AMMX, 0, 1, 0},
     {"AmigaOS 3.9/AmiKit, Vampire V4, P96 24-bit, CGX alpha",
-        {1,1,12515,1,0,0,1,0,0,0,1,24,0,0,1},
+        {1,1,12515,1,0,0,1,0,0,0,1,24,0,0,1,0},
         DOCK_PROFILE_OK, DOCK_PIXELS_AMMX, 0, 1, 1},
     /* Coffin r65 (AmigaOS 3.9) on the Vampire, probed by drawing on
        2026-11-10: no RGB RastPort tags (pens), no alpha template text, no
        window shapes. The glass and its rounded edges are drawn over the
        captured screen. */
     {"AmigaOS 3.9 Coffin r65, Vampire V4, 24-bit SAGA",
-        {1,1,12398,1,0,0,0,0,0,0,1,24,1,0,0},
+        {1,1,12398,1,0,0,0,0,0,0,1,24,1,0,0,0},
         DOCK_PROFILE_OK, DOCK_PIXELS_AMMX, 0, 1, 0},
     /* The 68080 binary does not run here; the profile still answers. */
     {"AmigaOS 3.x, 68030 AGA, 8-bit",
-        {0,0,0,0,0,0,0,0,0,0,0,8,1,0,0},
+        {0,0,0,0,0,0,0,0,0,0,0,8,1,0,0,0},
         DOCK_PROFILE_PIP_NO_AMMX, DOCK_PIXELS_PORTABLE, 0, 0, 0},
 };
 

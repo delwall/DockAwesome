@@ -519,3 +519,47 @@ void dock_open_glyph_row(const DockOpenGlyph *g, int py, int px0, int count, uns
         }
     }
 }
+
+DockRect dock_pulldown_reach(int screen_width, int bar_height, int items_bottom)
+{
+    if (items_bottom < 0) items_bottom = 0;
+    return (DockRect){0,0,screen_width,bar_height+1+items_bottom+DOCK_PULLDOWN_MARGIN};
+}
+
+int dock_menu_step(DockMenuWatch *watch, int first, int windows, int reach, int pointer, int expired)
+{
+    if (first) { watch->hides = 0; watch->waiting = 0; }
+    if (watch->hides == 1) return 1;
+    /* The menu's own windows show where it is (as on ApolloOS); they also
+       undo a guess the pointer made before they opened. */
+    if (windows >= 0) {
+        watch->windows_seen = 1; watch->waiting = 0;
+        watch->hides = windows ? 1 : 0;
+        return watch->hides;
+    }
+    if (watch->hides) return 1;
+    if (!first && !watch->waiting) return 0;
+    if (reach >= 0) { watch->waiting = 0; watch->hides = reach ? 1 : 0; return watch->hides; }
+    /* Nothing is drawn yet: a menu like the last one opens its windows in
+       a few fields, so the dock stays until they show (no blink). */
+    if (first && watch->windows_seen) { watch->waiting = 1; return 0; }
+    if (watch->waiting && !expired) return 0;
+    watch->waiting = 0;
+    watch->hides = pointer ? 2 : 0;
+    return watch->hides != 0;
+}
+
+int dock_menu_covers(DockRect dock, int pointer_x, int pointer_y, const DockRect *menus, int count)
+{
+    int i, dx, dy;
+    if (dock.right <= dock.left || dock.bottom <= dock.top) return 0;
+    if (count >= 0) {
+        for (i = 0; i < count; ++i)
+            if (menus[i].left < dock.right && menus[i].right > dock.left &&
+                menus[i].top < dock.bottom && menus[i].bottom > dock.top) return 1;
+        return 0;
+    }
+    dx = pointer_x < dock.left ? dock.left-pointer_x : pointer_x >= dock.right ? pointer_x-dock.right+1 : 0;
+    dy = pointer_y < dock.top ? dock.top-pointer_y : pointer_y >= dock.bottom ? pointer_y-dock.bottom+1 : 0;
+    return dock.top < DOCK_MENU_REACH || (dx < DOCK_MENU_REACH && dy < DOCK_MENU_REACH);
+}

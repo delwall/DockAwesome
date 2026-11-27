@@ -66,6 +66,47 @@ int dock_edge_panel_reach(const DockSettings *settings, DockEdge edge,
     const DockPlacement *placement, int count, int width, int height,
     const DockRect *include, DockRect *out);
 
+/* Whether PiP must step aside for a held native menu (PiP2 lies over
+   menus). dock is the shown PiP box on the screen. Where the system draws
+   its menus in windows (ApolloOS), menus holds the count windows in front
+   of the dock: only one overlapping the dock counts; AmigaOS 3.x Intuition
+   passes its pull-down's area (dock_pulldown_reach). count < 0: nothing
+   is known of the menu (MagicMenu); a menu opened within
+   DOCK_MENU_REACH of the pointer may reach the dock, and so does one that
+   drops from the title bar onto a dock that starts near the top. */
+enum { DOCK_MENU_REACH = 256 };
+int dock_menu_covers(DockRect dock, int pointer_x, int pointer_y, const DockRect *menus, int count);
+/* The area AmigaOS 3.x Intuition's own menus can cover: they drop from the
+   screen's bar (bar_height rows), and items_bottom is the lowest row of any
+   item or subitem below the drop box's top (MenuItem TopEdge + Height,
+   subitems relative to their item). The whole width, with
+   DOCK_PULLDOWN_MARGIN rows for the box's borders and Intuition moving a
+   subitem box to fit. */
+enum { DOCK_PULLDOWN_MARGIN = 16 };
+DockRect dock_pulldown_reach(int screen_width, int bar_height, int items_bottom);
+
+/* PiP's choice for one native menu on AmigaOS 3.x, from its press until it
+   closes (also after the button is up: MagicMenu's sticky and select
+   modes keep it open). hides: 0 shown; 1 hidden for the rest of the menu;
+   2 hidden by the pointer rule until the menu's windows show where it is.
+   waiting: the pointer rule waits for the menu's windows because an
+   earlier menu had some. windows_seen: a menu showed itself as windows
+   since the dock started (MagicMenu's non-blocking mode draws its boxes in
+   borderless windows; Intuition and a blocking MagicMenu draw none, and
+   Directory Opus's pop-ups are windows with a port, which are not
+   watched: those get the pointer rule after the wait). */
+typedef struct {
+    unsigned char hides, waiting, windows_seen;
+} DockMenuWatch;
+/* One loop pass while the menu is up; returns whether PiP stays hidden.
+   first: a new menu (a new press). windows: the menu's windows in front of
+   the dock, -1 none, 0 none overlaps the dock, 1 one does. reach: whether
+   Intuition's own pull-down reaches the dock (dock_pulldown_reach), -1 when
+   the menu is not Intuition's. pointer: whether the pointer rule
+   (dock_menu_covers with count -1) says the menu may reach the dock.
+   expired: the wait for windows is over. */
+int dock_menu_step(DockMenuWatch *watch, int first, int windows, int reach, int pointer, int expired);
+
 /* The empty slot a drag or a drop opens in the row, animated like an icon
    so the plate's ends move with the row: at an end nothing else bounds the
    plate, and set at once it jumped there while the icons slid (IMG_2595).

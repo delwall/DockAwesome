@@ -30,6 +30,11 @@ Keep the original Workbench artwork, aspect ratio, and alpha.
   active one, a hairline separator, then a muted **Click to** heading,
   **Show Stack** and **Open Folder** with a check mark on what a left click
   does. All its labels start past the check column.
+- A pinned disk has the same menu, with **Open Folder** checked until
+  **Show Stack** is chosen. While its window is open the menu ends with a
+  second hairline and **Close**, last as the Mac's **Quit**, its label in
+  the same column. A disk's box is titled with the volume name without
+  its colon, as its hover label.
 - A Folder Stack box ends each page with an **Open Folder** tile below
   the real icons: a ring about 72% of the icon size at the icon's centre,
   ring and one-line label in the muted heading tone.

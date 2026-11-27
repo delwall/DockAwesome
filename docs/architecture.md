@@ -250,15 +250,34 @@ edge defaults to bottom. A `"folder"` key from 1.0 beta 5 and older is read,
 moved to the end of `"paths"` (`dock_prefs_migrate`) and never written again.
 `"sorts"` maps a stack's path to its order (`"date"` or `"kind"`); stacks
 sorted by name are not listed, and a key or path this build does not know
-reads as name. `"clicks"` maps a stack's path to `"folder"` the same way
-(the same reader and writer for both maps): stacks that show their box are
-not listed, and anything else reads as Show Stack. Older builds skip both
-keys. Both follow the pin's `Item` through reorder, removal and
+reads as name. `"clicks"` maps a pin's path to `"stack"` or `"folder"` the same way
+(the same reader and writer for both maps), but only when the click is not
+the path's default (`dock_click_default`): Show Stack for a drawer, Open
+Folder for a disk (a path ending in `:`). So a drawer is listed only as
+`"folder"` and a disk only as `"stack"`; a value this build does not know
+reads as the path's default. 1.0 beta 5 skips both keys. 1.0 beta 6 reads
+`"stack"` for a disk (its disks are never stacks, so it opens a window)
+and drops it at its next save; every path is kept (checked on the host
+with both tags' readers). Both follow the pin's `Item` through reorder, removal and
 `save_config`, and are matched by path, not by position.
 
 Every pinned drawer that is a directory and not a volume root is a Folder
 Stack: a click opens its box, and the pin moves and is removed like any
-other, without a running dot. While the dock idles with the pointer off it,
+other, without a running dot. A disk (a drawer pin whose path ends in `:`,
+`disk_pin`) is a stack only while its click is Show Stack: `set_click` sets
+`Item.stack` from the click and, when the flag changes, clears the running
+state that belonged to the other kind (`running`, `owner`, `lister`); the
+status worker ignores a reply for a pin that became a stack while it ran,
+and finds an Open Folder disk's window again on its next poll
+(`status_changed`). Becoming a stack builds the close button
+(`stack_button_build`) and arms that disk's read-ahead; with Open Folder,
+its default, it is the drawer pin of 1.0 beta 6 (window, dot, Close, no
+read-ahead, so idle reads never touch a disk's root by default). Its menu
+(`stack_menu`) is the stack menu in both modes, with Close after a
+separator while its window is open. The box's read of a disk's root, the
+read-ahead and the icon reads (`read_folder_icon`) run without DOS
+requesters (`pr_WindowPtr` -1): a disk taken out shows "Cannot read
+drawer" in the box at once. While the dock idles with the pointer off it,
 the event loop reads one more icon of a stack's first page per live tick,
 round robin over the stacks from the one nearest the pointer, into a
 512-entry icon cache that this read-ahead never evicts from.

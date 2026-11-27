@@ -3854,8 +3854,8 @@ each stop).
       Disabled holds the user's WBDock, Matrix and others and, until
       reboot (locked by WBStartup), DockAwesome-locked-delete (551).
       amiagent and ApolloExplorerSrv keep running.
-- [ ] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete (551) after
-      the next Coffin boot.
+- [x] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete (551) after
+      the next Coffin boot (done in the beta 7 session, 2026-11-27).
 - [ ] NOT RUN on Coffin: the native (no AA) path (not used here); a DOpus
       lister for Open Folder (Workbench is the desktop).
 
@@ -4123,10 +4123,1432 @@ running; started with Run >NIL: C:ApolloExplorerSrv.
       untouched (588 bytes, 18:10:59 as at the start). RAM: holds only
       Clipboards, ENV, T; DL: assign removed, ENV:dpid deleted.
       amiagent and C:ApolloExplorerSrv (started this session) keep running.
-- [ ] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete (569) after
-      the next ApolloOS boot.
+- [x] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete (569) after
+      the next ApolloOS boot (done in the disk stack session).
 - [ ] NOT RUN: AmigaOS 3.9, Coffin, AmigaOS 3.2.3, AmigaOS 3.1.4.1, AmiKit
       XE (same renderer, menu code and PiP cut-out; 24-bit screens there);
       1.0 beta 5 on hardware (same code, by reading); a right-click on the
       plate while the row is still easing (the review's case, covered by
       the pending-frame draw, not reproduced).
+
+### Disks as Folder Stacks, opt-in per pin (ApolloOS, 2026-11-26, owner decision)
+Scope: a disk pin (a drawer pin whose path ends in ':') gets the stack menu
+(Sort by, Click to). Default Open Folder = 1.0 beta 6's disk pin (window,
+running dot, Close while open, no read-ahead); Show Stack makes it a stack
+(box, no dot, no Close, read ahead). Close stays offered while the window
+is open, last, after a second hairline. Persisted in "clicks" by path, only
+non-default values ("stack" for a disk, "folder" for a drawer).
+- [x] dock_prefs: `dock_click_default(path)`; the reader gives each path its
+      own default, the writer omits it; "stack" and "folder" accepted for
+      any path; unknown values read as the path's default. Migration keeps
+      the 1.0 beta 5 Folder Stack showing its box (a disk there: "stack").
+- [x] amiga_main: `disk_pin` (derived from kind + path), `stack_menu`,
+      `set_click` (sets `Item.stack` for disks, clears running/owner/lister
+      when the flag changes, arms the read-ahead for a box); `pin_path`
+      and startup go through it; `click_menu_item` builds the close button
+      and calls `status_changed` on a flag change; `read_folder_icon` runs
+      without requesters; icon reload keeps the disk loader for disks.
+- [x] amiga_status: a reply for a pin that is a stack now is ignored (a
+      poll in flight when a disk became a stack).
+- [x] amiga_ui: `drawer_items` + separator + Close (`DRAWER_ROWS` without
+      them, all rows with `DOCK_UI_CLOSE_ITEM`); a root's box title drops
+      the colon ("Personal", as the hover label).
+- [x] Host: `test_disk_clicks` (defaults per path, exact "clicks" format
+      with "stack"/"folder", round trip, explicit defaults not written
+      back, unknown/odd values, key for no pin, reorder, removal, hand
+      edit, migration of a disk Folder Stack); `make host-test`, `make
+      host-sanitize` pass; `make amiga` no warnings (build 576).
+- [x] Compatibility (host, `git archive` of each tag's dock_prefs.c, a file
+      with "Personal:": "stack", "Personal:Downloads": "folder" and sorts):
+      v1.0b5 reads all 5 paths, ignores "sorts" and "clicks" and writes
+      neither; v1.0b6 reads all 5 paths, Personal: as Show Stack (its disks
+      are never stacks: a window opens), keeps "folder" and the sorts and
+      drops "stack" at its next save (the disk reads as Open Folder again
+      in this build). No path lost.
+- [x] impeccable polish (in-thread): group order Sort by, Click to as for
+      drawers; Close is an action, not an option, so it goes last below
+      its own hairline (the Mac puts Quit last), label in the same column;
+      wording kept ("Open Folder" as the box tile). Box title without the
+      colon. No other change.
+- [x] ApolloOS R9.5, test docks from RAM: (`--config RAM:d1.json`: the
+      user's 14 pins + Archives:), one dock at a time (FindTask, Sems,
+      Status before each start; 5 s+ before each stop):
+
+      | check | result |
+      | --- | --- |
+      | right-click Archives: (no window) | Sort by (Name checked), hairline, Click to, Open Folder checked; no Close (115x146) |
+      | right-click Personal: (window open) | the same + hairline + Close (115x172) |
+      | Archives: -> Show Stack | file gains "clicks": {"Archives:": "stack"}; click opens the box "Archives" (185x200, 8 entries + Open Folder) |
+      | Date Modified | "sorts": {"Archives:": "date"}; box order Games, Prefs, C, Demos, iGame.guide, S, Devs, ABDisk (List SORT=DATE agrees) |
+      | drawer inside, parent arrow | Archives:Games (356x359, parent arrow) and back to the root box |
+      | Personal: (open) -> Show Stack | menu without Close; canvas dump: dot under Personal gone; click opens its box (299x253, 16 entries) |
+      | Personal: -> Open Folder | "Personal:" leaves "clicks"; Close back after the status poll; Close closed the window; click opened it again |
+      | reorder Archives: to slot 0 | first in "paths", "sorts"/"clicks" kept; slot 0 click opens its box |
+      | restart | Archives: menu: Date Modified + Show Stack checked; click opens the box |
+      | drag Archives: out | gone from "paths", no "sorts"/"clicks" left |
+
+      These ran on build 575; build 576 (the flag derived from the path,
+      see Performance) repeated: idle Archives: menu (Open Folder checked,
+      no Close), Show Stack saved as "stack" and the click opened its box
+      (185x200), Personal: (window open) menu 115x172 with Close.
+
+- [x] Many entries: BOOT: (about 180 root entries) as Show Stack: box
+      698x598, page 1/2; first open after the read-ahead: first paint
+      332 ms, entrance 140 ms, 3 frames (the largest box; the read-ahead
+      read 149 icons, pending=0).
+- [x] Absent volume: an ADF made on the Mac (FFS, "DockGone", 3 entries)
+      in IDF0: with MountDiskImage; pins CLI, DockGone: (stack), BOOT:,
+      Editor. Box 185x147 while inserted; after EJECT (Info: no volume
+      DockGone) a click shows the box with "Cannot read drawer" (185x109),
+      no requester, first paint 22 ms; Kind chosen for it re-armed its
+      read-ahead, which read once and finished (reads 123 = 3 + 119 + 1,
+      pending=0), no requester, no stall. Control: `Dir DockGone:` from the
+      Shell opened "Please insert volume "DockGone" in any drive" (cancelled).
+      A pin on an empty drive (DF0:, ICD0:) cannot load at startup, as in
+      1.0 beta 6 ("Cannot read this icon"), so it never becomes a pin.
+- [x] Dumps (`--pip-dump`, pins CLI, Personal: (window open), Archives:
+      (stack), Editor; sizes 36/48/72): menu 115x172 at every size; boxes
+      185x200, 224x246, 334x342. Images (4x menus, 3x/2x boxes):
+      scratchpad `design/disk-stack-menu-{36,48,72}-4x.png`,
+      `-menu-idle-36-4x.png`, `-box-36-3x.png`, `-box-48-3x.png`,
+      `-box-72-2x.png`, `-absent-36-4x.png`, `-boot-p1-36-2x.png`,
+      `-dot-folder-vs-stack-4x.png`; also in ~/Downloads/DockAwesome-design/.
+- [x] Performance (ChangeTaskPri -30, fresh dock per run, 573 = the
+      installed binary from RAM:). First open of Downloads after 50 s idle,
+      o.json:
+
+      | run | build | first paint ms | entrance ms | fields |
+      | --- | --- | --- | --- | --- |
+      | n1-n4 | 575 | 102.1 / 103.5 / 103.7 / 103.0 | 137.5 / 148.7 / 136.0 / 145.7 | 0122 / 01121 / 01112 / 01121 |
+      | o1-o4 | 573 | 102.8 / 103.4 / 103.0 / 104.4 | 136.9 / 131.3 / 145.1 / 135.7 | 01112 / 0112 / 01121 / 0112 |
+      | n5-n8 | 576 | 110.2 / 111.9 / 104.7 / 104.3 | 132.5 / 136.1 / 147.3 / 147.8 | 0112 / 01112 / 01121 / 01121 |
+
+      n5/n6: one prepare stage each at 29.4 / 34.0 ms (21-26 in every
+      other run; the box's painting, not changed code), as 572's n4. The
+      01121 pattern (one field late, ~146 ms) shows on 573 too. Prefetch
+      stacks=3 pending=0 reads=81 every run. Pass.
+      Hover sweep (t.json, 15 pins, relative moves x 350..950 at y 688,
+      one per call, 45 s idle, then off the dock):
+
+      | run | build | render_us_avg | compose_us_avg | stalled | redraws |
+      | --- | --- | --- | --- | --- | --- |
+      | hn1, hn2 | 575 | 11338 / 11327 | 8755 / 8769 | 5 / 4 | 111 / 96 |
+      | ho1, ho2 | 573 | 10065 / 10182 | 7343 / 7501 | 0 / 2 | 97 / 93 |
+      | hn3, hn4 | 576 | 10212 / 10227 | 7648 / 7637 | 0 / 1 | 95 / 94 |
+
+      575 had `int volume` in `Item` (App grew 128 bytes): compose 1.4 ms
+      slower with unchanged compose code (lessons.md). 576 derives it from
+      the path: within 0.5% of 573. Pass.
+- [x] Independent review (Opus, the diff only): no P0/P1; two P2 fixed in
+      build 577: the 1.0 beta 5 Folder Stack that was also a pin kept its
+      default click on migration (a disk then lost its box): now Show
+      Stack either way (host test); at startup a click equal to the file
+      path's default is not applied over the pin's own default (a
+      hand-edited assign such as "C:" pins a drawer and must show its
+      box). 577 on ApolloOS: "C:" + "Archives:" ("stack") config: C: opened
+      its box (698x598), Archives: its box (185x200); hover sweep 10421 /
+      compose 7639 (576: 7648 / 7637), stalled 1.
+- [x] End state: 577 in SYS:WBStartup/DockAwesome (Version 0.577), started
+      with WBRun; FindTask finds one DockAwesome, one DockAwesome.PiP2
+      semaphore, Status lists no CLI dock; with the user's config the
+      Personal: menu shows Open Folder checked and Close (its window is
+      open). The 573 file was "in use" (WBStartup), so it is now
+      SYS:WBStartup/Disabled/DockAwesome-locked-delete; the 569 one from
+      the last session was deleted. ENVARC:DockAwesome.json untouched (588
+      bytes, 17:16:08, as at the start). RAM: holds only Clipboards, ENV, T;
+      DL: assign removed, ENV:dpid deleted, IDF0: empty (the test ADF
+      ejected and deleted). amiagent and ApolloExplorerSrv keep running.
+- [ ] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete (573) after
+      the next ApolloOS boot.
+- [ ] NOT RUN: Coffin, AmigaOS 3.2.3, AmigaOS 3.9, AmigaOS 3.1.4.1, AmiKit
+      XE (a disk's Open Folder there opens a Directory Opus lister, as
+      before; Show Stack on a disk untested there); the running dot on the
+      monitor (PiP; seen only in the canvas dump); a real CD or floppy
+      taken out (an ejected ADF image stood in).
+
+### Dock hides on a right-click in the lower half of the screen (ApolloOS, 2026-11-27)
+User report and video IMG_2662 (ApolloOS only): the dock row vanishes and
+fades back for each right-click in the lower half of the Workbench screen,
+not in the upper half; no menu near the dock. Build 577 installed; test
+docks used RAM:da.json / RAM:dl.json copies; ENVARC untouched.
+- [x] Observe PiP objectively. PiP2 registers are write-only, so the tool
+      PipWatch (scratch, read-only) read the dock's own `AmigaPip`
+      (`configured` = DMA on, front, physical x/y) through the
+      "DockAwesome.PiP2" lease semaphore, every 2 ms (timer.device, 20-50 s
+      bounded), with an input.device handler at pri 127 logging button
+      events, the pointer, PeekQualifier and the screen's top layers on one
+      EClock.
+- [x] Agent clicks do not reproduce it: amiga_click/amiga_button events
+      carry no button qualifier, PeekQualifier stayed "free", so the dock's
+      `native_menu_held()` never fired (PiP stayed ON in every agent
+      right-click, also a 6 s hold). A tool sending IND_ADDEVENT with
+      IEQUALIFIER_RBUTTON (as the gameport path does) reproduced it.
+- [x] Timeline, build 577 (installed), dock box 208,612-1071,719:
+
+      | right button | pointer (y) | PiP2 |
+      | --- | --- | --- |
+      | click | 400,200 / 300,350 | stays ON |
+      | click | 400,500 / 300,362 / 300,600 | OFF 2.3 ms after down, ON 41 ms after up |
+      | down lower, up upper | 450,650 -> 450,200 | OFF at down, ON 36 ms after up |
+      | down upper, up lower | 450,200 -> 450,650 | stays ON |
+      | left click (control) | 400,560 | stays ON |
+      | Personal window active | 300,600 | OFF / ON as above |
+      | on the dock | 640,705 | dock's own menu, stays ON |
+      | no dock running | 400,500 | no lease (nothing turns PiP on or off) |
+
+      Intuition's menu window is always [0,0-1279,11] (the title bar);
+      the Workbench menu drops to [1,12-164,92]. IControl prefs: ic_Flags
+      $1000C01E, ICF_POPUPMENUS off (pull-down menus).
+- [x] Root cause: the dock. `menu_near_dock()` (commit 7171165, made for
+      MagicMenu's pop-up menus on Coffin) hid PiP for any native menu
+      opened within 256 px of the dock: dock top 612 - 256 = y 357, the
+      "lower half". ApolloOS menus drop from the title bar. 1.0 beta 5
+      (built from the tag) does the same (native_menu_hides=2, OFF at
+      400,500 and 300,650); 577 matched run native_menu_hides=3.
+- [x] Fix (build 578, review fixes in 579): Intuition V50 (ApolloOS) draws menus in windows
+      (`caps.menu_windows`), so while a native menu is held the dock reads
+      the windows in front of its own (AttemptSemaphore only) and steps
+      aside once one overlaps its PiP box, polling at the fast rate until
+      then. Other systems keep the pointer rule, once per menu.
+      `dock_menu_covers()` holds the decision; host test in
+      test_geometry.
+- [x] 578, bottom dock (pw5): right-clicks at y 200 / 500 / 362, press
+      lower release upper, and the Workbench menu dropped and released off
+      it: PiP2 ON throughout, native_menu_hides=0.
+- [x] 578, left dock (dl.json, box 3,13-194,719): right-click at 600,400
+      stays ON (the old rule always hid a dock whose top is < 256); the
+      Window menu dropping over the dock ([73,12-218,154]) turned PiP OFF in
+      the same 2 ms poll, ON again after release; native_menu_hides=2.
+- [x] Hover sweep, 8 relative moves along y 690, one run each: 578
+      render_us_avg 9151, compose 6699 (130 redraws); 577 9993 / 7459
+      (132). No regression (single runs; not claimed as a gain).
+- [x] Independent review (Opus, the diff): one P1 fixed in build 579:
+      any foreign window in front of the dock counted as a menu, so a
+      program's window over the dock would still hide it. Menu windows on
+      R9.5 are borderless with no UserPort (PipWatch: Flags $00040800,
+      Workbench windows $2A24107F with a port); only those count now. P2
+      fixed: a new right press is a new menu even when the loop missed the
+      release (`right_seen`); no layer walk while another screen is in
+      front or a reset runs. P2 left: a layer lock busy for a whole menu
+      leaves the dock up (none seen: layer_busy 0-1 per run); the tested
+      box includes the keyed zoom headroom (as before the change).
+- [x] 579 bottom (pw9): clicks at 400,500 / 300,650 / 400,200 and the
+      Window and Workbench menus dropped: PiP2 ON throughout,
+      native_menu_hides=0; hover sweep render 9500 / compose 7052 (133
+      redraws; 577 9993 / 7459). 579 left (pw10): click at 600,400 stays
+      ON; the Window menu over the dock: OFF 5 ms after its window
+      appeared, ON 82 ms after release; native_menu_hides=1.
+- [x] make host-test, make host-sanitize, make amiga (no warnings).
+- [ ] NOT RUN: Coffin, AmigaOS 3.2.3, 3.9, 3.1.4.1, AmiKit XE (unchanged
+      pointer rule there; plain Intuition pull-down menus on AmigaOS 3.x
+      would hide a bottom dock in the lower half the same way: to check
+      with a qualifier-correct right-click); ApolloOS pop-up menus
+      (ICF_POPUPMENUS); the monitor itself (PiP is not in screenshots: the
+      dock's register writes were observed, not the picture).
+- [x] End state: 579 in SYS:WBStartup/DockAwesome (Version 0.579), started
+      with WBRun; one PiP2 lease, Status lists no CLI dock; re-measured
+      after install: right-clicks at 400,500 / 300,650 / 400,200 keep PiP2
+      ON. 577 was "in use", so it is SYS:WBStartup/Disabled/
+      DockAwesome-locked-delete-577 (573's locked copy is still there
+      too). ENVARC:DockAwesome.json untouched (588 bytes, 17:16:08). RAM:
+      holds only Clipboards, ENV, T (amiagent files); the probe tools,
+      configs, logs and test builds are deleted; the 1.0 beta 5 scratch
+      worktree is removed.
+- [ ] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete and
+      DockAwesome-locked-delete-577 after the next ApolloOS boot.
+
+### Coffin, beta 7 items, build 579 (2026-11-27)
+Coffin r65 on the Vampire (Kickstart 45.20, AmigaOS 3.9 Workbench, MagicMenu
+pop-up menus), 24-bit 1280x720. Build 579 = 95699ba (HEAD 21056eb changed
+only docs; `make amiga`: nothing to rebuild, no warnings; byte-identical
+to the ApolloOS upload). Installed before: 569 from SYS:WBStartup. Test
+docks from RAM: with `--config RAM:` copies, one dock at a time (FindTask,
+Sems, Status COM= before each start; 5 s or more before each stop);
+agent input with relative moves.
+- [x] Install: the old Disabled/DockAwesome-locked-delete (551) was no
+      longer locked and is deleted; 569 stopped (BreakTask, gone after
+      5 s, no PiP2 semaphore), 579 copied as DockAwesome.new, the 569 file
+      was "in use" (WBStartup), so it is now
+      SYS:WBStartup/Disabled/DockAwesome-locked-delete; .new renamed into
+      place (Version 0.579 build 579).
+- [x] (a) Menu glass over the row: user's config copy (18 pins, size 32),
+      right-click on Downloads (zoomed, last pin), `--pip-dump`: menu
+      902,536 105x160, dock 176,613 928x107, 3362 dock pixels in the
+      capture. Inner glass pixels covered by the dock (rim and corners
+      excluded; tint [20,23,29] fitted on the desktop-only pixels, 100%
+      share): 2803 px, glass vs tint(desktop+dock) max 0 (100% within 1);
+      vs tint(desktop only) max 59, mean 29.2 (the old look). The window
+      read back from the screen equals the glass exactly (24-bit) on 95%
+      of the menu; the rest are text and checks. Canvas at opening vs at
+      exit with the menu still open: 1177 covered pixels changed, as on
+      ApolloOS (the plate re-mixing the menu window). Same numbers as
+      ApolloOS 572/573. Pass.
+- [x] (b) Disk stacks, test config CLI (DH0:System/Shell), Personal:,
+      Archives:, BOOT:, DockGone: (an FFS ADF in IDF0: with
+      MountDiskImage: Docs, Tools, readme.json), Downloads, EditPad:
+
+      | check | result |
+      | --- | --- |
+      | right-click Archives: (no window) | Sort by (Name), hairline, Click to, Open Folder checked; no Close (105x160) |
+      | Archives: -> Show Stack, Date Modified | "clicks": {"Archives:": "stack"}, "sorts": {"Archives:": "date"}; box "Archives" 183x184, order Games, Prefs, C, Demos, iGame.guide, S, Devs, ABDisk (List SORT=DATE agrees; C/S/Demos share a timestamp) |
+      | restart | Archives: menu: Date Modified + Show Stack checked |
+      | Personal: click (Open Folder) | Workbench window "Personal" opened; its menu then 105x188 with Close below a hairline; Close closed the window |
+      | Personal: -> Show Stack | "Personal:": "stack"; box 297x232 (16 entries); -> Open Folder: "Personal:" leaves "clicks" |
+      | BOOT: (about 180 root entries) -> Show Stack | box 696x547 (page 1); first open after 30 s idle: first paint 267 ms, entrance 131 ms (2 frames, 03) |
+      | DockGone: Show Stack, inserted | box 183x136, first paint 22 ms |
+      | DockGone: ejected (MountDiskImage EJECT, Info: no disk) | click: box 183x103 "Cannot read drawer", no requester, first paint 18 ms; Kind chosen (re-arms the read-ahead), 25 s idle: no requester (screenshot), next click the same box (first paint 109 ms: one OpenWindow stage 92 ms, not the read) |
+      | reorder Archives: to slot 0 (drag) | first in "paths", "sorts"/"clicks" kept; slot 0 click opens its box |
+      | restart with DockGone: absent | "Cannot read this icon: DockGone:" at startup, as in 1.0 beta 6; the path and its "clicks"/"sorts" stay in the file |
+      | read-ahead | Open Folder disks are not read: 3 stacks (Archives:, BOOT:, Downloads) with Personal: at Open Folder, pending=0 reads=157 |
+
+      Profile: right_seen=7 right_icons=7, downs=8 ups=8. Pass.
+- [x] (c) Right-click rule (unchanged on Coffin: pointer within 256 px of
+      the dock while the right button is held). Agent clicks carry no
+      button qualifier, and input.device here has no IND_ADDEVENT (DoIO
+      -3, IOERR_NOCMD); IND_WRITEEVENT passes the event but leaves
+      PeekQualifier() free (PiP stayed ON). So the test tool RmbHold
+      (scratch) wrote the press and release with IND_WRITEEVENT and
+      patched PeekQualifier (SetFunction, restored at once, checked) to
+      report the button held between them, as the gameport path does for
+      the physical mouse. A CON window without menus was active so that
+      no MagicMenu menu opened. PipWatch (read-only, 2 ms polls) logged on
+      one EClock, dock box 176,613-1104,720 (user's config):
+
+      | right button held 0.5 s at | PiP2 |
+      | --- | --- |
+      | 400,500 | OFF 0.4 ms after down, ON 47 ms after up |
+      | 300,650 | OFF at down, ON 28 ms after up |
+      | 1270,450 (166 px right of the dock) | OFF at down, ON 28 ms after up |
+      | 640,358 (dy 255) | OFF at down, ON 27 ms after up |
+      | 640,356 (dy 257) | stays ON |
+      | 400,200 / 640,300 | stays ON |
+      | on the Downloads pin (954,700) | dock's own menu opens, stays ON |
+
+      As designed. native_menu_hides=8 for the 4 hides: with the menuless
+      CON window active every written press reached the handlers twice
+      (logged twice at the same EClock), so the decision ran twice per
+      press with the same result; on the pin it arrived once. Not a dock
+      defect. NOT RUN: the hold with Workbench active (a MagicMenu pop-up
+      would open under the pointer; see lessons.md) and the physical mouse.
+- [x] (4) First open of Downloads after 45 s idle (o.json, migrated each
+      run, pointer off the dock, fresh dock per run, ChangeTaskPri -30),
+      569 (the installed binary, from RAM:) alternated:
+
+      | run | build | first paint ms | entrance ms | fields |
+      | --- | --- | --- | --- | --- |
+      | n1 | 579 | 84.0 | 135.9 | 01112 |
+      | o1 | 569 | 83.6 | 136.1 | 01112 |
+      | n2 | 579 | 83.5 | 131.1 | 0112 |
+      | o2 | 569 | 84.1 | 130.5 | 0112 |
+      | n3 | 579 | 83.5 | 136.0 | 01112 |
+      | n4 | 579 | 84.4 | 135.3 | 01112 |
+
+      569 on Coffin yesterday: 88.1-88.6 / 131.9-146.4. Prefetch stacks=3
+      pending=0 reads=120 every run. Pass.
+      Hover sweep (pl.json, 20 pins, relative moves x 350..950 at y 692,
+      one per call, 50 s idle, -30):
+
+      | run | build | render_us_avg | compose_us_avg | max us | stalled | redraws |
+      | --- | --- | --- | --- | --- | --- | --- |
+      | hn1 | 579 | 9292 | 6505 | 18196 | 8 | 113 |
+      | ho1 | 569 | 9213 | 6578 | 18517 | 4 | 100 |
+      | hn2 | 579 | 9193 | 6495 | 18208 | 5 | 98 |
+
+      569 yesterday 9128 / 18538 / 3. Compose equal; the stalls are two-field
+      frames in both builds (hn1 had more redraws). Pass.
+- [x] Images: scratchpad `design/co7-menu-glass-bottom-4x.png`,
+      `co7-menu-glass-bottom-before-after-4x.png` (left: the same dump with
+      the glass recomputed from the desktop alone, as 1.0 beta 6 drew it),
+      `co7-disk-menu-{archives-idle,archives-after-restart,personal-open-close}-3x.png`,
+      `co7-disk-stack-{archives-date,personal,dockgone-inserted,dockgone-absent}-3x.png`,
+      `co7-disk-stack-boot-p1-2x.png`; also in ~/Downloads/DockAwesome-design/.
+- [x] No defect found; no change to src/.
+- [x] End state: 579 in SYS:WBStartup/DockAwesome, started with WBRun,
+      FindTask finds it, one DockAwesome.PiP2 semaphore, Status lists no
+      CLI dock; its Downloads menu opened (105x160) and closed.
+      ENVARC:DockAwesome.json untouched (751 bytes, Wednesday 10:03:46).
+      RAM: holds only Clipboards and T; IDF0: empty (the test ADF ejected
+      and deleted); DL: assign removed, ENV:dpid deleted; the CON window
+      closed; probe tools deleted. amiagent and ApolloExplorerSrv keep
+      running.
+- [x] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete (569) after
+      the next Coffin boot (deleted in the 589 recheck below).
+- [ ] NOT RUN on Coffin: the menu glass with the dock on the left/right;
+      a real disk taken out (an ejected ADF stood in); the PiP picture on
+      the monitor (dumps and register state only).
+
+### AmigaOS 3.2.3, beta 7 items, builds 579 and 582 (2026-11-27)
+AmigaOS 3.2.3 on the Vampire (Kickstart 47.13, volume AOS32), 24-bit
+1280x720, stock Intuition pull-down menus (no icontrol.prefs: defaults;
+the 3.2 NDK's IControl has no pop-up menu option). Installed before: 569
+from SYS:WBStartup (one task, one PiP2 lease). Build 579 = HEAD 9e4ccf2
+(`make amiga`: nothing to rebuild, byte-identical to the ApolloOS/Coffin
+upload). Test docks from RAM: with `--config RAM:` copies, one at a time
+(FindTask, Sems, Status COM= before each start; 3 s or more before each
+stop); 569 copied to RAM: for matched runs. Agent warps land 1:1.
+- [x] (a) Menu glass over the row: user's config copy (14 pins, size 36),
+      right-click on Audio (zoomed), `--pip-dump`: menu 768,542 115x146,
+      dock 208,610 864x110, 3770 dock pixels in the capture. Inner glass
+      pixels covered by the dock (rim and corners excluded; tint [20,23,29]
+      fitted on the desktop-only pixels, 100% share): 3018 px, glass vs
+      tint(desktop+dock) max 0 (100% within 1); vs tint(desktop only) max
+      63, mean 27.4 (the old look). The window read back from the screen
+      equals the glass exactly on 95.4% of the menu (92.6% of the covered
+      part at RGB565); the rest are text and checks. Canvas at opening vs
+      at exit with the menu still open: 1237 covered pixels changed (the
+      plate re-mixing the menu window), as on ApolloOS and Coffin. Pass.
+- [x] (b) Disk stacks, test config Shell, Personal:, Archives:, BOOT:,
+      DockGone: (the FFS ADF in IDF0: with `MountDiskImage DRIVE IDF0:
+      INSERT`; Docs, Tools, readme.json made on it), Personal:Downloads,
+      TextEdit (build 579):
+
+      | check | result |
+      | --- | --- |
+      | right-click Archives: (no window) | Sort by (Name), hairline, Click to, Open Folder checked; no Close (115x146) |
+      | Archives: -> Show Stack, Date Modified | "clicks": {"Archives:": "stack"}, "sorts": {"Archives:": "date"}; box "Archives" 185x200, order Games, Prefs, C, Demos, iGame.guide, S, Devs, ABDisk (List SORT=DATE agrees; C/S/Demos share a timestamp) |
+      | Personal: click (Open Folder) | Workbench window "Personal" opened; its menu then 115x172 with Close below a hairline; Close closed the window |
+      | Personal: -> Show Stack | "Personal:": "stack"; box 299x253 (16 entries, first paint 52 ms); -> Open Folder: "Personal:" leaves "clicks" |
+      | BOOT: (about 180 root entries) -> Show Stack | box 698x598, page 1/2; first open after 30 s idle: first paint 292 ms, entrance 134 ms (3 frames, 023) |
+      | DockGone: Show Stack, inserted | box 185x147, first paint 23 ms |
+      | DockGone: ejected (MountDiskImage EJECT, Info: no disk) | click: box 185x109 "Cannot read drawer", no requester, first paint 19 ms; Kind chosen (re-arms the read-ahead), 30 s idle: no requester (screenshot) |
+      | reorder Archives: to slot 0 (relative drag) | first in "paths", "sorts"/"clicks" kept; slot 0 click opens its box (185x200) |
+      | read-ahead | Personal: at Open Folder is not read: stacks=4 (Archives:, BOOT:, DockGone:, Downloads) pending=0 reads=158 |
+      | restart with DockGone: absent | "Cannot read this icon: DockGone:" at startup, as in 1.0 beta 6; Archives: menu shows Date Modified + Show Stack checked; the path and its "clicks"/"sorts" stay in the file |
+
+      Profile: downs=9 ups=9 right_seen=8 right_icons=8. Pass.
+- [x] (c) Right-click hiding, reproduced on 569 first. Agent clicks carry
+      no button qualifier; input.device on 3.2.3 has IND_ADDEVENT (DoIO 0),
+      so the scratch tool Rmb sent the press and release with
+      IEQUALIFIER_RBUTTON (PeekQualifier "held" between them). PipWatch
+      (read-only, 2 ms polls) logged on one EClock; dock box 208,610-
+      1072,720 (user's config). With Workbench active each press showed
+      Intuition's menu bar at the top (screenshot), no menu at the pointer.
+      PipWatch's layer_busy matched the menu time exactly (e.g. 3097 polls
+      = 6.9 s for 6.9 s of held menus): Intuition holds the screen's
+      LayerInfo lock from press to release; the dock's own right-click
+      (consumed by its handler) takes none.
+
+      | right button held 0.5 s at | 569 (installed) | 579 | 582 |
+      | --- | --- | --- | --- |
+      | 400,500 | OFF 1.5 ms after down, ON 26 ms after up | OFF 0.6 ms after down, ON 27 ms after up | stays ON |
+      | 300,650 | OFF 1.5 ms after down, ON 42 ms after up | OFF 1.4 ms after down, ON 27 ms after up | stays ON |
+      | 1270,450 (198 px right of the dock) | - | OFF 0.6 ms after down, ON 27 ms after up | stays ON |
+      | 640,355 (dy 255) | - | OFF 0.7 ms after down, ON 27 ms after up | stays ON |
+      | 640,353 (dy 257) | - | stays ON | - |
+      | 400,200 | stays ON | stays ON | stays ON |
+      | Workbench menu dropped (press at 30,5, released at 400,400 off its items) | - | stays ON | stays ON |
+      | on the Audio pin (825,692) | - | dock's own menu, stays ON | dock's own menu, stays ON |
+
+      native_menu_hides: 579 4, 582 0. Confirmed: the same bug as on
+      ApolloOS (IMG_2662), here for every right-click within 256 px of the
+      dock; the menu itself always drops from the title bar.
+- [x] Fix (build 581, owner check in 582): on Intuition before V50, when
+      the screen's LayerInfo lock is held by input.device's task (where
+      Intuition runs its menus) as the menu is decided, the menu is
+      Intuition's pull-down; the dock reads the active window's MenuStrip
+      (items, subitems relative to their item, bounded loops, under
+      Forbid; ClearMenuStrip waits for a menu in use) and steps aside only
+      if the area from the top to the bar + the lowest item + 16 rows
+      (`dock_pulldown_reach`, host-tested) overlaps the dock. Any other
+      case (lock free, as MagicMenu's pop-ups left it on Coffin, or held by
+      another task) keeps the 256 px pointer rule. ApolloOS's menu-window
+      path is unchanged.
+- [x] Further checks: the table above (582); left dock (581, 5 pins, l.json): a right-click
+      at 600,400 and the Workbench menu dropped over the dock both turn PiP
+      OFF at the press and ON 33-36 ms after the release (native_menu_hides=2,
+      as with the old rule, which always hid a dock whose top is < 256); 582
+      with a menuless CON window active: right-clicks at 400,500 and 400,200 stay
+      ON (Intuition still enters menu mode with an empty bar and holds the
+      lock; the empty strip reaches only the bar). Installed 582: right-
+      clicks at 400,500 / 300,650 / 400,200 stay ON.
+- [x] Independent review (Opus, the diff): no P0. P1 fixed in 582: a busy
+      lock alone is not proof of Intuition's menu (another task can hold it
+      as the menu is decided): only input.device's task counts now. P1
+      answered: AmigaOS 3.2 has no pop-up menus of its own (NDK 3.2
+      prefs/icontrol.h has no such flag; intuition and IControl release
+      notes name none). P2 left: no profile counter for which branch ran
+      (a field in App moved hover by 12% once, lessons.md; PipWatch shows
+      the outcome); the strip walk is not host-tested (only the reach
+      arithmetic and the overlap are).
+- [x] make host-test, make host-sanitize, make amiga (no warnings).
+- [x] (4) First open of Downloads (356x359 box) after 45 s idle, pl.json
+      (the user's 14 paths + Archives:Games + AOS32:Prefs, 16 pins), pointer
+      off the dock, fresh dock per run, ChangeTaskPri -30, 569 alternated:
+
+      | run | build | first paint ms | entrance ms | fields |
+      | --- | --- | --- | --- | --- |
+      | o1 | 569 | 100.0 | 137.8 | 01112 |
+      | n1 | 582 | 90.4 | 147.8 | 01121 |
+      | o2 | 569 | 90.9 | 130.4 | 0112 |
+      | n2 | 582 | 90.5 | 149.2 | 01121 |
+      | o3 | 569 | 90.5 | 147.1 | 01121 |
+      | n3 | 582 | 90.3 | 145.8 | 01121 |
+      | n4 | 582 | 91.3 | 138.8 | 02112 |
+
+      (581 before the owner check: 91.2 / 147.1.) 569 earlier on 3.2.3
+      (559 runs): 90.1-103.8 / 136.1-149.8. Prefetch stacks=4 pending=0
+      reads=90 every run. Pass.
+      Hover sweep (pl.json, relative moves x 350..950 at y 692, one per
+      call, 45 s idle, -30):
+
+      | run | build | render_us_avg | compose_us_avg | max us | stalled | redraws |
+      | --- | --- | --- | --- | --- | --- | --- |
+      | hn1 | 582 | 10474 | 7758 | 19722 | 6 | 113 |
+      | ho1 | 569 | 9838 | 7091 | 19350 | 4 | 96 |
+      | hn2 | 582 | 10496 | 7770 | 19629 | 6 | 97 |
+      | ho2 | 569 | 9715 | 7018 | 19170 | 4 | 99 |
+      | hp1 | 579 | 9893 | 7224 | 19294 | - | 99 |
+      | hc1 | control | 10915 | 8220 | 101466 | - | 96 |
+
+      582 composed 0.5-0.7 ms slower than 569/579 with no change to the
+      compose code. Control (lessons.md: "a per-binary timing gap is not a
+      code regression until a rebuild agrees"): 582's sources with the new
+      decision not called (`pulldown_reach` kept, linked, never used; the
+      579 behaviour, 582's layout) composed 8220 us, slower still. So the
+      gap follows the binary's layout (the new code shifts everything
+      linked after amiga_surface_pip.o), not the menu code, which runs
+      only while the right button is held. Recorded, not fixed (the open
+      layout-sensitivity item of the 553 rerun).
+- [x] Images: scratchpad `design/32-7-menu-glass-bottom-4x.png`,
+      `32-7-menu-glass-bottom-before-after-4x.png` (left: the same dump with
+      the covered glass recomputed from the desktop alone, as 1.0 beta 6
+      drew it), `32-7-disk-menu-{archives-idle,archives-stack,archives-after-restart,personal-open-close}-3x.png`,
+      `32-7-disk-stack-{archives-date,personal,dockgone-inserted,dockgone-absent}-3x.png`,
+      `32-7-disk-stack-boot-p1-2x.png`; also in ~/Downloads/DockAwesome-design/.
+- [x] End state: 582 in SYS:WBStartup/DockAwesome (Version 0.582 build 582;
+      569 was not locked and is deleted; copied as .new and renamed),
+      started with WBRun; FindTask finds it, one DockAwesome.PiP2
+      semaphore, Status lists no CLI dock; its Downloads menu opened over
+      the row and closed (Esc). ENVARC:DockAwesome.json untouched (590
+      bytes, 01:03:31 yesterday, as at the start). SYS:WBStartup/Disabled
+      holds only WBDock. RAM: holds only Clipboards, ENV, T; IDF0: empty
+      (the test ADF ejected and deleted, ENV:DiskImage/unit_0.xml it made
+      deleted); DL: assign removed, ENV:dpid deleted; tools, configs, logs,
+      dumps and test builds deleted; the control worktree removed.
+      amiagent and ApolloExplorerSrv keep running.
+- [ ] NOT RUN on 3.2.3: the physical mouse and the monitor (PiP is not in
+      screenshots; register state and dumps only); a menu strip long enough
+      to reach a bottom dock (host test only); the menu glass on a side
+      dock; a real disk taken out (an ejected ADF stood in).
+- [ ] NOT RUN with 582: Coffin (MagicMenu: by code unchanged, its menus
+      leave the layer lock free), AmigaOS 3.9 and 3.1.4.1 (stock Intuition
+      V45/V40: same pull-down path expected, not run), AmiKit XE, ApolloOS
+      (menu-window path unchanged; same code before the new branch).
+
+### AmigaOS 3.9, beta 7 items, build 583 (2026-11-27)
+Plain AmigaOS 3.9 on the Vampire (Kickstart 40.68 mapped, agent reports
+40.10; intuition.library 40.85, input.device 40.1; volume AOS39), 24-bit
+1280x720. Stock Intuition pull-down menus: no MagicMenu or other menu
+patch in WBStartup, S:Startup-Sequence or S:User-Startup, no
+ENVARC:sys/icontrol.prefs. Build 583 = HEAD 2a322f5 (`make amiga`, no
+warnings: the 3.2.3 control build had left objects stale, so it rebuilt;
+583 differs from 3.2.3's 582 only in the three version digits).
+Installed before: 569 from SYS:WBStartup. Test docks from RAM: with
+`--config RAM:` copies, one at a time (FindTask, Sems, Status COM= before
+each start; 3 s or more before each stop); 569 copied to RAM: for the
+controls. Agent input with relative moves.
+- [x] Install: the old Disabled/DockAwesome-locked-delete (551) was no
+      longer locked and is deleted; 569 stopped (BreakTask, gone after
+      5 s, no PiP2 semaphore), 583 copied as DockAwesome.new, the 569
+      file was "in use" (WBStartup), so it is now
+      SYS:WBStartup/Disabled/DockAwesome-locked-delete; .new renamed into
+      place (Version 0.583 build 583). WBRun: FindTask finds it, one
+      DockAwesome.PiP2 semaphore.
+- [x] (a) Menu glass over the row: user's config copy (13 pins, size 36),
+      right-click on Downloads (zoomed, last pin), `--pip-dump`: menu
+      831,542 115x146, dock 224,610 832x110, 3201 dock pixels in the
+      capture. Inner glass pixels covered by the dock (rim and corners
+      excluded; tint [20,23,29] fitted on the desktop-only pixels, 100%
+      share): 2649 px, glass vs tint(desktop+dock) max 0 (100% within 1);
+      vs tint(desktop only) max 63, mean 30.95 (the old look). The window
+      read back from the screen equals the glass exactly on 95.4% of the
+      menu (91.5% of the covered part at RGB565); the rest are text and
+      checks. Canvas at opening vs at exit with the menu still open: 1081
+      covered pixels changed (the plate re-mixing the menu window), as on
+      the other systems. The bright pixels at the menu's top corners are
+      the desktop (the backdrop's green and yellow V stripes lie there;
+      the desktop capture has them too). Pass.
+- [x] (b) Disk stacks, test config Shell, Personal:, Archives:, BOOT:,
+      DockGone: (the FFS ADF in IDF0: with `MountDiskImage DRIVE IDF0:
+      INSERT`; Docs, Tools, readme.json made on it), Personal:Downloads,
+      Editor (7 pins):
+
+      | check | result |
+      | --- | --- |
+      | right-click Archives: (no window) | Sort by (Name), hairline, Click to, Open Folder checked; no Close (115x146) |
+      | Archives: -> Show Stack, Date Modified | "clicks": {"Archives:": "stack"}, "sorts": {"Archives:": "date"}; box "Archives" 185x200, order Games, Prefs, C, Demos, iGame.guide, S, Devs, ABDisk (List SORT=DATE agrees; C/S/Demos share a timestamp) |
+      | Personal: click (Open Folder) | Workbench window "Personal" opened; its menu then 115x172 with Close below a hairline; Close closed the window |
+      | Personal: -> Show Stack | "Personal:": "stack"; box 299x253 (first paint 57 ms); -> Open Folder: "Personal:" leaves "clicks" |
+      | BOOT: (about 180 root entries) -> Show Stack | box 698x598; first open after 30 s idle: first paint 296 ms, entrance 141 ms (3 frames, 023) |
+      | DockGone: Show Stack, inserted | box 185x147, first paint 23 ms |
+      | DockGone: ejected (MountDiskImage EJECT, Info: no disk) | click: box 185x109 "Cannot read drawer", no requester, first paint 18 ms; Kind chosen (re-arms the read-ahead), 30 s idle: no requester (screenshot) |
+      | reorder Archives: to slot 0 (relative drag) | first in "paths", "sorts"/"clicks" kept; slot 0 click opens its box (185x200) |
+      | read-ahead | Personal: at Open Folder is not read: stacks=4 (Archives:, BOOT:, DockGone:, Downloads) pending=0 reads=178 |
+      | restart with DockGone: absent | "Cannot read this icon: DockGone:" at startup, as in 1.0 beta 6; Archives: menu shows Date Modified + Show Stack checked; the path and its "clicks"/"sorts" stay in the file |
+
+      Profile: downs=8 ups=8 right_seen=8 right_icons=8. Pass. The first
+      box of that session (Archives:) entered in 204 ms with a 34 ms
+      fourth frame (fields 0115); its next open took 145 ms in 6 frames
+      (011111), so it was not repeated.
+- [x] (c) Right-click hiding. input.device 40.1 has no IND_ADDEVENT
+      (Rmb: DoIO -3, IND_WRITEEVENT left PeekQualifier free), so RmbHold
+      (IND_WRITEEVENT + PeekQualifier patched for the hold, restored and
+      checked each time) gave the held button, as on Coffin. With
+      Workbench active each press showed Intuition's menu bar at the top
+      (screenshot), and the pull-down from 30,5 dropped below the bar; no
+      menu at the pointer. PipWatch (read-only, 2 ms polls) on one EClock;
+      dock box 224,610-1056,720 (user's config); layer_busy matched the
+      held menus (4601 polls of 2.2 ms = 10.2 s for 10.0 s of menus):
+      Intuition 40 holds the screen's LayerInfo lock for its menus, as on
+      3.2.3.
+
+      | right button held 0.5 s at | 569 (installed before) | 583 (installed) |
+      | --- | --- | --- |
+      | 400,500 | OFF 1.4 ms after down, ON 25 ms after up | stays ON |
+      | 300,650 | OFF 0.7 ms after down, ON 25 ms after up | stays ON |
+      | 1270,450 (214 px right of the dock) | OFF 1.2 ms after down, ON 25 ms after up | stays ON |
+      | 640,355 (dy 255) | OFF 1.2 ms after down, ON 25 ms after up | stays ON |
+      | 640,350 (dy 260) | stays ON | - |
+      | 400,200 | stays ON | stays ON |
+      | Workbench menu dropped (press at 30,5) | stays ON (1 s) | stays ON (1 s; 3 s, released at 400,500) |
+      | held 3 s at 400,500 | - | stays ON |
+      | on the Downloads pin (888,692) | - | dock's own menu, stays ON (native_menu_hides=0) |
+
+      native_menu_hides: 569 4 (its profile; the installed 583 has no
+      profile, PipWatch is the record). Left dock (583, the user's 13
+      pins, l.json, dock from y 12): a right-click at 640,400 and the
+      Workbench menu dropped from 30,5 both turn PiP OFF 0.5-1.0 ms after
+      the press and ON 54-55 ms after the release (native_menu_hides=2):
+      a menu that can reach the dock still hides it. Confirmed on 3.9:
+      the bug (569) and the fix (583), the same as on 3.2.3.
+- [x] (4) First open of Downloads (356x359 box) after 45 s idle, o.json
+      (migrated each run, 15 pins), pointer off the dock, fresh dock per
+      run, ChangeTaskPri -30, 569 alternated:
+
+      | run | build | first paint ms | entrance ms | fields |
+      | --- | --- | --- | --- | --- |
+      | n1 | 583 | 92.1 | 142.6 | 01121 |
+      | o1 | 569 | 92.1 | 147.8 | 01121 |
+      | n2 | 583 | 91.4 | 148.4 | 01121 |
+      | o2 | 569 | 92.0 | 148.2 | 01121 |
+      | n3 | 583 | 92.1 | 148.0 | 01121 |
+      | n4 | 583 | 183.3 | 131.8 | 0112 |
+      | o3 | 569 | 92.0 | 147.9 | 01121 |
+      | n5 | 583 | 92.1 | 142.7 | 01121 |
+
+      569 on 3.9 yesterday: 92.2-93.0 / 141.7-147.0. n4: the last
+      prepare stage (window open) took 117 ms against 25.5-26.0 ms in
+      every other run; n5 repeated cleanly (as Coffin's one 92 ms
+      OpenWindow stage, not the read). Prefetch stacks=3 pending=0
+      reads=92 every run. Pass.
+      Hover sweep (pl.json, 15 pins, relative moves x 350..950 at y 692,
+      one per call, 45 s idle, -30):
+
+      | run | build | render_us_avg | compose_us_avg | max us | stalled | redraws |
+      | --- | --- | --- | --- | --- | --- | --- |
+      | hn1 | 583 | 9444 | 6871 | 18042 | 1 | 114 |
+      | ho1 | 569 | 10505 | 7957 | 100201 | 0 | 99 |
+      | hn2 | 583 | 9430 | 6851 | 18393 | 0 | 98 |
+      | ho2 | 569 | 9411 | 6874 | 18005 | 0 | 100 |
+
+      569 yesterday 9835 / 18297 / 1. ho1 had one 100 ms frame. Equal.
+      Pass (the 3.2.3 gap of 0.5-0.7 ms compose does not show here).
+- [x] Images: scratchpad `design/39-7-menu-glass-bottom-4x.png`,
+      `39-7-menu-glass-bottom-before-after-4x.png` (left: the same dump
+      with the covered glass recomputed from the desktop alone, as 1.0
+      beta 6 drew it),
+      `39-7-disk-menu-{archives-idle,archives-stack,archives-after-restart,personal-open-close}-3x.png`,
+      `39-7-disk-stack-archives-date-3x.png`,
+      `39-7-disk-stack-dockgone-absent-2x.png` (on 3.9 the box is a
+      real window, so a screenshot shows it); also in
+      ~/Downloads/DockAwesome-design/. The Personal:, BOOT: and DockGone:
+      inserted box dumps were deleted with the DL: drawer before they
+      were fetched; their sizes and timings are above.
+- [x] No defect found; no change to src/.
+- [x] End state: 583 in SYS:WBStartup/DockAwesome, started with WBRun,
+      FindTask finds it, one DockAwesome.PiP2 semaphore, Status lists no
+      CLI dock; its Downloads menu opened (115x146) and closed (Esc).
+      ENVARC:DockAwesome.json untouched (566 bytes, Yesterday 18:19:58, as
+      at the start). RAM: holds only Clipboards, ENV, T and amiagent's own
+      file; IDF0: empty (the test ADF ejected and deleted,
+      ENV:DiskImage/unit_0.xml it made deleted); DL: assign removed,
+      ENV:dpid and an Execute temp file deleted; tools, configs, logs and
+      dumps deleted. amiagent and ApolloExplorerSrv keep running.
+- [x] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete (569) after
+      the next 3.9 boot: deleted at the start of the 589 recheck.
+- [ ] NOT RUN on 3.9: the physical mouse and the monitor (PiP is not in
+      screenshots; register state and dumps only); the menu glass on a
+      side dock; a real disk taken out (an ejected ADF stood in).
+
+### AmiKit XE, beta 7 items, builds 583 and 589 (2026-11-27)
+AmiKit XE 11.5 on the Vampire (Kickstart 47.7, agent reports KS 47.96 in
+the title; intuition.library 47.51, input.device 47.1), Directory Opus 5
+desktop, 24-bit 1280x720, agent warps at ((X+4)/2, (Y+4)/2). Menus:
+MagicMenu 2 (task running; ENV:MagicMenu.prefs MenuType=0x02 = pull-down
+when pressed in the screen's title bar, pop-up elsewhere; NonBlocking=Yes
+= every box a borderless window without a port, no layer lock;
+PUMode=0x02 = "select": a pop-up stays open after a quick release until
+the next click) plus Directory Opus's own pop-ups (desktop, lister files,
+lister title: windows with a port); VisualPrefs, Birdie and TitleShadow
+run. Installed before: 569 in SYS:WBStartup (FindTask found it, one PiP2
+semaphore). Build 583 = HEAD 0555984 (`make amiga`: nothing to rebuild,
+byte-identical to the 3.9 upload). ApolloExplorerSrv was not running;
+started with `Run >NIL: AmiKit:C/ApolloExplorerSrv`. Test docks from
+RAM: with copies of the user's file (u.json = ENVARC:DockAwesome.json,
+10 pins, size 36, dock box 288,606-992,720), one at a time (Sems and
+Status COM= before each start, 3 s or more before each stop).
+- [x] Install: 569 stopped (BreakTask, gone after 5 s, no PiP2
+      semaphore), 583 copied as DockAwesome.new, the 569 file was not
+      locked and is deleted, .new renamed (Version 0.583 build 583); 589
+      replaced it the same way at the end (below).
+- [x] (a) Menu glass over the row (586; a CON window with no text behind,
+      so no desktop icons): right-click on Downloads (zoomed, last pin),
+      `--pip-dump`: menu 769,514 119x174, dock 288,606 704x114, 3167 dock
+      pixels in the capture. Inner glass pixels covered by the dock (rim
+      and corners excluded; tint [20,23,29] fitted on the desktop-only
+      pixels, 100% share): 2629 px, glass vs tint(desktop+dock) max 0
+      (100% within 1); vs tint(desktop only) max 36, mean 19.3 (the old
+      look; the grey CON window is darker than a backdrop, so the gap is
+      smaller than on 3.9). The window read back from the screen equals
+      the glass at RGB565 on 91.2% of the covered part (the rest text and
+      checks). Canvas at opening vs at exit with the menu still open: 2271
+      covered pixels changed (the plate re-mixing the menu window), as on
+      the other systems. Pass.
+- [x] (b) Disk stacks (586; the same stack code as 587), test config
+      Shell, Personal:, Archives:, BOOT:, DockGone: (the Coffin/3.9 FFS
+      ADF in IDF0: with `MountDiskImage DRIVE IDF0: INSERT`; Docs, Tools,
+      readme.json made on it), Personal:Downloads, MultiView:
+
+      | check | result |
+      | --- | --- |
+      | right-click Archives: (no window) | Sort by (Name), hairline, Click to, Open Folder checked; no Close (119x174) |
+      | Archives: click (Open Folder) | Directory Opus lister "Archives" (326M free), no DOS error; its menu then 119x204 with Close below a hairline; Close closed the lister |
+      | Personal: click (Open Folder) | Directory Opus lister "Personal" (3.7G free), no DOS error; Close (menu 119x204) closed it |
+      | Archives: -> Show Stack, Date Modified | "clicks": {"Archives:": "stack"}, "sorts": {"Archives:": "date"}; box 185x200, order Games, Prefs, C, Demos, iGame.guide, S, Devs, ABDisk (List SORT=DATE agrees; C/S/Demos/iGame.guide share 12:14:47) |
+      | Personal: -> Show Stack | box 299x253 (16 icons read on open: it was not read ahead at Open Folder; first paint 72 ms); -> Open Folder: "Personal:" leaves "clicks" |
+      | BOOT: (about 180 root entries) -> Show Stack | box 698x598; first open after 30 s idle: first paint 317 ms, entrance 202 ms (3 frames, 026; 3.9: 296 / 141) |
+      | DockGone: Show Stack, inserted | empty disk 185x109; with Docs, Tools, readme.json 185x147, first paint 30 ms |
+      | DockGone: ejected (MountDiskImage EJECT, Info: no disk) | click: box 185x109 "Cannot read drawer" (dump), no requester, first paint 40 ms (58 ms in the dump run); Kind chosen, 30 s idle: no requester (screenshot) |
+      | reorder Archives: to slot 0 (drag at warp coordinates) | first in "paths", "sorts"/"clicks" kept; slot 0 click opens its box (185x200) |
+      | read-ahead | Personal: at Open Folder is not read: stacks=4 (Archives:, BOOT:, DockGone:, Downloads) pending=0 reads=158 |
+      | restart (dump run, DockGone: inserted) | Archives: menu shows Date Modified + Show Stack checked |
+      | restart with DockGone: absent | the dock's "Cannot read this icon" requester at startup (three lines, as in 1.0 beta 6; ReqAttack's pattern made the screenshot unreadable, the layout matches the message), OK pressed; the path and its "clicks"/"sorts" stay in the file |
+
+      Directory Opus opened its own lister for DockGone at each insert; it
+      was closed again.
+- [x] (c) Right-click hiding. input.device 47.1 has IND_ADDEVENT (Rmb:
+      DoIO 0, PeekQualifier 2000 while held), so the scratch tool Rmb gave
+      the held button (`Rmb 25`, or `Rmb down` / `Rmb up` to look at a
+      menu and release off its boxes; a select-mode pop-up was closed with
+      a second right press). PipWatch (read-only, 2 ms polls, its layer
+      list showed every menu box) on one EClock; dock box
+      288,606-992,720. With MagicMenu each press reached the handlers twice
+      when MagicMenu passed it on (menuless window), once when it showed a
+      menu.
+
+      | right button at (what opened) | 569 | 583 | 587 (584/586 where marked or for the DOpus rows) |
+      | --- | --- | --- | --- |
+      | 400,500, menuless CON active (Intuition's empty bar, layer lock busy) | - | OFF 0.4 ms after down, ON 44 ms after up | stays ON (584) |
+      | 300,650, menuless CON | - | OFF at down, ON 48 ms after up | stays ON (584) |
+      | 640,356 / 640,350, menuless CON (dy 250 / 256) | - | OFF, ON 26 ms after up / stays ON | - |
+      | 1270,450 / 400,200, menuless CON | - | stays ON | stays ON (584) |
+      | 640,450 desktop: MagicMenu pop-up 596,440-686,583 (does not reach the dock) | OFF 0.5 ms after down, ON 58 ms after up | OFF at down, ON 42 ms after up | first menu after start: OFF at down, ON 76 ms after up; every later one: stays ON (box opens 68-93 ms after the press) |
+      | 640,600 desktop: MagicMenu pop-up 596,578-686,719 over the plate, stays open after the release (select mode) | OFF at down, ON 58 ms after up: PiP over the open menu's lower titles for 3.3 s | the same (ON 40 ms after up, menu open 3.9 s more) | OFF 6.6 ms after the box opened, stays OFF after the release until the menu is cancelled, ON 45 ms after that |
+      | 30,6 bar: MagicMenu pull-down (bar window 0,0-1279,24, Opus box 2,21-176,140) | - | stays ON | stays ON |
+      | 400,200 desktop: MagicMenu pop-up 356,190-446,333 | - | - | stays ON |
+      | 500,530 in a DOpus lister: DOpus file pop-up 492,472-645,719 (a window with a port, opens 234-244 ms after the press) | - | - | OFF 156 ms after the press, before it opened (584 with a 250 ms wait: OFF 13 ms after it opened) |
+      | 550,312 lister title: DOpus pop-up 542,308-739,458 | - | - | stays ON |
+      | 640,450 desktop with a lister open: DOpus desktop pop-up 632,446-759,571 (port) | - | - | OFF at down (pointer rule; no MagicMenu box seen yet in that dock), ON after up |
+      | left dock (586, u.json edge left): 30,6 pull-down / 640,400 pop-up | - | - | OFF 8 ms after down, ON 190 ms after up / stays ON |
+
+      Which rule 583 applied on AmiKit: the 256 px pointer rule for every
+      menu (MagicMenu takes no layer lock; for a menuless window the dock
+      decided at the press, before MagicMenu passed the event on to
+      Intuition). Found: (1) DEFECT (569 and 583): a MagicMenu pop-up kept
+      open after the release (select mode) lies under PiP when it reaches
+      the dock; (2) every right-click within 256 px hid the dock while
+      held, also when the menu opened away from it.
+- [x] Fix (builds 584-589; 589 installed): on AmigaOS 3.x a menu is "up"
+      while the right button is held or the active window on the dock's
+      screen is marked MENUSTATE (Intuition and MagicMenu set it until the
+      menu closes; `native_menu_up`). Per menu, `dock_menu_step`
+      (host-tested): MagicMenu's boxes (borderless windows without a port
+      in front of the dock; windows already there at the press are
+      ignored) decide once they show (step aside while one overlaps the
+      dock, for the rest of the menu), also undoing a pointer-rule guess;
+      Intuition's pull-down decides by its reach (unchanged); otherwise the
+      256 px pointer rule. After a menu with boxes, later menus wait up to
+      150 ms for their boxes before the pointer rule (no blink). A menu
+      kept open after the release that hid the dock keeps the loop in the
+      menu branch (no status polls or captures); one that leaves the dock
+      shown runs the normal pass as before (which draws PiP again). App
+      keeps its size and layout (menu state packed into bytes, the EClock's
+      low word for the wait; checked with the cross compiler: sizeof 215690
+      and the same offsets). ApolloOS's path is unchanged.
+- [x] 589 on AmiKit (PipWatch): 640,450 pop-up: first menu after start
+      OFF 5 ms after down, ON 24 ms after up with the menu still open;
+      later ones stay ON. 640,600 pop-up over the plate: OFF when its box
+      opened (87 ms after the press), OFF after the release until the menu
+      was cancelled, ON 26 ms after that. Title-bar pull-down, 400,200
+      pop-up, DOpus lister title pop-up: stay ON. DOpus file pop-up in a
+      lister (492,472-694,719): OFF 156 ms after the press, 97 ms before
+      it opened. Menuless CON at 400,500 and 300,650: 6 of 7 presses stay
+      ON; the first press after the CON window opened turned PiP off
+      158 ms after the press (the wait ran out before Intuition's lock was
+      seen; 583 turned it off at every press). native_menu_hides=4.
+- [x] Independent review (Opus, the 587 diff): no P0. P1 "a menu still
+      open after the release runs the full pass (status polls, capture)":
+      fixed in 588/589 as above for a menu that hides the dock (a blocking
+      MagicMenu holding locks then never meets the polls); a menu that
+      leaves the dock shown keeps the normal pass, as 569-583 did and as
+      AmiKit ran it for seconds without a stall. P1 "an undone pointer
+      guess does not redraw while the button is held": 588 routed every
+      open menu into the menu branch and so kept PiP off until the menu
+      closed; 589 redraws at the release instead (24 ms after up); while
+      the button is still held the first menu after start stays hidden as
+      in 583 (a redraw there would need a present without capture; left).
+      P2 "any borderless window without a port counts as a menu box":
+      windows already in front of the dock at the press are now ignored
+      for that menu (MENU_OLD_WINDOWS).
+- [x] make host-test, make host-sanitize, make amiga (no warnings).
+- [x] (4) First open after 45 s idle, pointer parked at 640,300 on the
+      DOpus desktop, fresh dock per run, ChangeTaskPri -30, a copy of the
+      user's ENVARC file per run; Pictures opened and closed, then
+      Downloads after another 45 s (build 586; 587-589 changed only the
+      menu code and its packing):
+
+      | run | build | Pictures first paint / entrance ms (fields) | Downloads first paint / entrance ms (fields) |
+      | --- | --- | --- | --- |
+      | f1 | 586 | 232.8 / 188.6 (0125) | 113.5 / 164.7 (01222) |
+      | f2 | 586 | 238.9 / 162.5 (0124) | 110.5 / 174.2 (024) |
+      | f3 | 586 | 306.5 / 154.6 (0132) | 112.5 / 142.2 (013) |
+      | g1 | 569 | 259.0 / 163.2 (0223) | 112.4 / 135.5 (013) |
+      | f4 | 586 | 250.8 / 164.1 (04) | 134.2 / 164.5 (0222) |
+
+      Medians 586: Pictures 244.9 / 163.3, Downloads 113.0 / 164.6;
+      569 yesterday: 284.4 / 168.2 and 126.5 / 153.9. First paints are
+      faster; the entrances spread in the fields a present waits, as
+      before. The first agent click after idle was lost once (f4
+      Pictures: `presses_armed=0 presses_unarmed=0`, the click never
+      reached the dock) in 8 opens; in f1 the box only opened slowly (a
+      second click closed it). Prefetch stacks=5 pending=0 reads=153 in
+      every run. Pass.
+      Hover sweep (relative moves x 350..950 at y 690, one per call, 45 s
+      idle, user's file copy, -30):
+
+      | run | build | render_us_avg | compose_us_avg | max us | stalled | redraws |
+      | --- | --- | --- | --- | --- | --- | --- |
+      | hn1 | 586 | 10375 | 8478 | 101223 | 0 | 39 |
+      | ho1 | 569 | 7397 | 5626 | 14832 | 2 | 40 |
+      | hn2 | 586 | 7998 | 6104 | 14811 | 0 | 41 |
+      | hp1 | 583 | 7057 | 5134 | 14223 | 1 | 41 |
+      | hq1 | 587 | 8159 | 6262 | 15117 | 0 | 40 |
+      | hp2 | 583 | 6962 | 5081 | 14893 | 2 | 40 |
+      | hs1 | 589 | 8011 | 6104 | 15371 | 0 | 41 |
+
+      569 yesterday 6957 / 14374 / 2. 586-589 compose about 1 ms slower
+      than 583, with no stall. Checked: packing the menu state so App
+      keeps its size (587) did not change it; the compose, renderer, core,
+      AMMX and display objects of 583 and 587 are identical instruction
+      for instruction (only local static symbol numbers differ), and 808
+      bytes of new code (amiga_main.o +16, amiga_surface_pip.o +792) now
+      lie before them in the link. So the gap follows the binary's layout
+      (the open layout item of the 553 and 3.2.3 runs), not code that runs
+      while hovering. Recorded, not fixed.
+- [x] Images: scratchpad `design/ak7-menu-glass-bottom-3x.png`,
+      `ak7-menu-glass-bottom-before-after-4x.png` (left: the covered glass
+      recomputed from the desktop alone, as 1.0 beta 6 drew it),
+      `ak7-disk-menu-{archives-idle,archives-open-close,archives-after-restart}-3x.png`,
+      `ak7-disk-stack-{archives-date,dockgone-absent}-3x.png` (box dumps),
+      `ak7-disk-archives-open-folder-lister-1x.png`; also in
+      ~/Downloads/DockAwesome-design/.
+- [x] End state: 589 in SYS:WBStartup/DockAwesome (Version 0.589 build
+      589; 583 was not locked and is deleted; copied as .new and renamed),
+      started with a script `Run >NIL: Stack 400000 +` /
+      `SYS:WBStartup/DockAwesome` (deleted); Status shows it once with stk
+      400000, one DockAwesome.PiP2 semaphore, no test dock; its Downloads
+      box opened (356x359) and closed with the user's config.
+      ENVARC:DockAwesome.json untouched (424 bytes, 17:49:26, as at the
+      start). RAM: holds only Clipboards, T, ENV and Logs; ENV:DiskImage
+      empty (the test ADF ejected and deleted with its unit_0.xml); DL:
+      assign removed, ENV:dpid deleted; tools, configs, logs and dumps
+      deleted; no Directory Opus lister open (none was at the start); the
+      scratch worktree removed. amiagent and ApolloExplorerSrv keep
+      running.
+- [ ] NOT RUN on AmiKit: the physical mouse and the monitor (PiP is not in
+      screenshots; register state and dumps only); the menu glass on a
+      side dock; a real disk taken out (an ejected ADF stood in); first
+      open on 589 itself (586 measured).
+- [ ] NOT RUN with 589: ApolloOS (path unchanged), AmigaOS 3.2.3/3.9/3.1.4.1
+      (Intuition's lock path unchanged; MENUSTATE only adds menus that stay
+      open after the release). Coffin: run, see "Coffin, build 589
+      recheck" below (its MagicMenu is non-blocking, so the watching
+      applies there).
+- [ ] Open: the first menu after the dock starts still hides it while the
+      button is held near the dock (until MagicMenu's first box is seen);
+      Directory Opus's own pop-ups (windows with a port) keep the pointer
+      rule.
+
+### Coffin, build 589 recheck (2026-11-27)
+Coffin r65 on the Vampire (Kickstart 45.20, AmigaOS 3.9 Workbench),
+24-bit 1280x720. Build 589 = aa39aed (`make amiga`: nothing to rebuild,
+no warnings; byte-identical to the AmiKit upload). Installed before: 579
+from SYS:WBStartup. MagicMenu prefs (ENV:MagicMenu.prefs): MenuType 0x02
+(pull-down in the title bar, pop-up elsewhere), NonBlocking=Yes (boxes are
+borderless windows without a port), PDMode=PUMode=0x01 = STICKY (source:
+the release does nothing; the menu stays open until the next right press,
+a left click or Esc). Tools (scratch `co589/`): PipWatch (read-only, 2 ms
+polls, one EClock), RmbHold (IND_WRITEEVENT press/release with
+PeekQualifier patched for the hold, restored and checked each time; new:
+`RmbHold <ticks> <x> <y>` writes the pointer to x,y just before the
+release, so no release lands on a menu item). Workbench pop-ups were
+released off their boxes and closed with Esc (menu still open, checked by
+screenshot before each Esc); no click inside a menu. Dock box
+176,613-1104,720 (the user's 18 pins).
+- [x] Install: the old Disabled/DockAwesome-locked-delete (569) was no
+      longer locked and is deleted; 579 stopped (BreakTask, gone after
+      5 s, no PiP2 semaphore), 589 copied as DockAwesome.new, the 579 file
+      was "in use", so it is now
+      SYS:WBStartup/Disabled/DockAwesome-locked-delete; .new renamed into
+      place (Version 0.589 build 589); WBRun: FindTask finds it, one
+      DockAwesome.PiP2 semaphore.
+- [x] (1) Right-click, the installed dock with the user's config, 579
+      measured first in the same session:
+
+      | right button held 0.5 s at (what opened) | 579 | 589 |
+      | --- | --- | --- |
+      | 400,500, menuless CON active (Intuition's empty bar, layer lock busy 0.5 s) | OFF at down, ON 27 ms after up | stays ON |
+      | 300,650 / 1270,450 / 640,358 (dy 255), menuless CON | OFF at down, ON 28 ms after up (579 table) | stays ON |
+      | 400,200 menuless CON; held 3 s at 400,200 and 400,500 | stays ON (579 table) | stays ON |
+      | 400,200 desktop: pop-up 365,190-445,315 (+ submenu), sticky | stays ON | stays ON |
+      | 640,450 desktop: pop-up 605,440-675,565, does not reach the dock | OFF 0.4 ms after down, ON 24 ms after up | stays ON |
+      | 640,600 desktop: pop-up 605,592-675,715 over the dock, stays open after the release | OFF at down, ON 43 ms after up: PiP over the open menu's lower part until Esc (the AmiKit defect, also on Coffin) | OFF 32 ms after the press (its box opened), stays OFF after the release until Esc closed the menu 2.4 s later, then ON |
+      | the same, a quick click (RmbHold 3) | - | OFF 22 ms after the press, stays OFF until Esc (2.4 s), then ON |
+      | 1270,450 desktop: pop-up 1208,440-1280,565 (submenu to the left) | OFF at down, ON 25 ms after up | stays ON |
+      | 30,5 title bar: Workbench pull-down 0,20-153,108 | stays ON | stays ON |
+      | first menu after the dock started, 640,450 (pop-up away from the dock) | (as above) | OFF at down, ON 65 ms after up with the menu still open |
+      | the Downloads pin (954,700), the dock's own menu | dock's menu, stays ON (579 table) | dock's menu, stays ON; closed by a left click on the desktop |
+
+      With the menuless CON window each press reached the handlers twice
+      (as in the 579 run); layer_busy matched the held time (3689 polls of
+      2.2 ms for 8 s of holds): Intuition shows its empty menu and holds
+      the layer lock, so 589 decides by the strip's reach. 589 on Coffin:
+      BETTER than 579. The defect "dock over an open MagicMenu pop-up" is
+      reproduced on 579 and gone in 589; right-clicks whose menu opens away
+      from the dock no longer blink it; the dock came back after every
+      closed menu; no blinking on repeated clicks. Equal to 579: the first
+      menu after start (pointer rule while held, then back with the menu
+      open), the known open item from AmiKit.
+- [x] (2) First open of Downloads after 50 s idle (o.json, migrated each
+      run, 20 pins, pointer at 640,300, fresh test dock from RAM: per run,
+      ChangeTaskPri -30, relative click at 995,700), 579 alternated:
+
+      | run | build | first paint ms | entrance ms | fields |
+      | --- | --- | --- | --- | --- |
+      | n1 | 589 | 84.0 | 131.0 | 0112 |
+      | o1 | 579 | 84.2 | 134.3 | 01112 |
+      | n2 | 589 | 84.1 | 130.3 | 0112 |
+      | o2 | 579 | 84.1 | 130.4 | 0112 |
+      | n3 | 589 | 84.1 | 130.2 | 0112 |
+      | n4 | 589 | 84.2 | 130.6 | 0112 |
+
+      579 earlier tonight: 83.5-84.4 / 131.1-135.9. Prefetch stacks=3
+      pending=0 reads=120 every run. Pass.
+      Hover sweep (pl.json, 20 pins, relative moves x 350..950 at y 692,
+      one per call, 50 s idle, -30):
+
+      | run | build | render_us_avg | compose_us_avg | max us | stalled | redraws |
+      | --- | --- | --- | --- | --- | --- | --- |
+      | hn1 | 589 | 9168 | 6509 | 18761 | 4 | 99 |
+      | ho1 | 579 | 9110 | 6471 | 18748 | 3 | 100 |
+      | hn2 | 589 | 9150 | 6505 | 19023 | 4 | 98 |
+
+      579 earlier tonight 9193-9292 / 6495-6505. Equal (the AmiKit 1 ms
+      layout gap does not show here). Pass.
+      Menu glass (user's config copy, right-click on Downloads, zoomed,
+      `--pip-dump`): menu 902,536 105x160, dock 176,613 928x107, 3362 dock
+      pixels; tint [20,23,29] (100% share); 2803 covered inner pixels,
+      glass vs tint(desktop+dock) max 0 (100% within 1), vs desktop only
+      max 59 mean 29.2; canvas change at exit 1177. The glass, desktop and
+      dock dumps are byte-identical to the 579 dump. Pass.
+- [x] No defect found; no change to src/.
+- [x] End state: 589 in SYS:WBStartup/DockAwesome, started with WBRun,
+      FindTask finds it, one DockAwesome.PiP2 semaphore, Status lists no
+      CLI dock; its Downloads menu opened and closed.
+      ENVARC:DockAwesome.json untouched (751 bytes, Wednesday 10:03:46).
+      RAM: holds only Clipboards and T (amiagent's file, SetDST.log);
+      tools, configs, logs and dumps deleted; DL: assign removed,
+      ENV:dpid deleted; the CON window closed. amiagent and
+      ApolloExplorerSrv keep running.
+- [ ] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete (579) after
+      the next Coffin boot (still "in use" at the end).
+- [ ] NOT RUN on Coffin with 589: the physical mouse and the monitor (PiP
+      is not in screenshots; register state and dumps only); a side dock.
+
+### ApolloOS, build 589 recheck (2026-11-27)
+ApolloOS R9.5 on the Vampire (Kickstart 51.3), 16-bit 1280x720, fresh
+boot with 579 in SYS:WBStartup. Build 589 = aa39aed (`make amiga`:
+nothing to rebuild, no warnings; md5 35f778... as on AmiKit/Coffin).
+C:ApolloExplorerSrv was not running; started with Run >NIL:. Tools
+(scratch `ao589/`, the 579 run's binaries): PipWatch (read-only, 2 ms
+polls, one EClock), RmbQ (IND_ADDEVENT press/release with
+IEQUALIFIER_RBUTTON; PeekQualifier "held" in every log), BreakTask,
+FindTask, Sems. Dock box 208,612-1071,719 (the user's 14 pins).
+- [x] Install: the locked copies of 573 and 577 in
+      SYS:WBStartup/Disabled were free after the reboot and are deleted.
+      579 stopped (BreakTask, gone after 5 s, no PiP2 semaphore), 589
+      copied as DockAwesome.new, the 579 file was "in use", so it is now
+      SYS:WBStartup/Disabled/DockAwesome-locked-delete; .new renamed into
+      place (Version 0.589); WBRun: FindTask finds it, one
+      DockAwesome.PiP2 semaphore, Status lists no CLI dock.
+- [x] (1) Right-click with the held qualifier, installed dock, user's
+      config. 579 baseline in the same session: 400,500 held 0.5 s, PiP2
+      ON throughout.
+
+      | right button (pointer) | 577 (579 table) | 579 (table / today) | 589 |
+      | --- | --- | --- | --- |
+      | 0.5 s at 400,500 / 300,362 / 300,600 / 1270,450 | OFF 2.3 ms after down, ON 41 ms after up | ON | ON throughout |
+      | 0.5 s at 400,200 / 300,350 | ON | ON | ON |
+      | 3 s at 400,500 / 300,600 / 1270,450 / 400,200 | - | - | ON |
+      | Workbench menu [1,12-164,92] then Window menu [73,12-218,154] dropped, held 15 s, released at 640,300 | ON | ON | ON |
+      | on a pin (Personal:, 620,700), agent click and RmbQ | dock's menu, ON | dock's menu, ON | dock's menu 115x146 (Sort by, Click to, Open Folder checked, no Close), ON |
+      | on the plate gap (640,700) | - | - | plate menu (Settings/About/Quit), ON |
+
+      native_menu_hides=0 in every bottom-dock profile; PiP2 never
+      changed state (only front-buffer flips while the dock drew).
+      Left dock (RAM:dl.json, test dock from RAM:, box 3,13-194,719):
+      right-clicks at 600,400 and 400,600 stay ON; the Window and
+      Workbench menus dropped over the dock: PiP2 OFF in the same 2 ms
+      poll as the first menu window appeared, ON 39 ms after the release
+      (579: OFF 5 ms after, ON 82 ms after); native_menu_hides=1 (579: 1).
+      No regression, no change to src/.
+- [x] Menus with the agent: an absolute warp (amiga_move_mouse) to the
+      title bar while the button is held does NOT drop an Intuition menu
+      on ApolloOS; a relative move (relative:true) does. Released each
+      menu at 640,300, off every box; dock menus closed with the pointer
+      off them and Esc while the menu was the active window.
+- [x] (2) First open of Downloads after 45 s idle (o.json, migrated each
+      run, 14 pins, pointer at 640,300, fresh test dock per run,
+      ChangeTaskPri -30, relative click at 906,700), alternated:
+
+      | run | build | first paint ms | entrance ms | fields |
+      | --- | --- | --- | --- | --- |
+      | n1 | 589 | 100.1 | 138.4 | 01112 |
+      | o1 | 579 | 99.7 | 138.4 | 01112 |
+      | n2 | 589 | 100.1 | 138.3 | 01112 |
+      | o2 | 579 | 99.3 | 138.8 | 01112 |
+      | n3 | 589 | 99.1 | 139.1 | 01112 |
+      | n4 | 589 | 99.8 | 138.7 | 01112 |
+
+      Box 356x359 every run; prefetch stacks=3 pending=0 reads=81. Earlier
+      figures 100-105 / 137-141. Pass.
+      Hover sweep (t.json, 15 pins, relative moves x 350, 500, 650, 800,
+      950 at y 688, one per call, 45 s idle, -30):
+
+      | run | build | render_us_avg | compose_us_avg | max us | stalled | redraws |
+      | --- | --- | --- | --- | --- | --- | --- |
+      | hn1 | 589 | 9715 | 7080 | 18998 | 2 | 107 |
+      | ho1 | 579 | 9793 | 7147 | 18979 | 0 | 93 |
+
+      Equal (earlier 9.4-10.4 ms). Pass.
+      Menu glass (user's config copy, right-click on Audio, zoomed,
+      `--pip-dump`): menu 520,550 115x146, dock 208,612 864x108, 4832
+      dock pixels; tint [20,23,29] (100% share); 3964 covered inner
+      pixels, glass vs tint(desktop+dock) max 0 (100% within 1), vs
+      desktop only max 54 mean 23.3; canvas change at exit 1462 (inside
+      the menu). Pass.
+      Disk stack (test dock, RAM:dc.json = copy of the user's file):
+      right-click Personal: shows Sort by (Name checked) and Click to
+      (Open Folder checked), no Close; Show Stack saved "clicks":
+      {"Personal:": "stack"} in RAM:dc.json; a click on Personal: opened
+      its box (299x253, 16 entries + Open Folder). Pass.
+- [x] End state: 589 in SYS:WBStartup/DockAwesome, started with WBRun,
+      FindTask finds it, one DockAwesome.PiP2 semaphore, Status lists no
+      CLI dock; re-measured: right-clicks at 400,500 / 300,650 / 400,200
+      keep PiP2 ON. ENVARC:DockAwesome.json untouched (588 bytes,
+      17:16:08 on the Amiga clock). RAM: holds only Clipboards, ENV and T
+      (dhclient.pid and a boot temp file); tools, configs, logs and dumps
+      deleted; DL: assign removed, ENV:dpid deleted. amiagent and
+      ApolloExplorerSrv keep running. No scratch worktrees.
+- [ ] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete (579) after
+      the next ApolloOS boot (still "in use" at the end).
+- [ ] NOT RUN on ApolloOS with 589: the physical mouse and the monitor
+      (PiP is not in screenshots: register state and dumps only); IControl
+      pop-up menus (ICF_POPUPMENUS is off here); a right dock.
+
+### AmigaOS 3.2.3, build 589 recheck (2026-11-27)
+AmigaOS 3.2.3 on the Vampire (Kickstart 47.13, volume AOS32), 24-bit
+1280x720, stock Intuition pull-down menus. Installed before: 582 from
+SYS:WBStartup. Build 589 = HEAD 32bfde6 (`make amiga`: nothing to
+rebuild, no warnings; md5 35f778... as on AmiKit, Coffin and ApolloOS).
+582 for matched runs: rebuilt from 2a322f5 in a scratch worktree (build
+counter set so it reads 0.582; 295976 bytes, the installed size).
+Tools (scratch `u589/`, the ApolloOS 589 run's binaries): PipWatch
+(read-only, 2 ms polls, one EClock), RmbQ (IND_ADDEVENT press/release
+with IEQUALIFIER_RBUTTON: QUAL RBUTTON "held" in every log), BreakTask,
+FindTask, Sems. Pointer placed by absolute warp before each press; the
+pointer never moved during a hold except for the Workbench menu, which
+was released at 400,400 / 640,400 off its items (screenshot: closed,
+nothing chosen). Dock box 208,610-1072,720 (the user's 14 pins).
+- [x] Install: 582 stopped (BreakTask, gone after 5 s, no PiP2
+      semaphore); 589 copied as DockAwesome.new, 582 deleted (not
+      locked), .new renamed into place (Version 0.589); WBRun: FindTask
+      finds it, one DockAwesome.PiP2 semaphore, Status lists no CLI dock.
+- [x] (1) Right-click, installed 589, user's config:
+
+      | right button at | 582 (table above) | 589 |
+      | --- | --- | --- |
+      | 400,500 / 300,362 / 300,600 / 1270,450 / 640,355 (dy 255), held 0.5 s | stays ON (300,362 and 300,600 not run on 582) | stays ON (layer_busy 241-251 polls = the hold) |
+      | 400,500 / 300,600 / 1270,450 / 640,355, held 3 s | - | stays ON (layer_busy 1334-1427) |
+      | 400,200 (upper half), 0.5 s | stays ON | stays ON |
+      | Workbench menu dropped (press at 30,5, held 4.4 s, released at 400,400) | stays ON | stays ON |
+      | the Audio pin (825,692), held 4.9 s, released at 640,300 | dock's own menu, stays ON | dock's menu 768,542-882,687 (Sort by, Click to, Show Stack checked), stays ON; stays open after the release, closed by a left click on the desktop |
+
+      Left dock (RAM:dl.json = the user's 14 pins, edge left, test dock
+      from RAM: at ChangeTaskPri -30, box at phys 20,12), matched with 582
+      in the same session:
+
+      | right button | 582 | 589 |
+      | --- | --- | --- |
+      | 600,400, 0.5 s (strip reaches the dock) | OFF 1.4 ms after down, ON 58 ms after up (2 runs) | OFF 1.3-1.6 ms after down, ON 59 / 77 ms after up |
+      | Workbench menu dropped over the dock (30,5, released at 640,400) | OFF at down, ON after up (581 table) | OFF at down, ON 60 ms after up |
+
+      The "ON" delay is one full 192x707 left-dock frame (render_us_avg
+      33.7 ms at -30) plus PipWatch's own late poll; 582 and 589 alike.
+      native_menu_hides=3 for the three hides. No difference from 582: no
+      regression, no change to src/.
+- [x] (2) First open of Downloads (356x359 box) after 50 s idle, pl.json
+      (the user's 14 paths + Archives:Games + AOS32:Prefs, 16 pins), pointer
+      at 640,300, fresh test dock per run, ChangeTaskPri -30, relative
+      click at 866,700:
+
+      | run | build | first paint ms | entrance ms | fields |
+      | --- | --- | --- | --- | --- |
+      | n1 | 589 | 90.0 | 145.3 | 0113 |
+      | n2 | 589 | 89.6 | 176.4 | 011 (3 frames; dock frames in the motion 22.6 ms avg against 5-8 ms in the others) |
+      | n3 | 589 | 89.9 | 145.2 | 01121 |
+      | n4 | 589 | 90.0 | 130.1 | 0112 |
+      | o1 | 582 | 89.9 | 145.0 | 01121 |
+      | n5 | 589 | 90.1 | 144.9 | 01121 |
+
+      582 earlier on 3.2.3: 90.3-91.3 / 138.8-149.2. Prefetch stacks=4
+      pending=0 reads=90 every run. n2 did not repeat (n5). Pass.
+      Hover sweep (pl.json, relative moves x 350, 500, 650, 800, 950 at
+      y 692, one per call, 45 s idle, -30):
+
+      | run | build | render_us_avg | compose_us_avg | max us | stalled | redraws |
+      | --- | --- | --- | --- | --- | --- | --- |
+      | hn1 | 589 | 10098 | 7406 | 19260 | 5 | 96 |
+      | ho1 | 582 | 9847 | 7156 | 19446 | 5 | 98 |
+      | hn2 | 589 | 10089 | 7420 | 19263 | 3 | 99 |
+
+      582 earlier tonight 10474-10496 / 7758-7770. 589 composes 0.25 ms
+      slower than 582 in this session and 0.35 ms faster than 582 earlier
+      tonight; the compose code is unchanged and the menu code runs only
+      while a menu is up (App keeps its size). The binary-layout item of
+      the 553 and 582 runs (AmiKit: ~1 ms). Recorded, not fixed.
+      Menu glass (user's config copy, right-click on Audio, zoomed,
+      `--pip-dump`): menu 768,542 115x146, dock 208,610 864x110, 3770 dock
+      pixels (as with 582); tint [20,23,29] (99.9% share); 3394 covered
+      inner pixels (2 px rim and corners excluded), glass vs
+      tint(desktop+dock) max 0 (100% exact); vs desktop only max 63,
+      mean 27.9 (582: 63 / 27.4). Pass.
+      Disk stack (test dock, RAM:dc.json = the user's file + Archives:):
+      right-click Archives: shows Sort by (Name) and Click to (Open Folder
+      checked), no Close; Show Stack saved "clicks": {"Archives:":
+      "stack"}; a click on Archives: opened its box (window 832,438
+      185x200, first paint 30.5 ms); Open Folder chosen again removed
+      "clicks" (default). Input: downs=1 ups=1 right_seen=2
+      right_icons=2. Pass.
+- [x] End state: 589 in SYS:WBStartup/DockAwesome (Version 0.589),
+      started with WBRun; FindTask finds it, one DockAwesome.PiP2
+      semaphore, Status lists no CLI dock; re-measured: a right-click at
+      400,500 keeps PiP2 ON. ENVARC:DockAwesome.json untouched (590 bytes,
+      yesterday 01:03:31). SYS:WBStartup/Disabled holds only WBDock (no
+      locked-delete files). RAM: holds only Clipboards, ENV and T
+      (amiagent's empty .out/.err); tools, configs, logs and dumps
+      deleted; DL: assign removed, ENV:dpid deleted. amiagent and
+      ApolloExplorerSrv keep running. Scratch worktree (582) removed.
+- [ ] NOT RUN on 3.2.3 with 589: the physical mouse and the monitor (PiP
+      is not in screenshots: register state and dumps only); the menuless
+      CON window case and a side-dock menu glass (582 only).
+
+### AmigaOS 3.9, build 589 recheck (2026-11-27)
+Plain AmigaOS 3.9 on the Vampire (agent: Kickstart 40.10, volume AOS39),
+24-bit 1280x720, stock Intuition pull-down menus (no MagicMenu), fresh
+boot. Installed before: 583 from SYS:WBStartup. Build 589 = HEAD 0b610e3
+(`make amiga`: nothing to rebuild, no warnings; md5 35f778... as on the
+other systems). 583 for the matched controls: the 3.9 583 run's binary
+(295976 bytes, Version 0.583; no rebuild needed). Tools: the 3.9 583
+run's PipWatch (read-only, 2 ms polls, one EClock), RmbHold with the
+release warp (IND_WRITEEVENT + PeekQualifier patch, restored and checked
+each time: "restored=yes", held_qual=2000 in every run), BreakTask,
+FindTask, Sems. Pointer warped before each press, released at the press
+point (or off every menu box). Dock box 224,610-1056,720 (user's 13 pins).
+- [x] Install: the old Disabled/DockAwesome-locked-delete (569) was no
+      longer locked and is deleted; 583 stopped (BreakTask, gone after
+      5 s, no PiP2 semaphore); 589 copied as DockAwesome.new; the 583
+      file was "in use" (WBRun), so it is now
+      SYS:WBStartup/Disabled/DockAwesome-locked-delete; .new renamed into
+      place (Version 0.589); WBRun: FindTask finds it, one
+      DockAwesome.PiP2 semaphore, PipWatch reads its lease (PIP2 ON,
+      phys 241,609).
+- [x] (1) Right-click, installed 589, user's config, Workbench active:
+
+      | right button at | 583 (table above) | 589 |
+      | --- | --- | --- |
+      | 400,500, 0.5 s | stays ON | stays ON (layer_busy 252) |
+      | 300,650, 0.5 s | stays ON | stays ON (no dock menu: screenshot) |
+      | 1270,450, 0.5 s | stays ON | stays ON |
+      | 640,355 (dy 255), 0.5 s / 3 s | stays ON / - | stays ON / stays ON (layer_busy 288 / 1447) |
+      | 400,500, 3 s | stays ON | stays ON (layer_busy 1457) |
+      | 400,200, 0.5 s | stays ON | stays ON |
+      | Workbench menu dropped (press at 30,5, 3 s, released at 400,500) | stays ON | stays ON (layer_busy 1437; screenshot: menu dropped, then closed, nothing chosen) |
+      | the Downloads pin (888,692), 2 s, released at 640,300 | dock's own menu, stays ON | dock's menu 831,542 115x146 (Sort by, Click to, Show Stack checked), PiP ON throughout (front flips only); closed with Esc while it was the active window |
+
+      Left dock (RAM:l.json = the user's 13 pins, edge left, test dock
+      from RAM: at -30, phys 20,12):
+
+      | right button | 583 | 589 |
+      | --- | --- | --- |
+      | 640,400, 0.5 s | OFF 0.5-1.0 ms after down, ON 54-55 ms after up | OFF 1.3 / 0.5 ms after down, ON 73 / 54 ms after up |
+      | Workbench menu dropped (30,5, 1 s, released at 640,400) | OFF at down, ON 54-55 ms after up | OFF at PipWatch's first held poll (3.8 ms, the probe's own poll was late), ON 74 ms after up |
+
+      native_menu_hides=3 for the three hides. The ON delay is one left-dock
+      frame plus the probe's poll phase (54-77 ms on 3.2.3 for 582 and 589
+      alike). No difference from 583: no regression, no change to src/.
+- [x] (2) First open of Downloads (356x359 box) after 45 s idle, o.json
+      (migrated each run, 15 pins), pointer at 640,300, fresh test dock per
+      run, ChangeTaskPri -30, relative click at 927,692:
+
+      | run | build | first paint ms | entrance ms | fields |
+      | --- | --- | --- | --- | --- |
+      | n1 | 589 | 92.5 | 142.8 | 01121 |
+      | n2 | 589 | 92.7 | 142.5 | 01121 |
+      | n3 | 589 | 106.0 | 133.8 | 0112 (prepare stage 3 took 23.3 ms against 9.8-10.2 in every other run) |
+      | n4 | 589 | 92.9 | 162.4 | 06 (one 65+ ms pass with the dock task not running; amiga_ui_tree was sent right after the click) |
+      | n5 | 589 | 92.7 | 142.4 | 01121 (no agent call for 5 s after the click) |
+      | n6 | 589 | 92.9 | 142.4 | 01121 (same) |
+      | o1 | 583 | 96.2 | 143.6 | 01121 |
+
+      583 earlier on 3.9: 91.4-92.1 / 142.6-148.4 (one 183.3 / 131.8 run).
+      The 583 control in this session was slower than every clean 589
+      run; n3 and n4 did not repeat (n5, n6). Prefetch stacks=3 pending=0
+      reads=92 every run. Pass.
+      Hover sweep (pl.json, 15 pins, relative moves x 350, 500, 650, 800,
+      950 at y 692, one per call, 45 s idle, -30):
+
+      | run | build | render_us_avg | compose_us_avg | max us | stalled | redraws |
+      | --- | --- | --- | --- | --- | --- | --- |
+      | hn1 | 589 | 9480 | 6897 | 18204 | 0 | 97 |
+      | ho1 | 583 | 9463 | 6928 | 18368 | 0 | 98 |
+
+      583 earlier tonight 9430-9444 / 6851-6871. Equal. Pass.
+      Menu glass (user's config copy, right-click on Downloads,
+      `--pip-dump`, dock stopped with the menu open): menu 831,542 115x146,
+      dock 224,610 832x110, 3201 dock pixels; tint [20,23,29] (100% share);
+      2649 covered inner pixels, glass vs tint(desktop+dock) max 0 (100%
+      exact); vs desktop only max 63, mean 30.95; window == glass at RGB565
+      on 91.5% of the covered part; 1081 canvas pixels changed between the
+      menu's opening and exit. Every figure equals 583's. Pass.
+      Disk stack (test dock, RAM:dcc.json = the user's file + Archives:):
+      right-click Archives: (907,692) shows Sort by (Name) and Click to
+      (Open Folder checked), no Close (850,542 115x146); Show Stack saved
+      "clicks": {"Archives:": "stack"}; a click on Archives: opened its box
+      (window 813,438 185x200, first paint 47 ms), a second click closed
+      it; Open Folder chosen again removed "clicks". Input: downs=1 ups=1
+      right_seen=2 right_icons=2 (as on 3.2.3). Pass.
+- [x] End state: 589 in SYS:WBStartup/DockAwesome (Version 0.589),
+      started with WBRun; FindTask finds it, one DockAwesome.PiP2
+      semaphore, Status lists no CLI dock; re-measured: a right-click at
+      400,500 keeps PiP2 ON (phys 241,609). ENVARC:DockAwesome.json
+      untouched (566 bytes, Yesterday 18:19:58). RAM: holds only
+      Clipboards, ENV and T (amiagent's own file); tools, configs, logs
+      and dumps deleted; DL: assign removed, ENV:dpid and an Execute temp
+      file deleted. amiagent and ApolloExplorerSrv keep running. No
+      scratch worktree was needed (no difference from 583).
+- [ ] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete (583) after
+      the next 3.9 boot (still "in use" at the end).
+- [ ] NOT RUN on 3.9 with 589: the physical mouse and the monitor (PiP is
+      not in screenshots: register state and dumps only); a menuless CON
+      window; a side-dock menu glass.
+
+### AmigaOS 3.1.4.1, beta 7 items, build 589 (2026-11-27)
+AmigaOS 3.1.4.1 on the Vampire (agent: Kickstart 46.45; volume AOS3141;
+intuition.library 40.87, input.device 45.2), 24-bit 1280x720, agent warps
+1:1. Stock Intuition pull-down menus: no MagicMenu or other menu patch
+(SYS:WBStartup holds only DockAwesome and WindowToFront; S:Startup-Sequence
+and S:User-Startup start none; no icontrol prefs in ENVARC:Sys). Build 589
+= HEAD 509e5c3 (`make amiga`: nothing to rebuild, no warnings; md5
+35f778... as on the other five systems). Installed before: 569 (1.0
+beta 6) from SYS:WBStartup; copied to RAM: as the control. Tools (scratch
+`t7/`, the 3.9 589 run's binaries): PipWatch (read-only, 2 ms polls, one
+EClock), RmbHold with the release warp, BreakTask, FindTask, Sems. Test
+docks from RAM: with `--config RAM:` copies, one at a time (Sems and
+Status COM= before each start, 5 s or more before each stop).
+- [x] Boot: the first real boot with the two lines the user approved at the
+      end of S:User-Startup (`run > NIL: Personal:Applications/AmiMCP/amiagent
+      TOKEN=amiga`, `run > NIL: Personal:Applications/ApolloExplorer-Amiga/ApolloExplorerSrv`).
+      Both started by themselves: Status showed Process 2 amiagent and
+      Process 3 ApolloExplorerSrv before anything was run, and acp uploads
+      and downloads worked without starting the server by hand.
+- [x] Install: the old Disabled/DockAwesome-locked-delete (553, Wednesday)
+      was no longer locked and is deleted; 569 stopped (BreakTask, gone
+      after 5 s, no PiP2 semaphore); 589 copied as DockAwesome.new; the 569
+      file was "in use" (WBStartup), so it is now
+      SYS:WBStartup/Disabled/DockAwesome-locked-delete; .new renamed into
+      place (Version 0.589); WBRun: FindTask finds it, one DockAwesome.PiP2
+      semaphore, PipWatch reads its lease (PIP2 ON, phys 241,609).
+- [x] (c) Right-click hiding. input.device 45.2 has no IND_ADDEVENT that
+      sets the qualifier (Rmb: PeekQualifier 0000 while "held"), so
+      RmbHold (IND_WRITEEVENT + PeekQualifier patched for the hold,
+      restored and checked: held_qual=2000 restored=yes in every run) gave
+      the held button, as on 3.9 and Coffin. layer_busy matched every held
+      menu (243-253 polls for 0.5 s, 1384-1458 for 3 s): Intuition 40.87
+      holds the screen's LayerInfo lock for its menus, as on 3.2.3 and 3.9.
+      Installed dock, user's config (13 pins, dock box 224,610-1056,720),
+      Workbench active; 569 measured first in the same session:
+
+      | right button held at | 569 (installed before) | 589 (installed) |
+      | --- | --- | --- |
+      | 400,500, 0.5 s | OFF 1.4 ms after down, ON 24.7 ms after up | stays ON |
+      | 300,650, 0.5 s | OFF 0.5 ms after down, ON 26.1 ms after up | stays ON |
+      | 1270,450 (214 px right of the dock), 0.5 s | OFF 1.2 ms after down, ON 24.9 ms after up | stays ON |
+      | 640,355 (dy 255), 0.5 s | - | stays ON |
+      | 400,500 / 300,650, 3 s | - | stays ON |
+      | 400,200 (upper half), 0.5 s | stays ON | stays ON |
+      | Workbench menu dropped (press at 30,5, 3 s, released at 400,500) | - | stays ON (screenshot: menu dropped, then closed, nothing chosen) |
+      | menuless CON window active (test dock 589, user's config): 400,500 / 300,650, 0.5 s | - | stays ON (Intuition's empty bar, layer_busy 246 / 241) |
+      | the Downloads pin (888,692), 2 s, released at 640,300 | - | dock's own menu 831,542 115x146 (Sort by, Click to, Show Stack checked), PiP ON throughout (front flips only, layer_busy 0); open after the release, closed by a left click on the desktop |
+
+      Left dock (RAM:l.json = the user's 13 pins, edge left, test docks
+      from RAM: at -30, phys 20,12), matched in the same session:
+
+      | right button | 569 | 589 |
+      | --- | --- | --- |
+      | 640,400, 0.5 s (strip reaches the dock) | OFF 1.2 ms after down, ON 54 ms after up | OFF 1.3 ms after down, ON 73 ms after up |
+      | Workbench menu dropped over the dock (30,5, 1 s, released at 640,400) | OFF 23 ms after down, ON 73 ms after up | OFF 23 ms after down, ON 74 ms after up |
+
+      native_menu_hides=2 in both left-dock profiles. The 23 ms is the
+      dock's pass after the warp to the title bar (569 and 589 alike); the
+      ON delay is one left-dock frame plus the probe's poll phase, as on
+      3.2.3 and 3.9. Confirmed on 3.1.4.1: the bug (569: every right-click
+      within 256 px hid the dock) and the fix (589).
+- [x] (a) Menu glass over the row: user's config copy (13 pins, size 36),
+      right-click on Downloads (zoomed, last pin), `--pip-dump`, dock
+      stopped with the menu open: menu 831,542 115x146, dock 224,610
+      832x110, 3201 dock pixels under the menu; tint [20,23,29] (100%
+      share); 2649 covered inner pixels (rim and corners excluded), glass
+      vs tint(desktop+dock) max 0 (100% exact); vs tint(desktop only) max
+      63, mean 30.95 (the old look); window == glass at RGB565 on 91.5% of
+      the covered part (the rest text and checks); 1081 canvas pixels
+      changed between the menu's opening and exit (the plate re-mixing the
+      menu window). Every figure equals 3.9's: the same 13-pin geometry,
+      and the desktop under the covered part is the same ApolloBoot colour
+      strip (the desktop dumps differ in 11518 of 16790 pixels, in the
+      upper part). Pass.
+- [x] (b) Disk stacks, test config Shell, Personal:, Archives:, BOOT:,
+      DockGone: (the Coffin/3.9 FFS ADF in IDF0: with `MountDiskImage
+      DRIVE IDF0: INSERT`; Docs, Tools, readme.json made on it),
+      Personal:Downloads, Editor (7 pins):
+
+      | check | result |
+      | --- | --- |
+      | right-click Archives: (no window) | Sort by (Name), hairline, Click to, Open Folder checked; no Close (542,542 115x146) |
+      | Archives: -> Show Stack, Date Modified | "clicks": {"Archives:": "stack"}, "sorts": {"Archives:": "date"}; box "Archives" 185x200 (first paint 32 ms), order Games, Prefs, C, Demos, iGame.guide, S, Devs, ABDisk (the List dates agree: Games 20:14, Prefs 13:20, C/S/Demos/iGame.guide 12:14:47, Devs 12:14:43, ABDisk 11:51) |
+      | Personal: click (Open Folder) | Workbench window "Personal" (346x166) opened; its menu then 115x172 with Close below a hairline; Close closed the window |
+      | Personal: -> Show Stack | "Personal:": "stack"; box 299x253 (13 icons read on open: not read ahead at Open Folder; first paint 53 ms); -> Open Folder: "Personal:" leaves "clicks" |
+      | BOOT: (about 180 root entries) -> Show Stack | box 698x598, page 1; first open after 32 s idle: first paint 295 ms, entrance 186 ms (4 frames, 0134); after the restart and 45 s idle: 295 / 167 ms (0232) |
+      | DockGone: Show Stack, inserted | box 185x147, first paint 24 ms |
+      | DockGone: ejected (MountDiskImage EJECT, Info: no disk) | click: box 185x109 "Cannot read drawer" (a real window here: in the screenshot), no requester, first paint 19 ms; Kind chosen (re-arms the read-ahead), 32 s idle: no requester (screenshot) |
+      | reorder Archives: to slot 0 (relative drag) | first in "paths", "sorts"/"clicks" kept; slot 0 click opens its box (185x200, first paint 31 ms) |
+      | read-ahead | Personal: at Open Folder is not read: stacks=4 (Archives:, BOOT:, DockGone:, Downloads) pending=0 reads=163 |
+      | restart with DockGone: absent | the dock's "Cannot read this icon: DockGone:" requester at startup, as in 1.0 beta 6 (OK pressed); Archives: menu shows Date Modified + Show Stack checked; the path and its "clicks"/"sorts" stay in the file; prefetch stacks=3 pending=0 reads=157 |
+
+      Profile: downs=8 ups=8 right_seen=8 right_icons=8. Pass. The BOOT:
+      entrance (167-186 ms, 4 frames) is longer than on 3.2.3 (134) and
+      3.9 (141). Control: BOOT:C pinned as a drawer stack (the same 698x598
+      box, 119 reads), 45 s idle, -30: 569 first paint 313.2 ms, entrance
+      184.4 ms (034); 589 312.9 / 184.9 ms (034). So a full-page box enters
+      that slowly on 3.1.4.1 with 1.0 beta 6 as well; not a regression.
+- [x] (4) First open of Downloads (356x359 box) after about 45 s idle,
+      o.json (1.0b5 format, migrated each run, 15 pins), pointer at
+      640,300, fresh test dock per run, ChangeTaskPri -30, relative click
+      at 927,692, no agent call for 6 s after it, 569 alternated:
+
+      | run | build | first paint ms | entrance ms | fields |
+      | --- | --- | --- | --- | --- |
+      | n1 | 589 | 93.8 | 146.1 | 01121 |
+      | o1 | 569 | 93.8 | 141.4 | 01121 |
+      | n2 | 589 | 93.6 | 141.7 | 05 (one 96.8 ms dock frame during the motion) |
+      | o2 | 569 | 93.4 | 146.3 | 01121 |
+      | n3 | 589 | 94.1 | 145.7 | 01121 |
+      | n4 | 589 | 93.9 | 141.2 | 01112 |
+
+      569 yesterday on 3.1.4.1: 94.0-94.3 / 139.1-140.8. Both builds
+      alternate between 141 and 146 ms (the field phase). Prefetch
+      stacks=3 pending=0 reads=84 every run. Pass.
+      Hover sweep (pl.json, 15 pins, relative moves x 350, 500, 650, 800,
+      950 at y 692, one per call, 45 s idle, -30):
+
+      | run | build | render_us_avg | compose_us_avg | max us | stalled | redraws |
+      | --- | --- | --- | --- | --- | --- | --- |
+      | hn1 | 589 | 10882 | 8247 | 18517 | 8 | 94 |
+      | ho1 | 569 | 10564 | 7970 | 104017 | 0 | 98 |
+      | hn2 | 589 | 11843 | 9226 | 100411 | 7 | 94 |
+      | ho2 | 569 | 9573 | 7000 | 18737 | 0 | 100 |
+
+      Without the one ~100 ms first frame: 589 10.89 / 10.89 ms, 569
+      9.60 / 9.57 ms. The damage is the same (41.1-41.2 kpx a frame against
+      40.3-40.5); 589 composes 195-211 us per damaged kpx against 168-183,
+      and 7-8 frames per sweep took two fields (render 14.4-16.8 ms after a
+      3.5 ms wake). 569 yesterday: 10680 / 101715 / stalled 2.
+      `--bench-sweep 8` (pl.json, -30, alternated):
+
+      | run | build | render_us_avg | compose_us_avg | stalled of 165 |
+      | --- | --- | --- | --- | --- |
+      | bo1 | 569 | 6680 | 4883 | 41 |
+      | bn1 | 589 | 6568 | 4760 | 39 |
+      | bo2 | 569 | 6690 | 4889 | 41 |
+      | bn2 | 589 | 6567 | 4761 | 41 |
+
+      553/v1.0b5 on 3.1.4.1: 6440 / 6736-6753, stalled 41-43. The same
+      compose code is 1.7% faster in 589 in the sweep, so the hover gap is
+      not slower compose code: it is the binary-layout item of the 553,
+      582 and AmiKit runs (589 adds `dock_overlay_onto_capture` to
+      dock_compose.c and menu code before the compose objects; AmiKit 1 ms,
+      3.2.3 0.25-0.7 ms, none on 3.9, Coffin and ApolloOS). Largest on
+      3.1.4.1 so far: about 1.3 ms a hover frame and 7-8 two-field frames
+      per sweep. Recorded, not fixed (open below).
+- [x] No defect found in the beta 7 items; no change to src/.
+- [x] Images: scratchpad `design/3141-7-menu-glass-bottom-4x.png`,
+      `3141-7-menu-glass-bottom-before-after-4x.png` (left: the covered
+      glass recomputed from the desktop alone, as 1.0 beta 6 drew it),
+      `3141-7-disk-menu-{archives-idle,archives-stack,archives-after-restart,personal-open-close}-3x.png`,
+      `3141-7-disk-stack-{archives-date,personal,dockgone-inserted,dockgone-absent}-3x.png`
+      (box dumps), `3141-7-disk-stack-boot-p1-2x.png`,
+      `3141-7-disk-stack-dockgone-absent-screen-2x.png` (screenshot); also
+      in ~/Downloads/DockAwesome-design/.
+- [x] End state: 589 in SYS:WBStartup/DockAwesome (Version 0.589),
+      started with WBRun; FindTask finds it, one DockAwesome.PiP2
+      semaphore, Status lists no CLI dock; re-measured: a right-click at
+      400,500 keeps PiP2 ON; its Downloads box opened (356x359) and closed
+      with the user's config. ENVARC:DockAwesome.json untouched (582
+      bytes, 02-Aug-25 15:35:16, as at the start). RAM: holds only
+      Clipboards, ENV and T (amiagent's empty .out); tools, configs,
+      scripts, logs, profiles, dumps and both test binaries deleted; DL:
+      assign removed, ENV:dpid deleted; IDF0: empty (the test ADF ejected
+      and deleted; the unit_0.xml MountDiskImage wrote to ENV:DiskImage and
+      ENVARC:DiskImage deleted, unit_4/unit_5 untouched). amiagent and
+      ApolloExplorerSrv keep running. No scratch worktree was needed (569
+      came from the installed copy).
+- [ ] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete (569) after
+      the next 3.1.4.1 boot (still "in use" at the end).
+- [ ] Open (owner): the hover layout gap, largest here (589 vs 569: about
+      1.3 ms a frame, 7-8 two-field frames per sweep; `--bench-sweep` equal
+      or faster).
+- [ ] NOT RUN on 3.1.4.1: the physical mouse and the monitor (PiP is not in
+      screenshots: register state and dumps only); the menu glass on a
+      side dock; a real disk taken out (an ejected ADF stood in); MagicMenu
+      (not installed here); Open Folder as a Directory Opus lister
+      (Workbench is the desktop).
