@@ -13,15 +13,15 @@ Draft, not released.
   works as before (running dot, **Close** while its window is open, now
   below the menu's groups) and is never read while the dock idles. A disk
   that is taken out shows "Cannot read drawer" in its box, without an
-  "insert volume" requester (checked on ApolloOS; not yet on the other
-  systems). Before, a right-click on a disk without an open window did
+  "insert volume" requester (checked on ApolloOS and Coffin; not yet on
+  the other systems). Before, a right-click on a disk without an open window did
   nothing.
 
 **Fixes**
 - A right-click menu that lies over the dock's icons now shows them, and
   the plate, through its glass; before, the glass there showed only the
   desktop, as if the dock were not behind it (checked on ApolloOS with
-  the dock at the bottom, left and right).
+  the dock at the bottom, left and right, and on Coffin at the bottom).
 - On ApolloOS a right-click on the desktop or in a window no longer hides
   the dock for a moment when the pointer is in the lower part of the
   screen. The dock now steps aside only when a menu actually opens over

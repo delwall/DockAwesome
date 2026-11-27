@@ -797,3 +797,20 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
   applied to every OS. Check how menus open on each target first (ApolloOS:
   pull-down windows from the title bar, IControl ICF_POPUPMENUS off) and
   decide from what is there (the menu's windows) where the OS shows it.
+
+## A held right button on AmigaOS 3.x needs more than an event (Coffin, 2026-11-27)
+- input.device on Coffin (Kickstart 45) has no IND_ADDEVENT (DoIO -3), and
+  IND_WRITEEVENT passes the event to the handlers but leaves
+  PeekQualifier() free, so the ApolloOS tool (RmbQ) did nothing here and
+  the dock never saw a held button. What worked: write the press/release
+  with IND_WRITEEVENT and patch PeekQualifier (SetFunction, restore at once
+  and check the vector is still ours) to report RBUTTON between them.
+  Check the DoIO result of every injected event before reading a log.
+- An agent right-click that misses the dock opens MagicMenu's pop-up at
+  the pointer in sticky mode, with Power > Reboot now under it. Close it by
+  moving the pointer away (absolute warp) and Esc, never a click; aim
+  right-clicks at a pin from the row arithmetic (centre 640 + pitch *
+  (k - (n-1)/2), pitch 37 at size 32) and test held-button rules with a
+  menuless CON window active.
+- Esc on the dock's own window quits the dock (any build): send Esc only
+  while one of its menus or boxes is the active window.
