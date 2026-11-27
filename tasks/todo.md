@@ -5175,3 +5175,100 @@ FindTask, Sems. Dock box 208,612-1071,719 (the user's 14 pins).
 - [ ] NOT RUN on ApolloOS with 589: the physical mouse and the monitor
       (PiP is not in screenshots: register state and dumps only); IControl
       pop-up menus (ICF_POPUPMENUS is off here); a right dock.
+
+### AmigaOS 3.2.3, build 589 recheck (2026-11-27)
+AmigaOS 3.2.3 on the Vampire (Kickstart 47.13, volume AOS32), 24-bit
+1280x720, stock Intuition pull-down menus. Installed before: 582 from
+SYS:WBStartup. Build 589 = HEAD 32bfde6 (`make amiga`: nothing to
+rebuild, no warnings; md5 35f778... as on AmiKit, Coffin and ApolloOS).
+582 for matched runs: rebuilt from 2a322f5 in a scratch worktree (build
+counter set so it reads 0.582; 295976 bytes, the installed size).
+Tools (scratch `u589/`, the ApolloOS 589 run's binaries): PipWatch
+(read-only, 2 ms polls, one EClock), RmbQ (IND_ADDEVENT press/release
+with IEQUALIFIER_RBUTTON: QUAL RBUTTON "held" in every log), BreakTask,
+FindTask, Sems. Pointer placed by absolute warp before each press; the
+pointer never moved during a hold except for the Workbench menu, which
+was released at 400,400 / 640,400 off its items (screenshot: closed,
+nothing chosen). Dock box 208,610-1072,720 (the user's 14 pins).
+- [x] Install: 582 stopped (BreakTask, gone after 5 s, no PiP2
+      semaphore); 589 copied as DockAwesome.new, 582 deleted (not
+      locked), .new renamed into place (Version 0.589); WBRun: FindTask
+      finds it, one DockAwesome.PiP2 semaphore, Status lists no CLI dock.
+- [x] (1) Right-click, installed 589, user's config:
+
+      | right button at | 582 (table above) | 589 |
+      | --- | --- | --- |
+      | 400,500 / 300,362 / 300,600 / 1270,450 / 640,355 (dy 255), held 0.5 s | stays ON (300,362 and 300,600 not run on 582) | stays ON (layer_busy 241-251 polls = the hold) |
+      | 400,500 / 300,600 / 1270,450 / 640,355, held 3 s | - | stays ON (layer_busy 1334-1427) |
+      | 400,200 (upper half), 0.5 s | stays ON | stays ON |
+      | Workbench menu dropped (press at 30,5, held 4.4 s, released at 400,400) | stays ON | stays ON |
+      | the Audio pin (825,692), held 4.9 s, released at 640,300 | dock's own menu, stays ON | dock's menu 768,542-882,687 (Sort by, Click to, Show Stack checked), stays ON; stays open after the release, closed by a left click on the desktop |
+
+      Left dock (RAM:dl.json = the user's 14 pins, edge left, test dock
+      from RAM: at ChangeTaskPri -30, box at phys 20,12), matched with 582
+      in the same session:
+
+      | right button | 582 | 589 |
+      | --- | --- | --- |
+      | 600,400, 0.5 s (strip reaches the dock) | OFF 1.4 ms after down, ON 58 ms after up (2 runs) | OFF 1.3-1.6 ms after down, ON 59 / 77 ms after up |
+      | Workbench menu dropped over the dock (30,5, released at 640,400) | OFF at down, ON after up (581 table) | OFF at down, ON 60 ms after up |
+
+      The "ON" delay is one full 192x707 left-dock frame (render_us_avg
+      33.7 ms at -30) plus PipWatch's own late poll; 582 and 589 alike.
+      native_menu_hides=3 for the three hides. No difference from 582: no
+      regression, no change to src/.
+- [x] (2) First open of Downloads (356x359 box) after 50 s idle, pl.json
+      (the user's 14 paths + Archives:Games + AOS32:Prefs, 16 pins), pointer
+      at 640,300, fresh test dock per run, ChangeTaskPri -30, relative
+      click at 866,700:
+
+      | run | build | first paint ms | entrance ms | fields |
+      | --- | --- | --- | --- | --- |
+      | n1 | 589 | 90.0 | 145.3 | 0113 |
+      | n2 | 589 | 89.6 | 176.4 | 011 (3 frames; dock frames in the motion 22.6 ms avg against 5-8 ms in the others) |
+      | n3 | 589 | 89.9 | 145.2 | 01121 |
+      | n4 | 589 | 90.0 | 130.1 | 0112 |
+      | o1 | 582 | 89.9 | 145.0 | 01121 |
+      | n5 | 589 | 90.1 | 144.9 | 01121 |
+
+      582 earlier on 3.2.3: 90.3-91.3 / 138.8-149.2. Prefetch stacks=4
+      pending=0 reads=90 every run. n2 did not repeat (n5). Pass.
+      Hover sweep (pl.json, relative moves x 350, 500, 650, 800, 950 at
+      y 692, one per call, 45 s idle, -30):
+
+      | run | build | render_us_avg | compose_us_avg | max us | stalled | redraws |
+      | --- | --- | --- | --- | --- | --- | --- |
+      | hn1 | 589 | 10098 | 7406 | 19260 | 5 | 96 |
+      | ho1 | 582 | 9847 | 7156 | 19446 | 5 | 98 |
+      | hn2 | 589 | 10089 | 7420 | 19263 | 3 | 99 |
+
+      582 earlier tonight 10474-10496 / 7758-7770. 589 composes 0.25 ms
+      slower than 582 in this session and 0.35 ms faster than 582 earlier
+      tonight; the compose code is unchanged and the menu code runs only
+      while a menu is up (App keeps its size). The binary-layout item of
+      the 553 and 582 runs (AmiKit: ~1 ms). Recorded, not fixed.
+      Menu glass (user's config copy, right-click on Audio, zoomed,
+      `--pip-dump`): menu 768,542 115x146, dock 208,610 864x110, 3770 dock
+      pixels (as with 582); tint [20,23,29] (99.9% share); 3394 covered
+      inner pixels (2 px rim and corners excluded), glass vs
+      tint(desktop+dock) max 0 (100% exact); vs desktop only max 63,
+      mean 27.9 (582: 63 / 27.4). Pass.
+      Disk stack (test dock, RAM:dc.json = the user's file + Archives:):
+      right-click Archives: shows Sort by (Name) and Click to (Open Folder
+      checked), no Close; Show Stack saved "clicks": {"Archives:":
+      "stack"}; a click on Archives: opened its box (window 832,438
+      185x200, first paint 30.5 ms); Open Folder chosen again removed
+      "clicks" (default). Input: downs=1 ups=1 right_seen=2
+      right_icons=2. Pass.
+- [x] End state: 589 in SYS:WBStartup/DockAwesome (Version 0.589),
+      started with WBRun; FindTask finds it, one DockAwesome.PiP2
+      semaphore, Status lists no CLI dock; re-measured: a right-click at
+      400,500 keeps PiP2 ON. ENVARC:DockAwesome.json untouched (590 bytes,
+      yesterday 01:03:31). SYS:WBStartup/Disabled holds only WBDock (no
+      locked-delete files). RAM: holds only Clipboards, ENV and T
+      (amiagent's empty .out/.err); tools, configs, logs and dumps
+      deleted; DL: assign removed, ENV:dpid deleted. amiagent and
+      ApolloExplorerSrv keep running. Scratch worktree (582) removed.
+- [ ] NOT RUN on 3.2.3 with 589: the physical mouse and the monitor (PiP
+      is not in screenshots: register state and dumps only); the menuless
+      CON window case and a side-dock menu glass (582 only).
