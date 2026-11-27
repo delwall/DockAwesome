@@ -37,15 +37,16 @@ Draft, not released.
   that are not drawn as windows keep the earlier rule (checked on
   AmigaOS 3.2.3 and AmigaOS 3.9 with the dock at the bottom and on the
   left).
-- With MagicMenu (AmiKit XE), a pop-up menu opened just above the dock no
-  longer disappears under the dock when the button is released: such a
-  menu stays open until the next click, and the dock now stays out of its
-  way until it closes. The dock watches MagicMenu's menu boxes and steps
+- With MagicMenu (AmiKit XE, Coffin), a pop-up menu opened just above the
+  dock no longer disappears under the dock when the button is released:
+  such a menu stays open until the next click, and the dock now stays out
+  of its way until it closes. The dock watches MagicMenu's menu boxes and steps
   aside only while one lies over it, so a right-click near the dock whose
   menu opens away from it no longer hides the dock (the first menu after
   the dock starts still hides it while the button is held). Directory
   Opus's own pop-up menus keep the earlier rule (checked on AmiKit XE
-  with the dock at the bottom and on the left).
+  with the dock at the bottom and on the left, and on Coffin with the
+  dock at the bottom).
 
 ## 1.0 beta 6
 

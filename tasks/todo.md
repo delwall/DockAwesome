@@ -4471,8 +4471,8 @@ agent input with relative moves.
       and deleted); DL: assign removed, ENV:dpid deleted; the CON window
       closed; probe tools deleted. amiagent and ApolloExplorerSrv keep
       running.
-- [ ] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete (569) after
-      the next Coffin boot.
+- [x] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete (569) after
+      the next Coffin boot (deleted in the 589 recheck below).
 - [ ] NOT RUN on Coffin: the menu glass with the dock on the left/right;
       a real disk taken out (an ejected ADF stood in); the PiP picture on
       the monitor (dumps and register state only).
@@ -4979,12 +4979,108 @@ Status COM= before each start, 3 s or more before each stop).
       screenshots; register state and dumps only); the menu glass on a
       side dock; a real disk taken out (an ejected ADF stood in); first
       open on 589 itself (586 measured).
-- [ ] NOT RUN with 589: Coffin (its MagicMenu mode is not recorded: if it
-      draws boxes as windows, the new watching applies there too; if not,
-      unchanged), ApolloOS (path unchanged), AmigaOS 3.2.3/3.9/3.1.4.1
+- [ ] NOT RUN with 589: ApolloOS (path unchanged), AmigaOS 3.2.3/3.9/3.1.4.1
       (Intuition's lock path unchanged; MENUSTATE only adds menus that stay
-      open after the release).
+      open after the release). Coffin: run, see "Coffin, build 589
+      recheck" below (its MagicMenu is non-blocking, so the watching
+      applies there).
 - [ ] Open: the first menu after the dock starts still hides it while the
       button is held near the dock (until MagicMenu's first box is seen);
       Directory Opus's own pop-ups (windows with a port) keep the pointer
       rule.
+
+### Coffin, build 589 recheck (2026-11-27)
+Coffin r65 on the Vampire (Kickstart 45.20, AmigaOS 3.9 Workbench),
+24-bit 1280x720. Build 589 = aa39aed (`make amiga`: nothing to rebuild,
+no warnings; byte-identical to the AmiKit upload). Installed before: 579
+from SYS:WBStartup. MagicMenu prefs (ENV:MagicMenu.prefs): MenuType 0x02
+(pull-down in the title bar, pop-up elsewhere), NonBlocking=Yes (boxes are
+borderless windows without a port), PDMode=PUMode=0x01 = STICKY (source:
+the release does nothing; the menu stays open until the next right press,
+a left click or Esc). Tools (scratch `co589/`): PipWatch (read-only, 2 ms
+polls, one EClock), RmbHold (IND_WRITEEVENT press/release with
+PeekQualifier patched for the hold, restored and checked each time; new:
+`RmbHold <ticks> <x> <y>` writes the pointer to x,y just before the
+release, so no release lands on a menu item). Workbench pop-ups were
+released off their boxes and closed with Esc (menu still open, checked by
+screenshot before each Esc); no click inside a menu. Dock box
+176,613-1104,720 (the user's 18 pins).
+- [x] Install: the old Disabled/DockAwesome-locked-delete (569) was no
+      longer locked and is deleted; 579 stopped (BreakTask, gone after
+      5 s, no PiP2 semaphore), 589 copied as DockAwesome.new, the 579 file
+      was "in use", so it is now
+      SYS:WBStartup/Disabled/DockAwesome-locked-delete; .new renamed into
+      place (Version 0.589 build 589); WBRun: FindTask finds it, one
+      DockAwesome.PiP2 semaphore.
+- [x] (1) Right-click, the installed dock with the user's config, 579
+      measured first in the same session:
+
+      | right button held 0.5 s at (what opened) | 579 | 589 |
+      | --- | --- | --- |
+      | 400,500, menuless CON active (Intuition's empty bar, layer lock busy 0.5 s) | OFF at down, ON 27 ms after up | stays ON |
+      | 300,650 / 1270,450 / 640,358 (dy 255), menuless CON | OFF at down, ON 28 ms after up (579 table) | stays ON |
+      | 400,200 menuless CON; held 3 s at 400,200 and 400,500 | stays ON (579 table) | stays ON |
+      | 400,200 desktop: pop-up 365,190-445,315 (+ submenu), sticky | stays ON | stays ON |
+      | 640,450 desktop: pop-up 605,440-675,565, does not reach the dock | OFF 0.4 ms after down, ON 24 ms after up | stays ON |
+      | 640,600 desktop: pop-up 605,592-675,715 over the dock, stays open after the release | OFF at down, ON 43 ms after up: PiP over the open menu's lower part until Esc (the AmiKit defect, also on Coffin) | OFF 32 ms after the press (its box opened), stays OFF after the release until Esc closed the menu 2.4 s later, then ON |
+      | the same, a quick click (RmbHold 3) | - | OFF 22 ms after the press, stays OFF until Esc (2.4 s), then ON |
+      | 1270,450 desktop: pop-up 1208,440-1280,565 (submenu to the left) | OFF at down, ON 25 ms after up | stays ON |
+      | 30,5 title bar: Workbench pull-down 0,20-153,108 | stays ON | stays ON |
+      | first menu after the dock started, 640,450 (pop-up away from the dock) | (as above) | OFF at down, ON 65 ms after up with the menu still open |
+      | the Downloads pin (954,700), the dock's own menu | dock's menu, stays ON (579 table) | dock's menu, stays ON; closed by a left click on the desktop |
+
+      With the menuless CON window each press reached the handlers twice
+      (as in the 579 run); layer_busy matched the held time (3689 polls of
+      2.2 ms for 8 s of holds): Intuition shows its empty menu and holds
+      the layer lock, so 589 decides by the strip's reach. 589 on Coffin:
+      BETTER than 579. The defect "dock over an open MagicMenu pop-up" is
+      reproduced on 579 and gone in 589; right-clicks whose menu opens away
+      from the dock no longer blink it; the dock came back after every
+      closed menu; no blinking on repeated clicks. Equal to 579: the first
+      menu after start (pointer rule while held, then back with the menu
+      open), the known open item from AmiKit.
+- [x] (2) First open of Downloads after 50 s idle (o.json, migrated each
+      run, 20 pins, pointer at 640,300, fresh test dock from RAM: per run,
+      ChangeTaskPri -30, relative click at 995,700), 579 alternated:
+
+      | run | build | first paint ms | entrance ms | fields |
+      | --- | --- | --- | --- | --- |
+      | n1 | 589 | 84.0 | 131.0 | 0112 |
+      | o1 | 579 | 84.2 | 134.3 | 01112 |
+      | n2 | 589 | 84.1 | 130.3 | 0112 |
+      | o2 | 579 | 84.1 | 130.4 | 0112 |
+      | n3 | 589 | 84.1 | 130.2 | 0112 |
+      | n4 | 589 | 84.2 | 130.6 | 0112 |
+
+      579 earlier tonight: 83.5-84.4 / 131.1-135.9. Prefetch stacks=3
+      pending=0 reads=120 every run. Pass.
+      Hover sweep (pl.json, 20 pins, relative moves x 350..950 at y 692,
+      one per call, 50 s idle, -30):
+
+      | run | build | render_us_avg | compose_us_avg | max us | stalled | redraws |
+      | --- | --- | --- | --- | --- | --- | --- |
+      | hn1 | 589 | 9168 | 6509 | 18761 | 4 | 99 |
+      | ho1 | 579 | 9110 | 6471 | 18748 | 3 | 100 |
+      | hn2 | 589 | 9150 | 6505 | 19023 | 4 | 98 |
+
+      579 earlier tonight 9193-9292 / 6495-6505. Equal (the AmiKit 1 ms
+      layout gap does not show here). Pass.
+      Menu glass (user's config copy, right-click on Downloads, zoomed,
+      `--pip-dump`): menu 902,536 105x160, dock 176,613 928x107, 3362 dock
+      pixels; tint [20,23,29] (100% share); 2803 covered inner pixels,
+      glass vs tint(desktop+dock) max 0 (100% within 1), vs desktop only
+      max 59 mean 29.2; canvas change at exit 1177. The glass, desktop and
+      dock dumps are byte-identical to the 579 dump. Pass.
+- [x] No defect found; no change to src/.
+- [x] End state: 589 in SYS:WBStartup/DockAwesome, started with WBRun,
+      FindTask finds it, one DockAwesome.PiP2 semaphore, Status lists no
+      CLI dock; its Downloads menu opened and closed.
+      ENVARC:DockAwesome.json untouched (751 bytes, Wednesday 10:03:46).
+      RAM: holds only Clipboards and T (amiagent's file, SetDST.log);
+      tools, configs, logs and dumps deleted; DL: assign removed,
+      ENV:dpid deleted; the CON window closed. amiagent and
+      ApolloExplorerSrv keep running.
+- [ ] Delete SYS:WBStartup/Disabled/DockAwesome-locked-delete (579) after
+      the next Coffin boot (still "in use" at the end).
+- [ ] NOT RUN on Coffin with 589: the physical mouse and the monitor (PiP
+      is not in screenshots; register state and dumps only); a side dock.

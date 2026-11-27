@@ -845,3 +845,8 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
   only a held button. Drive pop-ups with Rmb down / screenshot / move off
   the boxes / Rmb up, and close a select-mode pop-up with a second right
   press, never a left click over its items.
+- Coffin's MagicMenu is also non-blocking, but PUMode/PDMode 1 = sticky:
+  the release does nothing, the next right press selects the item under
+  the pointer. Test it with `RmbHold <ticks> <x> <y>` (the pointer is
+  written off the boxes just before the release), a screenshot, then Esc;
+  never a second right press over a menu (2026-11-27).
