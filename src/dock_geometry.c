@@ -520,6 +520,12 @@ void dock_open_glyph_row(const DockOpenGlyph *g, int py, int px0, int count, uns
     }
 }
 
+DockRect dock_pulldown_reach(int screen_width, int bar_height, int items_bottom)
+{
+    if (items_bottom < 0) items_bottom = 0;
+    return (DockRect){0,0,screen_width,bar_height+1+items_bottom+DOCK_PULLDOWN_MARGIN};
+}
+
 int dock_menu_covers(DockRect dock, int pointer_x, int pointer_y, const DockRect *menus, int count)
 {
     int i, dx, dy;

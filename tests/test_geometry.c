@@ -640,6 +640,21 @@ static void test_menu_covers(void)
     assert(!dock_menu_covers(bottom,1056+255,700,NULL,-1));
     assert(dock_menu_covers(bottom,1056+254,700,NULL,-1));
     assert(dock_menu_covers(left,1200,700,NULL,-1));
+    /* AmigaOS 3.x Intuition's own menus drop from the bar (12 rows, BarHeight
+       11) as deep as the active window's strip reaches: a bottom dock stays
+       for a Workbench-sized strip, a left dock does not, and a strip long
+       enough to reach the dock's top hides it. */
+    menus[0] = dock_pulldown_reach(1280,11,160);
+    assert(menus[0].left == 0 && menus[0].top == 0 && menus[0].right == 1280 &&
+        menus[0].bottom == 12+160+DOCK_PULLDOWN_MARGIN);
+    assert(!dock_menu_covers(bottom,0,0,menus,1));
+    assert(dock_menu_covers(left,0,0,menus,1));
+    menus[0] = dock_pulldown_reach(1280,11,612-12-DOCK_PULLDOWN_MARGIN);
+    assert(!dock_menu_covers(bottom,0,0,menus,1));
+    menus[0] = dock_pulldown_reach(1280,11,612-12-DOCK_PULLDOWN_MARGIN+1);
+    assert(dock_menu_covers(bottom,0,0,menus,1));
+    menus[0] = dock_pulldown_reach(1280,11,-40);
+    assert(menus[0].bottom == 12+DOCK_PULLDOWN_MARGIN);
     /* An empty dock box is never covered. */
     assert(!dock_menu_covers((DockRect){10,10,10,20},10,15,NULL,-1));
 }

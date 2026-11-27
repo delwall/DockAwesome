@@ -99,7 +99,13 @@ updates. These are elapsed times. See [Hardware](hardware.md) for kernel timings
 
 ## Hardware ownership
 
-Suspend PiP when another screen is in front or an outside menu is active.
+Suspend PiP when another screen is in front or an outside menu can reach
+the dock. ApolloOS menus are windows: step aside once one overlaps the
+dock. AmigaOS 3.x Intuition's own menus drop from the title bar and hold
+the screen's layer lock (owned by input.device's task) while up: step
+aside only if the active window's menu strip can drop as far as the dock.
+Otherwise (MagicMenu pop-ups at the pointer, no layer lock) step aside
+when the pointer is within 256 px of the dock.
 Key out owned dialogs and the rounded popup where they overlap the dock.
 Screen movement forces a new presentation. A replaced or unsupported
 bitmap stops the backend.

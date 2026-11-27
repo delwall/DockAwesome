@@ -814,3 +814,16 @@ commit title, while tasks/todo.md said "Not run: DOpus 5 listers; needs AmiKit".
   menuless CON window active.
 - Esc on the dock's own window quits the dock (any build): send Esc only
   while one of its menus or boxes is the active window.
+
+## Find how each OS shows its menus before picking a rule (3.2.3, 2026-11-27)
+- The 256 px pointer rule (MagicMenu pop-ups, Coffin) also hid a bottom dock
+  on AmigaOS 3.2.3, whose stock menus drop from the title bar. A read-only
+  probe's layer_busy count matched the held-menu time exactly: Intuition
+  3.x holds the screen's LayerInfo lock (owner: the input.device task) for
+  its whole menu; MagicMenu left it free. That owner, not a version check,
+  now tells the dock which kind of menu is up.
+- input.device on 3.2.3 has IND_ADDEVENT (DoIO 0): the ApolloOS-style Rmb
+  tool sets the held qualifier there; Coffin (3.9) needs the PeekQualifier
+  patch.
+- A review's "a busy lock is not proof" was right: check the lock's owner,
+  not only that it is busy.

@@ -69,12 +69,21 @@ int dock_edge_panel_reach(const DockSettings *settings, DockEdge edge,
 /* Whether PiP must step aside for a held native menu (PiP2 lies over
    menus). dock is the shown PiP box on the screen. Where the system draws
    its menus in windows (ApolloOS), menus holds the count windows in front
-   of the dock: only one overlapping the dock counts. count < 0: menus are
-   not windows (MagicMenu, AmigaOS 3.x); a menu opened within
+   of the dock: only one overlapping the dock counts; AmigaOS 3.x Intuition
+   passes its pull-down's area (dock_pulldown_reach). count < 0: nothing
+   is known of the menu (MagicMenu); a menu opened within
    DOCK_MENU_REACH of the pointer may reach the dock, and so does one that
    drops from the title bar onto a dock that starts near the top. */
 enum { DOCK_MENU_REACH = 256 };
 int dock_menu_covers(DockRect dock, int pointer_x, int pointer_y, const DockRect *menus, int count);
+/* The area AmigaOS 3.x Intuition's own menus can cover: they drop from the
+   screen's bar (bar_height rows), and items_bottom is the lowest row of any
+   item or subitem below the drop box's top (MenuItem TopEdge + Height,
+   subitems relative to their item). The whole width, with
+   DOCK_PULLDOWN_MARGIN rows for the box's borders and Intuition moving a
+   subitem box to fit. */
+enum { DOCK_PULLDOWN_MARGIN = 16 };
+DockRect dock_pulldown_reach(int screen_width, int bar_height, int items_bottom);
 
 /* The empty slot a drag or a drop opens in the row, animated like an icon
    so the plate's ends move with the row: at an end nothing else bounds the

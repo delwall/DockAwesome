@@ -172,15 +172,64 @@ static int menu_windows(App *app, DockRect *out, int max)
     return count;
 }
 
+/* AmigaOS 3.x Intuition draws its own menus in layers that drop from the
+   screen's bar and holds the screen's layer lock for the whole menu (seen
+   on 3.2.3: busy from press to release); MagicMenu's pop-ups at the
+   pointer leave that lock free (Coffin), and AmigaOS 3.2 has no pop-up
+   menus of its own (IControl has no such option). So the lock held by
+   input.device's task, where Intuition runs its menus, while the right
+   button is down is Intuition's pull-down menu; any other owner (a
+   program moving a window, a menu patch) keeps the pointer rule. The
+   active window's menu strip bounds how deep the menu can drop: out gets
+   that area. Only AttemptSemaphore, and the strip is only read:
+   ClearMenuStrip waits for a menu in use, so it stays put while
+   Intuition holds the menu. */
+static int pulldown_reach(App *app, DockRect *out)
+{
+    struct Window *window;
+    struct Menu *menu;
+    int bottom = 0, menus = 0;
+    if (AttemptSemaphore(&app->screen->LayerInfo.Lock)) {
+        ReleaseSemaphore(&app->screen->LayerInfo.Lock);
+        return 0;
+    }
+    Forbid();
+    if (!app->screen->LayerInfo.Lock.ss_Owner ||
+        app->screen->LayerInfo.Lock.ss_Owner != FindTask((STRPTR)"input.device")) {
+        Permit();
+        return 0;
+    }
+    window = IntuitionBase->ActiveWindow;
+    if (window && window->WScreen == app->screen)
+        for (menu = window->MenuStrip; menu && menus < 64; menu = menu->NextMenu, ++menus) {
+            struct MenuItem *item;
+            int items = 0;
+            for (item = menu->FirstItem; item && items < 256; item = item->NextItem, ++items) {
+                struct MenuItem *sub;
+                int subs = 0, low = item->TopEdge+item->Height;
+                for (sub = item->SubItem; sub && subs < 256; sub = sub->NextItem, ++subs)
+                    if (item->TopEdge+sub->TopEdge+sub->Height > low)
+                        low = item->TopEdge+sub->TopEdge+sub->Height;
+                if (low > bottom) bottom = low;
+            }
+        }
+    Permit();
+    *out = dock_pulldown_reach(app->screen->Width,app->screen->BarHeight,bottom);
+    return 1;
+}
+
 /* PiP2 lies over menus, so the dock steps aside for a native menu that
    reaches it and stays for one that does not (hiding it for every desktop
    right-click was jarring). ApolloOS draws menus in windows: the dock
    watches them for the whole menu and steps aside once one overlaps it;
    its menus drop from the title bar, so a right-click anywhere leaves a
    bottom dock in place (IMG_2662: it hid for every click within 256 px).
-   Elsewhere (MagicMenu draws no windows) the pointer decides, once per
-   menu. The screen is not read while a menu is up: under P96 MagicMenu
-   holds the screen's bitmap lock until it closes. */
+   AmigaOS 3.x Intuition's own menus drop from the bar as far as the
+   active window's menu strip reaches (pulldown_reach), so a bottom dock
+   stays there too. Elsewhere (MagicMenu draws no windows and takes no
+   layer lock) the pointer decides, once per menu. The screen is not read
+   while a menu is up: under P96 MagicMenu holds the screen's bitmap lock
+   until it closes. */
 static int pip_blocked_by_screen(App *app)
 {
     int menu = native_menu_held(app);
@@ -199,8 +248,11 @@ static int pip_blocked_by_screen(App *app)
                 count = menu_windows(app,windows,8);
                 covers = count > 0 && dock_menu_covers(dock,0,0,windows,count);
             }
-        } else if (first)
-            covers = dock_menu_covers(dock,app->screen->MouseX,app->screen->MouseY,NULL,-1);
+        } else if (first) {
+            DockRect drop;
+            covers = pulldown_reach(app,&drop) ? dock_menu_covers(dock,0,0,&drop,1) :
+                dock_menu_covers(dock,app->screen->MouseX,app->screen->MouseY,NULL,-1);
+        }
         if (covers) { app->menu_hides = 1; ++app->stats.menu_suspends; }
     }
     if (!app->resetting && IntuitionBase->FirstScreen == app->screen && !(menu && app->menu_hides)) return 0;
